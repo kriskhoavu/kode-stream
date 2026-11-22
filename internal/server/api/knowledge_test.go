@@ -15,14 +15,6 @@ import (
 	"kode-stream/internal/workspace/registry"
 )
 
-func TestKnowledgeRoutesRequireConfiguredService(t *testing.T) {
-	response := httptest.NewRecorder()
-	(&API{}).Routes().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/knowledge/wikis?workspaceId=ws", nil))
-	if response.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d body=%s", response.Code, response.Body.String())
-	}
-}
-
 func TestKnowledgeErrorMapping(t *testing.T) {
 	tests := []struct {
 		err    error

@@ -109,13 +109,20 @@ func TestDisconnectedSessionExpiresAfterGracePeriod(t *testing.T) {
 		t.Fatal(err)
 	}
 	disconnect()
-	time.Sleep(100 * time.Millisecond)
-	current, err := manager.Get(session.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if current.State != StateCancelled {
-		t.Fatalf("state=%s", current.State)
+	// Poll rather than sleep a fixed time: on a busy machine the expiry may run late.
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		current, err := manager.Get(session.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if current.State == StateCancelled {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("state=%s", current.State)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 

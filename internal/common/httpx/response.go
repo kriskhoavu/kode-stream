@@ -32,11 +32,6 @@ func WriteError(w http.ResponseWriter, status int, message string, hint func(str
 	WriteJSON(w, status, payload)
 }
 
-func WriteAppError(w http.ResponseWriter, err error, hint func(string) string) {
-	status, message, code := MapError(err)
-	WriteCodedError(w, status, message, code, hint)
-}
-
 func WriteCodedError(w http.ResponseWriter, status int, message string, code apperrors.ErrorCode, hint func(string) string) {
 	if strings.TrimSpace(message) == "" {
 		message = http.StatusText(status)

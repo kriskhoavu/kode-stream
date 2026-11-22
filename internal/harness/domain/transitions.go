@@ -65,16 +65,6 @@ var stageTransitions = map[StageState][]StageState{
 	StageFailed:           {StagePending},
 }
 
-var agentTransitions = map[AgentRunState][]AgentRunState{
-	AgentQueued:      {AgentRunning, AgentCancelled},
-	AgentRunning:     {AgentSucceeded, AgentFailed, AgentCancelled, AgentInterrupted},
-	AgentInterrupted: {AgentQueued, AgentFailed, AgentCancelled},
-}
-
-var approvalTransitions = map[ApprovalState][]ApprovalState{
-	ApprovalRequested: {ApprovalApproved, ApprovalRejected, ApprovalExpired, ApprovalSuperseded},
-}
-
 func allowed[S ~string](table map[S][]S, from, to S) bool {
 	for _, next := range table[from] {
 		if next == to {
@@ -103,20 +93,6 @@ func CheckStage(from, to StageState) error {
 		return nil
 	}
 	return IllegalTransitionError{Entity: "stage", From: string(from), To: string(to)}
-}
-
-func CheckAgentRun(from, to AgentRunState) error {
-	if allowed(agentTransitions, from, to) {
-		return nil
-	}
-	return IllegalTransitionError{Entity: "agent run", From: string(from), To: string(to)}
-}
-
-func CheckApproval(from, to ApprovalState) error {
-	if allowed(approvalTransitions, from, to) {
-		return nil
-	}
-	return IllegalTransitionError{Entity: "approval", From: string(from), To: string(to)}
 }
 
 // TaskTerminal reports whether a task state never reopens. A cancelled task

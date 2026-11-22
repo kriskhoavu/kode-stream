@@ -67,7 +67,7 @@ func TestKnowledgeE2ERunbookBoundsRunbookBeforeFingerprinting(t *testing.T) {
 	root := t.TempDir()
 	pagePath := "e2e-testing/example.md"
 	resultPath := "wiki/e2e-testing/automation/results/latest.md"
-	writeKnowledgeTestFile(t, filepath.Join(root, "wiki", pagePath), strings.Repeat("# x\n", e2eresult.MaxRunbookBytes))
+	writeKnowledgeTestFile(t, filepath.Join(root, "wiki", pagePath), strings.Repeat("# x\n", e2eresult.MaxRunbookBytes/4+1))
 	writeKnowledgeTestFile(t, filepath.Join(root, resultPath), `{}`)
 	runbook := (&KnowledgeService{}).e2ERunbook(models.WorkspaceConfig{Path: root}, "wiki", KnowledgePage{Title: "Example", Path: pagePath, Domain: "e2e-testing"})
 	if !strings.Contains(runbook.Diagnostic, "exceeds") {

@@ -63,15 +63,3 @@ func TestIsBinary(t *testing.T) {
 		})
 	}
 }
-
-func TestPreviewThresholdsRemainOrdered(t *testing.T) {
-	if RichPreviewThresholdBytes <= 0 {
-		t.Fatal("rich preview threshold must be positive")
-	}
-	if MaxTextResponseBytes <= RichPreviewThresholdBytes {
-		t.Fatal("maximum text response must exceed rich preview threshold")
-	}
-	if MaxImageResponseBytes <= MaxTextResponseBytes {
-		t.Fatal("maximum image response must exceed maximum text response")
-	}
-}

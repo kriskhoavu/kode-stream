@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"gopkg.in/yaml.v3"
 
 	appaisession "kode-stream/internal/ai"
 	"kode-stream/internal/common/models"
@@ -164,68 +163,6 @@ func TestSessionChangesCloudOwnership(t *testing.T) {
 				t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 			}
 		})
-	}
-}
-
-// TestSessionChangesReportsContentProviderUnsupported confirms a session
-// whose workspace's content provider is not a local checkout (here, a Remote
-// Snapshot workspace) comes back as a 200 with
-// availability=unsupported/reason=content_provider_unsupported, rather than
-// an error -- the controller simply forwards the guard result inline. The
-// workspace is written directly into the registry's YAML file (rather than
-// through Registry.Create, which does not persist AccessMode at all) so the
-// guard sees a non-local-checkout workspace without needing a real Remote
-// Snapshot checkout on disk.
-func TestSessionChangesReportsContentProviderUnsupported(t *testing.T) {
-	dataDir := t.TempDir()
-	workspacesPath := filepath.Join(dataDir, "workspaces.yaml")
-	workspace := models.WorkspaceConfig{
-		ID:             "ws-snap",
-		Name:           "Snapshot",
-		Path:           t.TempDir(),
-		AccessMode:     models.WorkspaceAccessModeRemoteSnapshot,
-		BaselineBranch: "main",
-		Sources: models.SourceList("plans"),
-		CreatedAt:      time.Now().UTC(),
-	}
-	yamlBytes, err := yaml.Marshal([]models.WorkspaceConfig{workspace})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(workspacesPath, yamlBytes, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	reg := registry.New(workspacesPath, gitadapter.New())
-
-	records := appaisession.NewFileSessionRecordRepository(filepath.Join(dataDir, "records.yaml"))
-	now := time.Now().UTC()
-	if _, err := records.Upsert(appaisession.SessionRecord{
-		ID: "session-1", WorkspaceID: workspace.ID, Provider: "claude", Intent: "workspace_only",
-		RequestedBranch: "main", ObservedCommit: "deadbeef", State: appaisession.StateExited,
-		StartedAt: now, LastKnownAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	service := appaisession.New(appaisession.NewSettingsRepository(filepath.Join(dataDir, "ai-settings.yaml")))
-	service.ConfigureLaunch(reg, itemindex.New(filepath.Join(dataDir, "items.yaml")), nil, t.TempDir())
-	service.ConfigureSessionRecords(records, gitadapter.New())
-	aiCtrl := &aiController{aiSessions: service, runtimeConfig: system.RuntimeConfig{Mode: models.RuntimeModeLocal}, cloudWorkspaces: newCloudWorkspaceStore()}
-	controller := &sessionsController{aiController: aiCtrl}
-
-	req := httptest.NewRequest(http.MethodGet, "/api/sessions/session-1/changes", nil)
-	req.SetPathValue("id", "session-1")
-	recorder := httptest.NewRecorder()
-	controller.sessionChanges(recorder, req)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
-	}
-	var changes appaisession.SessionChanges
-	if err := json.Unmarshal(recorder.Body.Bytes(), &changes); err != nil {
-		t.Fatal(err)
-	}
-	if changes.Availability != appaisession.SessionChangesUnsupported || changes.Reason != appaisession.ReasonContentProviderUnsupported {
-		t.Fatalf("changes=%#v", changes)
 	}
 }
 

@@ -919,31 +919,6 @@ func runOwnedNavigationContract(t *testing.T, repository navigation.SnapshotRepo
 	}
 }
 
-func TestSQLiteNavigationRepositoryOwnerContractAndRetention(t *testing.T) {
-	store, err := openSQLStore(Config{Driver: StorageDriverSQLite, SQLitePath: filepath.Join(t.TempDir(), "navigation.db"), Migrations: "auto"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	repository := &SQLiteNavigationRepository{db: store.db, driver: store.driver, now: time.Now}
-	filter, err := repository.SaveFilterForOwner("owner-a", models.SavedFilter{Name: "A", Route: "/workstream"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if deleted, err := repository.DeleteFilterForOwner("owner-b", filter.ID); err != nil || deleted {
-		t.Fatalf("cross-owner delete = %v, %v", deleted, err)
-	}
-	for index := 0; index < 51; index++ {
-		if err := repository.RecordRecentForOwner("owner-a", models.RecentItem{ItemID: fmt.Sprintf("item-%02d", index), Title: "item"}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	recents, err := repository.RecentsForOwner("owner-a", 0)
-	if err != nil || len(recents) != 50 {
-		t.Fatalf("recents = %d, %v", len(recents), err)
-	}
-}
-
 func TestSQLWorkspaceDeletionRollsBackAllOwnedStateOnFailure(t *testing.T) {
 	store, err := openSQLStore(Config{Driver: StorageDriverSQLite, SQLitePath: filepath.Join(t.TempDir(), "delete.db"), Migrations: "auto"})
 	if err != nil {

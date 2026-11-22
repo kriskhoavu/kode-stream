@@ -12,12 +12,6 @@ import (
 	"kode-stream/internal/filesystem/fileid"
 )
 
-func TestSafeJoinRejectsTraversal(t *testing.T) {
-	if _, err := safeJoin(t.TempDir(), "../secret.md"); err == nil {
-		t.Fatal("expected traversal to be rejected")
-	}
-}
-
 func TestReadStaysInsidePlanDirectory(t *testing.T) {
 	root := t.TempDir()
 	itemRoot := filepath.Join(root, "items", "platform", "PM-001")

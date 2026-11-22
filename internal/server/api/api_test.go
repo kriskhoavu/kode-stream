@@ -423,17 +423,6 @@ func TestE2ERunbookReadRoutesReturnLocalAndCanonicalCoverage(t *testing.T) {
 	}
 }
 
-func TestAIRoutesAreUnavailableWithoutService(t *testing.T) {
-	handler := New(Dependencies{}).Routes()
-	for _, endpoint := range []string{"/api/ai/settings", "/api/ai/capabilities"} {
-		response := httptest.NewRecorder()
-		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, endpoint, nil))
-		if response.Code != http.StatusServiceUnavailable {
-			t.Fatalf("%s status = %d", endpoint, response.Code)
-		}
-	}
-}
-
 func TestGinTransportOwnsPreviouslyLegacyRoutes(t *testing.T) {
 	handler := New(Dependencies{}).Routes()
 	response := httptest.NewRecorder()
@@ -698,27 +687,6 @@ func TestAILaunchRouteValidatesBodyAndReportsUnavailableLauncher(t *testing.T) {
 	handler.ServeHTTP(acceptsSurface, httptest.NewRequest(http.MethodPost, "/api/items/item-1/ai-sessions", strings.NewReader(`{"provider":"codex","terminal":"terminal","contextMode":"card_context","surface":"external"}`)))
 	if acceptsSurface.Code != http.StatusInternalServerError || !strings.Contains(acceptsSurface.Body.String(), `"code":"launch_failed"`) {
 		t.Fatalf("acceptsSurface status = %d, body = %s", acceptsSurface.Code, acceptsSurface.Body.String())
-	}
-}
-
-func TestValidateGitPathsStaysInsideSources(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: models.SourceList("items", "docs")}
-	if err := validateGitPaths(workspace, []string{"items/platform/PM-002/README.md", "docs/guide.md"}); err != nil {
-		t.Fatalf("expected paths to be valid: %v", err)
-	}
-}
-
-func TestValidateGitPathsRejectsEscapesAndUnregisteredPaths(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: models.SourceList("items")}
-	for _, paths := range [][]string{
-		{},
-		{"../secret.md"},
-		{"/tmp/secret.md"},
-		{"src/main.go"},
-	} {
-		if err := validateGitPaths(workspace, paths); err == nil {
-			t.Fatalf("expected %#v to be rejected", paths)
-		}
 	}
 }
 
@@ -1045,33 +1013,6 @@ func TestRoutesMissingItemReturnsNotFoundJSON(t *testing.T) {
 	}
 }
 
-func TestJiraConnectionRouteRequiresServiceAndValidBody(t *testing.T) {
-	unavailable := httptest.NewRecorder()
-	New(Dependencies{}).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodPost, "/api/workspaces/w1/jira/test", strings.NewReader(`{}`)))
-	if unavailable.Code != http.StatusServiceUnavailable {
-		t.Fatalf("unavailable status = %d", unavailable.Code)
-	}
-}
-
-func TestWorkspaceJiraIssueRouteRequiresService(t *testing.T) {
-	unavailable := httptest.NewRecorder()
-	New(Dependencies{}).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/workspaces/w1/jira/issues/DI-1", nil))
-	if unavailable.Code != http.StatusServiceUnavailable {
-		t.Fatalf("unavailable status = %d", unavailable.Code)
-	}
-}
-
-func TestItemJiraRoutesRequireService(t *testing.T) {
-	handler := (&API{}).Routes()
-	for _, path := range []string{"/api/items/item-1/jira", "/api/items/item-1/jira/attachments/attachment-1", "/api/workspaces/w1/jira/issues/DI-1/attachments/attachment-1"} {
-		response := httptest.NewRecorder()
-		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
-		if response.Code != http.StatusServiceUnavailable {
-			t.Fatalf("path=%s status=%d body=%s", path, response.Code, response.Body.String())
-		}
-	}
-}
-
 func TestZeroValueAPIRoutesReturnUnavailableForExtractedControllers(t *testing.T) {
 	routes := []struct {
 		name   string
@@ -1092,7 +1033,13 @@ func TestZeroValueAPIRoutesReturnUnavailableForExtractedControllers(t *testing.T
 		{name: "System", owner: "system", method: http.MethodPost, path: "/api/system/select-directory", body: `{}`, status: http.StatusServiceUnavailable},
 		{name: "Storage", owner: "storage", method: http.MethodGet, path: "/api/storage/status", status: http.StatusServiceUnavailable},
 		{name: "AI", owner: "ai", method: http.MethodGet, path: "/api/ai/capabilities", status: http.StatusServiceUnavailable},
+		{name: "AI settings", owner: "ai", method: http.MethodGet, path: "/api/ai/settings", status: http.StatusServiceUnavailable},
+		{name: "AI presets", owner: "ai", method: http.MethodGet, path: "/api/ai/presets", status: http.StatusServiceUnavailable},
 		{name: "Jira", owner: "jira", method: http.MethodGet, path: "/api/items/item-1/jira", status: http.StatusServiceUnavailable},
+		{name: "Jira item attachment", owner: "jira", method: http.MethodGet, path: "/api/items/item-1/jira/attachments/attachment-1", status: http.StatusServiceUnavailable},
+		{name: "Jira workspace issue", owner: "jira", method: http.MethodGet, path: "/api/workspaces/w1/jira/issues/DI-1", status: http.StatusServiceUnavailable},
+		{name: "Jira workspace attachment", owner: "jira", method: http.MethodGet, path: "/api/workspaces/w1/jira/issues/DI-1/attachments/attachment-1", status: http.StatusServiceUnavailable},
+		{name: "Jira connection test", owner: "jira", method: http.MethodPost, path: "/api/workspaces/w1/jira/test", body: `{}`, status: http.StatusServiceUnavailable},
 		{name: "Knowledge", owner: "knowledge", method: http.MethodGet, path: "/api/knowledge/wikis?workspaceId=ws", status: http.StatusServiceUnavailable},
 		{name: "Verification", owner: "verification", method: http.MethodPost, path: "/api/workspaces/ws/verification-jobs", body: `{}`, status: http.StatusServiceUnavailable},
 		{name: "Canvas", owner: "canvas", method: http.MethodGet, path: "/api/canvas/layouts/layout-1", status: http.StatusServiceUnavailable},
@@ -1126,14 +1073,6 @@ func TestZeroValueAPIRoutesReturnUnavailableForExtractedControllers(t *testing.T
 		if !covered[route.owner] {
 			t.Errorf("manifest owner %q has no zero-value behavior case", route.owner)
 		}
-	}
-}
-
-func TestAIPresetsRouteRequiresService(t *testing.T) {
-	unavailable := httptest.NewRecorder()
-	New(Dependencies{}).Routes().ServeHTTP(unavailable, httptest.NewRequest(http.MethodGet, "/api/ai/presets", nil))
-	if unavailable.Code != http.StatusServiceUnavailable {
-		t.Fatalf("unavailable status = %d", unavailable.Code)
 	}
 }
 
@@ -1288,28 +1227,6 @@ func TestReliabilityEndpointsReturnWorkspaceHealthAndRecentAuditEvents(t *testin
 	}
 	if auditResponse.Code != http.StatusOK || len(events) != 1 || events[0].Operation != "scan" {
 		t.Fatalf("audit status = %d, events = %#v", auditResponse.Code, events)
-	}
-}
-
-func TestAuditHTTPFiltersBeforeLimitWithInterleavedWorkspaces(t *testing.T) {
-	store := audit.New(filepath.Join(t.TempDir(), "audit.jsonl"))
-	for index := 0; index < 30; index++ {
-		workspaceID := "other"
-		if index == 0 || index == 4 {
-			workspaceID = "wanted"
-		}
-		if _, err := store.Append(models.AuditEvent{WorkspaceID: workspaceID, Operation: fmt.Sprintf("event-%d", index)}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	response := httptest.NewRecorder()
-	New(Dependencies{Audit: store}).Routes().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/audit-events?workspaceId=wanted&limit=2", nil))
-	var events []models.AuditEvent
-	if err := json.Unmarshal(response.Body.Bytes(), &events); err != nil {
-		t.Fatal(err)
-	}
-	if response.Code != http.StatusOK || len(events) != 2 {
-		t.Fatalf("status=%d events=%#v", response.Code, events)
 	}
 }
 

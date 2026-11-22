@@ -50,14 +50,6 @@ func serveHarness(handler http.Handler, method, path, body string) *httptest.Res
 	return recorder
 }
 
-func TestHarnessRoutesWithoutServiceAnswerUnavailable(t *testing.T) {
-	handler := (&API{}).Routes()
-	response := serveHarness(handler, http.MethodGet, "/api/harness/status", "")
-	if response.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
-	}
-}
-
 func TestHarnessUnsupportedStorageReadsEmptyAndRefusesWrites(t *testing.T) {
 	handler := New(Dependencies{Harness: harness.New(harness.Dependencies{Config: harness.Config{LocalMode: true}})}).Routes()
 	status := serveHarness(handler, http.MethodGet, "/api/harness/status", "")

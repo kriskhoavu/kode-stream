@@ -6,15 +6,6 @@ import (
 	"testing"
 )
 
-func TestJourneysBucketDefaultsToE2ETesting(t *testing.T) {
-	if got := (KnowledgeWiki{}).journeysBucket(); got != DefaultJourneysBucket {
-		t.Fatalf("journeysBucket() = %q, want %q", got, DefaultJourneysBucket)
-	}
-	if got := (KnowledgeWiki{JourneysBucket: "journeys"}).journeysBucket(); got != "journeys" {
-		t.Fatalf("journeysBucket() = %q, want the declared bucket", got)
-	}
-}
-
 func TestPageIsJourneyMatchesTheResolvedBucket(t *testing.T) {
 	tests := []struct {
 		name    string

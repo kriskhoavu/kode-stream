@@ -37,19 +37,6 @@ func TestWriteErrorUsesStatusTextAndRecoveryHint(t *testing.T) {
 	}
 }
 
-func TestWriteAppErrorAddsCompatibleOptionalCode(t *testing.T) {
-	recorder := httptest.NewRecorder()
-
-	WriteAppError(recorder, apperrors.Validation("name is required", nil), nil)
-
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d", recorder.Code)
-	}
-	if got := strings.TrimSpace(recorder.Body.String()); got != `{"code":"validation","error":"name is required"}` {
-		t.Fatalf("body = %s", got)
-	}
-}
-
 func TestMapErrorCoversSharedNotFoundErrors(t *testing.T) {
 	status, message, code := MapError(apperrors.ErrItemNotFound)
 

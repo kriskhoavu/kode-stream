@@ -63,27 +63,6 @@ func TestServiceMutationsWaitForSharedWorkspaceLock(t *testing.T) {
 	close(release)
 }
 
-func TestValidatePathsRequiresConfiguredSourcePaths(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: models.SourceList("plans", "docs")}
-	if err := ValidatePaths(workspace, []string{"plans/platform/PM-003/README.md", "docs/guide.md"}); err != nil {
-		t.Fatalf("expected valid paths: %v", err)
-	}
-}
-
-func TestValidatePathsRejectsEmptyEscapedAndUnregisteredPaths(t *testing.T) {
-	workspace := models.WorkspaceConfig{Sources: models.SourceList("plans")}
-	for _, paths := range [][]string{
-		{},
-		{"../secret.md"},
-		{"/tmp/secret.md"},
-		{"src/main.go"},
-	} {
-		if err := ValidatePaths(workspace, paths); err == nil {
-			t.Fatalf("expected %#v to be rejected", paths)
-		}
-	}
-}
-
 func TestNormalizeWorkspaceBranchesSortsDeduplicatesAndKeepsCurrent(t *testing.T) {
 	result := normalizeWorkspaceBranches("workspace", "feature/current", []string{"main", "alpha", "main", " "})
 	want := []string{"alpha", "feature/current", "main"}

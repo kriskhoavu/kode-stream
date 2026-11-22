@@ -29,7 +29,7 @@ func TestE2ERunbooksBoundLatestResultBeforeParsing(t *testing.T) {
 func TestE2ERunbooksBoundRunbookBeforeFingerprinting(t *testing.T) {
 	service, workspace, item := e2eRunbookTestService(t)
 	automation := filepath.Join(workspace.Path, item.ItemPath, "automation")
-	writeTestFile(t, filepath.Join(automation, "scenario-01-large.md"), strings.Repeat("# x\n", e2eresult.MaxRunbookBytes))
+	writeTestFile(t, filepath.Join(automation, "scenario-01-large.md"), strings.Repeat("# x\n", e2eresult.MaxRunbookBytes/4+1))
 	writeTestFile(t, filepath.Join(automation, "results", "latest.md"), `{}`)
 	result, _, err := service.E2ERunbooks(item.ID)
 	if err != nil || len(result.Runbooks) != 1 || !strings.Contains(result.Runbooks[0].Diagnostic, "exceeds") {

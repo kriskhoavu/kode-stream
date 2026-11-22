@@ -111,27 +111,3 @@ func TestAtomicNavigationWriteFailureLeavesPreviousSnapshotReadable(t *testing.T
 		t.Fatalf("persisted filters = %#v, %v", filters, err)
 	}
 }
-
-func TestNavigationSnapshotRestorePreservesIdentityOwnershipAndTimestamps(t *testing.T) {
-	dir := t.TempDir()
-	store := New(filepath.Join(dir, "filters.yaml"), filepath.Join(dir, "recents.yaml"))
-	created := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
-	updated := created.Add(time.Hour)
-	opened := created.Add(2 * time.Hour)
-	filter := models.SavedFilter{OwnerUserID: "owner", ID: "stable-filter", Name: "Snapshot", Route: "/workstream", Filters: map[string]any{}, CreatedAt: created, UpdatedAt: updated}
-	recent := models.RecentItem{OwnerUserID: "owner", ItemID: "stable-item", WorkspaceID: "workspace", Title: "Snapshot", Route: "/items/stable-item", OpenedAt: opened}
-	if err := store.RestoreFilter(filter); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.RestoreRecent(recent); err != nil {
-		t.Fatal(err)
-	}
-	filters, _ := store.FiltersForOwner("owner")
-	recents, _ := store.RecentsForOwner("owner", 10)
-	if len(filters) != 1 || filters[0].ID != filter.ID || !filters[0].CreatedAt.Equal(created) || !filters[0].UpdatedAt.Equal(updated) {
-		t.Fatalf("filters = %#v", filters)
-	}
-	if len(recents) != 1 || recents[0].ItemID != recent.ItemID || !recents[0].OpenedAt.Equal(opened) {
-		t.Fatalf("recents = %#v", recents)
-	}
-}

@@ -33,14 +33,8 @@ func TestTaskStateMachineRefusesReopeningTerminalStates(t *testing.T) {
 		}
 	}
 	var illegal IllegalTransitionError
-	if err := CheckAgentRun(AgentSucceeded, AgentQueued); !errors.As(err, &illegal) {
-		t.Fatalf("succeeded agent run requeued: %v", err)
-	}
-	if err := CheckAgentRun(AgentInterrupted, AgentQueued); err != nil {
-		t.Fatal(err)
-	}
-	if err := CheckApproval(ApprovalApproved, ApprovalRejected); err == nil {
-		t.Fatal("a decided approval changed its decision")
+	if err := CheckTask(TaskDone, TaskRanked); !errors.As(err, &illegal) {
+		t.Fatalf("a refused transition is not an IllegalTransitionError: %v", err)
 	}
 }
 
