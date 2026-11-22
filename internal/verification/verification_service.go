@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -264,42 +265,20 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	}
 	defer verifyLog.Close()
 
-	if err := s.runStep(jobID, "prepare", runtimeLog, func() error {
-		return s.runtime.Prepare(ctx, workspace.Path, config, runtimeLog)
-	}); err != nil {
-		s.failJob(jobID, FailureTypeInfra, 30, "prepare failed", err)
-		s.collectArtifacts(jobID, artifactRoot)
-		return
-	}
-	if err := s.runStep(jobID, "up", runtimeLog, func() error {
-		return s.runtime.Up(ctx, workspace.Path, config, runtimeLog)
-	}); err != nil {
-		_ = s.cleanupRuntime(workspace.Path, config, runtimeLog)
-		s.failJob(jobID, FailureTypeBoot, 10, "startup failed", err)
-		s.collectArtifacts(jobID, artifactRoot)
-		return
-	}
-	if err := s.runStep(jobID, "health", runtimeLog, func() error {
-		return s.runtime.Health(ctx, workspace.Path, config, runtimeLog)
-	}); err != nil {
-		_ = s.cleanupRuntime(workspace.Path, config, runtimeLog)
-		s.failJob(jobID, FailureTypeBoot, 10, "health checks failed", err)
-		s.collectArtifacts(jobID, artifactRoot)
-		return
-	}
-	if err := s.runStep(jobID, verifyStepName(job.Mode), verifyLog, func() error {
-		if job.Mode == JobModeAutomation {
-			return s.runtime.RunCommand(ctx, job.AutomationRepoPath, job.RenderedCommand, verifyLog)
+	for _, step := range s.jobSteps(ctx, job, workspace.Path, runtimeLog, verifyLog) {
+		if err := s.runStep(jobID, step.name, step.run); err != nil {
+			if step.cleanup {
+				_ = s.cleanupRuntime(workspace.Path, config, runtimeLog)
+			}
+			s.failJob(jobID, step.failure, step.exitCode, step.message, err)
+			s.collectArtifacts(jobID, artifactRoot)
+			if step.automationArtifacts {
+				s.collectAutomationArtifacts(jobID)
+			}
+			return
 		}
-		return s.runtime.Verify(ctx, workspace.Path, config, job.Profile, verifyLog)
-	}); err != nil {
-		_ = s.cleanupRuntime(workspace.Path, config, runtimeLog)
-		s.failJob(jobID, FailureTypeTest, 20, "verification failed", err)
-		s.collectArtifacts(jobID, artifactRoot)
-		s.collectAutomationArtifacts(jobID)
-		return
 	}
-	_ = s.runStep(jobID, "down", runtimeLog, func() error {
+	_ = s.runStep(jobID, "down", func() error {
 		return s.cleanupRuntime(workspace.Path, config, runtimeLog)
 	})
 
@@ -307,6 +286,39 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	s.collectAutomationArtifacts(jobID)
 	finalStatus = JobStatusPassed
 	s.mutate(jobID, func(state *Job) { state.ExitCode = 0 })
+}
+
+// jobStep is one stage of a verification job and what its failure means.
+type jobStep struct {
+	name                string
+	run                 func() error
+	failure             FailureType
+	exitCode            int
+	message             string
+	cleanup             bool
+	automationArtifacts bool
+}
+
+// jobSteps lists a job's stages in order: prepare, start, health checks and
+// the verification itself. Every stage after prepare stops the runtime when
+// it fails.
+func (s *Service) jobSteps(ctx context.Context, job Job, path string, runtimeLog, verifyLog io.Writer) []jobStep {
+	config := job.Runtime
+	return []jobStep{
+		{name: "prepare", failure: FailureTypeInfra, exitCode: 30, message: "prepare failed",
+			run: func() error { return s.runtime.Prepare(ctx, path, config, runtimeLog) }},
+		{name: "up", failure: FailureTypeBoot, exitCode: 10, message: "startup failed", cleanup: true,
+			run: func() error { return s.runtime.Up(ctx, path, config, runtimeLog) }},
+		{name: "health", failure: FailureTypeBoot, exitCode: 10, message: "health checks failed", cleanup: true,
+			run: func() error { return s.runtime.Health(ctx, path, config, runtimeLog) }},
+		{name: verifyStepName(job.Mode), failure: FailureTypeTest, exitCode: 20, message: "verification failed", cleanup: true, automationArtifacts: true,
+			run: func() error {
+				if job.Mode == JobModeAutomation {
+					return s.runtime.RunCommand(ctx, job.AutomationRepoPath, job.RenderedCommand, verifyLog)
+				}
+				return s.runtime.Verify(ctx, path, config, job.Profile, verifyLog)
+			}},
+	}
 }
 
 func (s *Service) cleanupRuntime(workspacePath string, config *models.WorkspaceRuntimeConfig, out *os.File) error {
@@ -343,7 +355,7 @@ func verifyStepName(mode JobMode) string {
 	return "verify"
 }
 
-func (s *Service) runStep(jobID, name string, _ *os.File, run func() error) error {
+func (s *Service) runStep(jobID, name string, run func() error) error {
 	start := time.Now()
 	err := run()
 	step := StepResult{Step: name, At: time.Now().UTC(), DurationMS: time.Since(start).Milliseconds()}
