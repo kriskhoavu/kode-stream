@@ -1,5 +1,6 @@
 import { lastPathSegment, parentDirectoryPath } from '../shared/domain/paths';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useHorizontalDrag } from '../components/useHorizontalDrag';
 import type { CSSProperties, ReactNode } from 'react';
 import { CaseSensitive, Clipboard, Code2, Eye, GitCompare, FilePlus2, FolderPlus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, Search, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -60,7 +61,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const treeRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
-  const resizeCleanupRef = useRef<(() => void) | null>(null);
+  const startDrag = useHorizontalDrag();
   const openTabsRef = useRef<OpenWorkspaceFileTab[]>([]);
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
   const rightPanelOpen = rightPanel ? !rightPanel.collapsed : inspectorOpen;
@@ -347,32 +348,18 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   };
 
   const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    resizeCleanupRef.current?.();
-    const start = event.clientX;
     const initial = side === 'left' ? leftWidth : rightWidth;
     let latest = initial;
-    const move = (next: PointerEvent) => {
-      const width = side === 'left'
-        ? boundedLeftPanelWidth(initial + next.clientX - start)
-        : boundedRightPanelWidth(initial + start - next.clientX);
-      latest = width;
-      gridRef.current?.style.setProperty(side === 'left' ? '--explorer-left-width' : '--explorer-right-width', `${width}px`);
-      if (side === 'left') setLeftWidth(width); else setRightWidth(width);
-    };
-    const cleanup = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-      writePreference(side === 'left' ? 'workstreamExplorer.leftWidth' : 'workstreamExplorer.rightWidth', String(latest));
-      if (resizeCleanupRef.current === cleanup) resizeCleanupRef.current = null;
-    };
-    function up() { cleanup(); }
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up, { once: true });
-    resizeCleanupRef.current = cleanup;
+    startDrag(event, {
+      move: (deltaX) => {
+        latest = side === 'left' ? boundedLeftPanelWidth(initial + deltaX) : boundedRightPanelWidth(initial - deltaX);
+        gridRef.current?.style.setProperty(side === 'left' ? '--explorer-left-width' : '--explorer-right-width', `${latest}px`);
+        if (side === 'left') setLeftWidth(latest); else setRightWidth(latest);
+      },
+      end: () => writePreference(side === 'left' ? 'workstreamExplorer.leftWidth' : 'workstreamExplorer.rightWidth', String(latest)),
+    });
   };
 
-  useEffect(() => () => resizeCleanupRef.current?.(), []);
 
   const gridStyle = {
     '--explorer-left-width': `${leftCollapsed ? 44 : leftWidth}px`,
