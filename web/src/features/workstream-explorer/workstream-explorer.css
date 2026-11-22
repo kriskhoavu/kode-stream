@@ -178,31 +178,9 @@
   width: 100%;
 }
 
-.explorer-panel-context {
-  min-width: 0;
-  display: flex;
-  justify-content: stretch;
-  overflow: hidden;
-}
-
-.explorer-panel-context .workspace-branch-control {
-  width: 100%;
-  flex: 1 1 auto;
-}
-
-.explorer-panel-context .workspace-branch-control select {
-  max-width: none;
-}
-
 @container (max-width: 560px) {
   .explorer-panel-header.embedded {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .explorer-panel-context {
-    grid-column: 1 / -1;
-    width: 100%;
-    justify-content: stretch;
   }
 
   .explorer-panel-actions.compact {
@@ -219,16 +197,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .explorer-panel-context,
+  
   .explorer-panel-actions.compact {
     grid-column: 1 / -1;
     width: 100%;
   }
 
-  .explorer-panel-context .workspace-branch-control,
-  .explorer-panel-context .workspace-branch-control select {
-    width: 100%;
-  }
 }
 
 .explorer-panel-header select {
@@ -251,69 +225,6 @@
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
-}
-
-.explorer-search-results {
-  max-height: 280px;
-  overflow: auto;
-  display: grid;
-  align-content: start;
-  gap: 3px;
-  padding: 6px;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--panel-soft) 64%, var(--panel));
-  outline: none;
-}
-
-.explorer-search-results:focus-visible {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--blue) 58%, transparent);
-}
-
-.explorer-search-results > button {
-  width: 100%;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  padding: 5px 8px;
-  text-align: left;
-}
-
-.explorer-search-results > button:hover,
-.explorer-search-results > button.active {
-  background: color-mix(in srgb, var(--blue) 11%, var(--panel));
-}
-
-.explorer-search-results > button > span {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-}
-
-.explorer-search-results strong,
-.explorer-search-results small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.explorer-search-results small,
-.explorer-search-results i,
-.explorer-search-message {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.explorer-search-results i {
-  font-style: normal;
-}
-
-.explorer-search-message {
-  padding: 10px;
 }
 
 .explorer-tree {
@@ -583,7 +494,6 @@
   min-height: 44px;
   padding-top: 4px;
 }
-
 
 @media (max-width: 1180px) {
   .explorer-grid {

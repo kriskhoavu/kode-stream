@@ -1,39 +1,3 @@
-/* ── Connection and cost ────────────────────────────────────────────────── */
-
-.hx-connection {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	color: var(--muted);
-	font-size: 13px;
-	white-space: nowrap;
-}
-
-.hx-connection-dot {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
-	background: var(--hx-idle);
-}
-
-.hx-connection.live .hx-connection-dot {
-	background: var(--hx-done);
-	box-shadow: 0 0 0 3px color-mix(in srgb, var(--hx-done) 25%, transparent);
-}
-
-.hx-connection.reconnecting .hx-connection-dot {
-	background: var(--hx-waiting);
-	animation: hx-blink 1.2s ease-in-out infinite;
-}
-
-.hx-connection.polling .hx-connection-dot {
-	background: var(--hx-waiting);
-}
-
-.hx-connection.offline .hx-connection-dot {
-	background: var(--hx-stopped);
-}
-
 .hx-cost {
 	position: relative;
 	display: inline-flex;

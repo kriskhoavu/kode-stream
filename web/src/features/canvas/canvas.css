@@ -194,16 +194,4 @@ body.is-resizing-panel .canvas-workbench-resize-handle { opacity: 1; }
 @media (max-width: 900px) { .canvas-workbench.open { position: absolute; z-index: 8; inset: 0 0 0 auto; width: min(var(--canvas-workbench-width, 410px), 94vw); max-width: 94vw; box-shadow: -16px 0 36px rgb(0 0 0 / .18); } }
 @media (prefers-reduced-motion: reduce) { .canvas-semantic-node, .canvas-workbench { transition: none; } }
 
-/* Compact session tables remain available to Workbench session surfaces. */
-.sessions-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-.sessions-table th, .sessions-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); vertical-align: middle; }
-.sessions-table th { color: var(--muted); font-weight: 600; }
-.sessions-table-state { display: inline-flex; border-radius: 999px; padding: 2px 8px; background: var(--panel-soft); text-transform: capitalize; }
-.sessions-table-state.state-running, .sessions-table-state.state-starting { color: var(--green); }
-.sessions-table-state.state-failed { color: var(--danger); }
-.sessions-table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.sessions-table-actions button { display: inline-flex; align-items: center; gap: 5px; }
-.sessions-table-empty { margin: 0; padding: 16px; color: var(--muted); font-size: 12px; }
-
 .canvas-session-summary .canvas-session-state { text-transform: capitalize; }
-

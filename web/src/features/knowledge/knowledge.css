@@ -113,7 +113,6 @@ body.is-resizing-panel .knowledge-browser {
   transition: none;
 }
 
-
 .knowledge-browser-list {
   min-height: 0;
   overflow: auto;
@@ -425,7 +424,6 @@ body.is-resizing-panel .knowledge-browser {
   height: auto;
 }
 
-.link-button,
 .knowledge-relationship-list button {
   padding: 0;
   border: 0;
@@ -639,16 +637,6 @@ body.is-resizing-panel .knowledge-browser {
   background: color-mix(in srgb, var(--blue) 12%, var(--panel));
   color: color-mix(in srgb, var(--blue) 85%, var(--text));
 }
-
-
-
-
-
-
-
-
-
-
 
 .react-flow__edge-path,
 .react-flow__connection-path {

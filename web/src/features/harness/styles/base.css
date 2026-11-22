@@ -33,65 +33,6 @@
 	color: var(--text);
 }
 
-.hx-page {
-	display: flex;
-	flex-direction: column;
-	gap: 24px;
-	min-width: 0;
-}
-
-.hx-title {
-	justify-content: flex-start;
-	flex-wrap: wrap;
-	gap: 18px;
-	margin-bottom: 0;
-}
-
-.hx-title h1 {
-	margin: 0;
-	font-size: 22px;
-	font-weight: 700;
-}
-
-/* The section switch wears Agent Space's view switcher; four sections instead of two. */
-.hx-sections.segmented-control {
-	grid-template-columns: repeat(4, auto);
-}
-
-.hx-sections.segmented-control button {
-	min-height: 36px;
-}
-
-.hx-sections .hx-seg-count {
-	min-width: 18px;
-	height: 18px;
-	margin-left: 2px;
-	padding: 0 5px;
-	border-radius: 9px;
-	background: var(--hx-waiting);
-	color: #111;
-	font-size: 11px;
-	font-weight: 700;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.hx-title h1:focus-visible {
-	outline: 2px solid var(--accent-text);
-	outline-offset: 4px;
-	border-radius: 4px;
-}
-
-.hx-title h1:focus:not(:focus-visible) {
-	outline: none;
-}
-
-.hx-title-status {
-	margin-left: auto;
-	font-size: 13px;
-}
-
 .hx-seg {
 	display: inline-flex;
 	gap: 2px;
@@ -126,29 +67,6 @@
 .hx-seg-small button {
 	padding: 4px 10px;
 	font-size: 12px;
-}
-
-.hx-seg .hx-seg-count {
-	min-width: 18px;
-	height: 18px;
-	padding: 0 5px;
-	border-radius: 9px;
-	background: var(--hx-waiting);
-	color: #111;
-	font-size: 11px;
-	font-weight: 700;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-}
-
-.hx-demo-chip {
-	border-style: dashed;
-}
-
-/* The shell mutes every span in a title row; the chip keeps its own colour. */
-.hx-title .hx-chip {
-	color: var(--text);
 }
 
 .hx-muted {

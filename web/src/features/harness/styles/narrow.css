@@ -14,15 +14,4 @@
 		flex-direction: row;
 		flex-wrap: wrap;
 	}
-	.hx-inbox-pair {
-		grid-template-columns: 1fr;
-	}
-	.hx-team {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-	.hx-title-status {
-		margin-left: 0;
-		width: 100%;
-	}
 }
-

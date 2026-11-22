@@ -1,18 +1,3 @@
-/* ── Inbox ──────────────────────────────────────────────────────────────── */
-
-.hx-inbox {
-	display: flex;
-	flex-direction: column;
-	gap: 28px;
-	max-width: 1040px;
-}
-
-.hx-section {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-}
-
 .hx-section-title {
 	margin: 0;
 	display: flex;
@@ -34,11 +19,6 @@
 	align-items: center;
 	gap: 12px;
 	color: var(--muted);
-}
-
-.hx-empty-line {
-	margin: 0;
-	font-size: 13px;
 }
 
 .hx-row {
@@ -82,12 +62,6 @@
 	font-size: 13px;
 }
 
-.hx-inbox-pair {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 18px;
-}
-
 .hx-panel {
 	padding: 18px 20px;
 	display: flex;
@@ -97,60 +71,4 @@
 
 .hx-panel p {
 	margin: 0;
-}
-
-.hx-spend-total {
-	display: flex;
-	align-items: baseline;
-	gap: 8px;
-}
-
-.hx-spend-total b {
-	font-size: 26px;
-}
-
-.hx-spend-roles {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 4px 14px;
-	font-size: 13px;
-}
-
-.hx-decisions {
-	margin: 0;
-	padding: 0;
-	list-style: none;
-	display: grid;
-	gap: 6px;
-	font-size: 13px;
-}
-
-.hx-team {
-	display: grid;
-	grid-template-columns: repeat(6, minmax(0, 1fr));
-	gap: 10px;
-}
-
-.hx-tile {
-	display: grid;
-	gap: 4px;
-	align-content: start;
-	justify-items: start;
-	padding: 12px 14px;
-	border: 1px solid var(--line);
-	border-radius: 10px;
-	background: var(--panel);
-}
-
-.hx-tile b {
-	font-size: 13px;
-}
-
-.hx-tile span {
-	color: var(--muted);
-	font-size: 12px;
-}
-
-.hx-tile.paused {
-	border-color: color-mix(in srgb, var(--hx-waiting) 50%, var(--line));
 }
