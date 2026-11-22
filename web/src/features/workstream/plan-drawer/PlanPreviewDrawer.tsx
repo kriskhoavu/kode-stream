@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ItemMetadataFields, isMetadataDirty, metadataDraftFrom } from '../../item-metadata/itemMetadata';
 import { Bot, PanelRightClose, PanelRightOpen, Code2, FileText, GitBranch, GripVertical, Info, RefreshCw, Ticket, X } from 'lucide-react';
 import { FileMenu } from '../../../components/FileMenu';
 import { useResizableDrawer } from '../../../components/useResizableDrawer';
@@ -7,7 +8,6 @@ import { autoSaveLabel, useFileEditorSession } from '../../file-editor/useFileEd
 import { preferredFile } from '../../../shared/domain/fileTree';
 import { ItemGitPanel } from '../../item-git/ItemGitPanel';
 import { useItemGit } from '../../item-git/useItemGit';
-import { StatusMenu } from '../../../components/StatusMenu';
 import { ContentViewer } from '../../content-viewer/ContentViewer';
 import { JiraItemPanel } from '../../jira/JiraItemPanel';
 import { api, statusLabels } from '../../../shared/api';
@@ -70,14 +70,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     onProblem: (problem) => setError('result' in problem ? problem.result.message ?? '' : operationErrorMessage(problem.caught, problem.fallback))
   });
   const fileOptions = useMemo(() => flattenFileOptions(files), [files]);
-  const dirtyMetadata = Boolean(plan) && (
-    (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
-    (metadataDraft.scope ?? '') !== (plan?.scope ?? '') ||
-    (metadataDraft.identifier ?? '') !== (plan?.identifier ?? '') ||
-    (metadataDraft.status ?? '') !== (plan?.status ?? '') ||
-    (metadataDraft.owner ?? '') !== (plan?.owner ?? '') ||
-    (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
-  );
+  const dirtyMetadata = isMetadataDirty(metadataDraft, plan);
 
   const editor = useFileEditorSession({
     save: (targetFile, content) => api.saveFile(itemId, targetFile.id, { content, expectedHash: targetFile.hash }),
@@ -202,14 +195,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
 
   useEffect(() => {
     if (!plan) return;
-    setMetadataDraft({
-      title: plan.title,
-      scope: plan.scope,
-      identifier: plan.identifier,
-      status: plan.status,
-      owner: plan.owner ?? '',
-      tags: plan.tags
-    });
+    setMetadataDraft(metadataDraftFrom(plan));
   }, [plan]);
 
   const loadDrawerFile = async (fileId: string) => {
@@ -376,13 +362,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
                     <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
                   </dl>
                   {!isDocumentationMetadataSource(plan?.metadataSource) && (
-                    <div className="metadata-form drawer-metadata-form">
-                      <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
-                      <label>{labels.identifier}<input value={metadataDraft.identifier ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, identifier: event.target.value }))} /></label>
-                      <label>Status<StatusMenu value={metadataDraft.status ?? 'draft'} onChange={(status) => setMetadataDraft((draft) => ({ ...draft, status }))} /></label>
-                      <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
-                      <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
-                    </div>
+                    <ItemMetadataFields draft={metadataDraft} onChange={setMetadataDraft} showScope={false} className="metadata-form drawer-metadata-form" />
                   )}
                   <div className="workspace-actions">
                     <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || isDocumentationMetadataSource(plan?.metadataSource)} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>

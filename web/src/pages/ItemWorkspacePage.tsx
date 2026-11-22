@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ItemMetadataFields, isMetadataDirty, metadataDraftFrom } from '../features/item-metadata/itemMetadata';
 import { useHorizontalDrag } from '../components/useHorizontalDrag';
 import { useFileTabs } from '../features/file-editor/useFileTabs';
 import { createItemPath, relativePathParts, renamedPath, renameItemPath } from '../features/item-workspace/itemPathActions';
@@ -11,10 +12,9 @@ import { ItemQualityPanel } from '../features/item-workspace/ItemQualityPanel';
 import { useItemQuality } from '../features/item-workspace/useItemQuality';
 import { ItemGitPanel } from '../features/item-git/ItemGitPanel';
 import { useItemGit } from '../features/item-git/useItemGit';
-import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api } from '../shared/api';
-import type { FileContent, FileNode, GitChange, ItemDetail, ItemMetadataUpdateInput, ItemStatus, WorkspaceConfig } from '../lib/types';
+import type { FileContent, FileNode, GitChange, ItemDetail, ItemMetadataUpdateInput, WorkspaceConfig } from '../lib/types';
 import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -221,14 +221,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
 
   useEffect(() => {
     if (!plan) return;
-    setMetadataDraft({
-      title: plan.title,
-      scope: plan.scope,
-      identifier: plan.identifier,
-      status: plan.status,
-      owner: plan.owner ?? '',
-      tags: plan.tags
-    });
+    setMetadataDraft(metadataDraftFrom(plan));
     void git.loadStatus();
   }, [plan]);
 
@@ -329,14 +322,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
 
 	useEffect(() => { setMatchContext(null); setContentSearchIndex(0); }, [contentSearch.query]);
 
-  const dirtyMetadata = Boolean(plan) && (
-    (metadataDraft.title ?? '') !== (plan?.title ?? '') ||
-    (metadataDraft.scope ?? '') !== (plan?.scope ?? '') ||
-    (metadataDraft.identifier ?? '') !== (plan?.identifier ?? '') ||
-    (metadataDraft.status ?? '') !== (plan?.status ?? '') ||
-    (metadataDraft.owner ?? '') !== (plan?.owner ?? '') ||
-    (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
-  );
+  const dirtyMetadata = isMetadataDirty(metadataDraft, plan);
   dirtyMetadataRef.current = dirtyMetadata;
   const dirty = dirtyMetadata;
   const diffFiles = useMemo(() => parseGitDiff(diff), [diff]);
@@ -555,14 +541,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
             <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
           </dl>
           {!isDocumentationMetadataSource(plan?.metadataSource) && (
-            <div className="metadata-form">
-              <label>Title<input value={metadataDraft.title ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, title: event.target.value }))} /></label>
-              <label>{labels.scope}<input value={metadataDraft.scope ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, scope: event.target.value }))} /></label>
-              <label>{labels.identifier}<input value={metadataDraft.identifier ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, identifier: event.target.value }))} /></label>
-              <label>Status<StatusMenu value={(metadataDraft.status ?? 'draft') as ItemStatus} onChange={(status) => setMetadataDraft((draft) => ({ ...draft, status }))} /></label>
-              <label>Owner<input value={metadataDraft.owner ?? ''} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, owner: event.target.value }))} /></label>
-              <label>Tags<input value={(metadataDraft.tags ?? []).join(', ')} onChange={(event) => setMetadataDraft((draft) => ({ ...draft, tags: event.target.value.split(',').map((tag) => tag.trim()).filter(Boolean) }))} /></label>
-            </div>
+            <ItemMetadataFields draft={metadataDraft} onChange={setMetadataDraft} className="metadata-form" />
           )}
           <div className="workspace-actions">
             <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || isDocumentationMetadataSource(plan?.metadataSource)} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
