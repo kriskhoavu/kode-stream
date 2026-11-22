@@ -269,8 +269,8 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 							{policyRows.map((row) => (
 								<tr key={row.role}>
 									<th scope="row"><b>{row.name}</b><br /><small className="hx-muted">{row.does}</small></th>
-									<td><input aria-label={`Skill for “${row.does}”`} placeholder="Built-in instructions" value={own.procedure[row.role]?.skill ?? ''} onChange={(event) => updateSkill(row.role, { skill: event.target.value.trim() })} /></td>
-									<td><input aria-label={`Track for “${row.does}”`} placeholder="Whole skill" value={own.procedure[row.role]?.track ?? ''} onChange={(event) => updateSkill(row.role, { track: event.target.value })} /></td>
+									<td><input className="hx-select hx-skill-input" aria-label={`Skill for “${row.does}”`} placeholder="Built-in instructions" value={own.procedure[row.role]?.skill ?? ''} onChange={(event) => updateSkill(row.role, { skill: event.target.value.trim() })} /></td>
+									<td><input className="hx-select hx-skill-input" aria-label={`Track for “${row.does}”`} placeholder="Whole skill" value={own.procedure[row.role]?.track ?? ''} onChange={(event) => updateSkill(row.role, { track: event.target.value })} /></td>
 								</tr>
 							))}
 						</tbody>

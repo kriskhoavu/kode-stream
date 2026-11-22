@@ -665,7 +665,8 @@ a.hx-source:hover {
 	vertical-align: middle;
 }
 
-.hx-table tr:last-child td {
+.hx-table tr:last-child td,
+.hx-table tbody tr:last-child th {
 	border-bottom: 0;
 }
 
@@ -2747,4 +2748,16 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 .workspace-settings-modal .workspace-own-settings,
 .workspace-settings-modal .hx-settings {
 	max-width: none;
+}
+
+/* A role's skill and track: the same field as the rest of the harness settings, filling most of its column. */
+.hx-skill-input {
+	width: min(260px, 100%);
+}
+
+/* A picked value (a tool, a model) sits in the middle of its field. */
+.hx-settings select.hx-select,
+.hx-model-input input {
+	text-align: center;
+	text-align-last: center;
 }
