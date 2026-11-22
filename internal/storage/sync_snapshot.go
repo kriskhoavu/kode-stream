@@ -1,0 +1,448 @@
+package storage
+
+import (
+	"bufio"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"gopkg.in/yaml.v3"
+
+	"kode-stream/internal/ai"
+	"kode-stream/internal/audit"
+	"kode-stream/internal/canvas"
+	"kode-stream/internal/common/models"
+	itemindex "kode-stream/internal/item/index"
+	"kode-stream/internal/navigation"
+	"kode-stream/internal/system"
+	"kode-stream/internal/workspace/registry"
+)
+
+type storageSnapshot struct {
+	Workspaces     []models.WorkspaceConfig
+	Items          []models.ItemDetail
+	Scans          []models.BranchScanMetadata
+	Audit          []models.AuditEvent
+	Filters        []models.SavedFilter
+	Recents        []models.RecentItem
+	AISettings     ai.Settings
+	Canvas         canvas.Snapshot
+	SessionRecords []ai.SessionRecord
+}
+
+type fileIndexState struct {
+	Items       []models.ItemDetail                             `yaml:"items"`
+	Warnings    []models.ScanWarning                            `yaml:"warnings"`
+	Scans       map[string]time.Time                            `yaml:"scans"`
+	BranchScans map[string]map[string]models.BranchScanMetadata `yaml:"branchScans"`
+}
+
+func (s storageSnapshot) summary() map[string]int {
+	return map[string]int{
+		"workspaces":       len(s.Workspaces),
+		"items":            len(s.Items),
+		"branchScans":      len(s.Scans),
+		"auditEvents":      len(s.Audit),
+		"savedFilters":     len(s.Filters),
+		"recentItems":      len(s.Recents),
+		"canvasLayouts":    len(s.Canvas.Layouts),
+		"canvasPlacements": len(s.Canvas.Placements),
+		"sessionRecords":   len(s.SessionRecords),
+	}
+}
+
+func (s *StorageSyncService) writeDatabaseSnapshotAt(snapshot storageSnapshot, target string) error {
+	config := s.config
+	config.StorageOption = StorageOptionDatabase
+	config.Driver = StorageDriverSQLite
+	config.DatabaseURL = ""
+	config.SQLitePath = target
+	store, err := openSQLStore(config)
+	if err != nil {
+		return err
+	}
+	defer store.Close()
+	if err := clearSQLAppState(store); err != nil {
+		return err
+	}
+	workspaces := newSQLiteWorkspaceRepository(store, s.paths, s.git)
+	for _, workspace := range snapshot.Workspaces {
+		if err := workspaces.upsert(workspace); err != nil {
+			return err
+		}
+	}
+	items := &SQLiteItemRepository{db: store.db, driver: store.driver}
+	grouped := map[string]map[string][]models.ItemDetail{}
+	for _, item := range snapshot.Items {
+		if grouped[item.WorkspaceID] == nil {
+			grouped[item.WorkspaceID] = map[string][]models.ItemDetail{}
+		}
+		grouped[item.WorkspaceID][item.Branch] = append(grouped[item.WorkspaceID][item.Branch], item)
+	}
+	for _, scan := range snapshot.Scans {
+		if err := items.ReplaceWorkspaceBranch(scan.WorkspaceID, scan.Branch, grouped[scan.WorkspaceID][scan.Branch], scan); err != nil {
+			return err
+		}
+		delete(grouped[scan.WorkspaceID], scan.Branch)
+	}
+	for workspaceID, branches := range grouped {
+		for branch, branchItems := range branches {
+			if err := items.ReplaceWorkspaceBranch(workspaceID, branch, branchItems, models.BranchScanMetadata{WorkspaceID: workspaceID, Branch: branch, SourceMode: "working_tree", Editable: true, ScannedAt: time.Now().UTC()}); err != nil {
+				return err
+			}
+		}
+	}
+	auditStore := &SQLiteAuditRepository{db: store.db, driver: store.driver, now: time.Now}
+	for i := len(snapshot.Audit) - 1; i >= 0; i-- {
+		if _, err := auditStore.Append(snapshot.Audit[i]); err != nil {
+			return err
+		}
+	}
+	navigationStore := &SQLiteNavigationRepository{db: store.db, driver: store.driver, now: time.Now}
+	for _, filter := range snapshot.Filters {
+		if err := navigationStore.RestoreFilter(filter); err != nil {
+			return err
+		}
+	}
+	for _, recent := range snapshot.Recents {
+		if err := navigationStore.RestoreRecent(recent); err != nil {
+			return err
+		}
+	}
+	_, err = (&SQLiteAISettingsRepository{db: store.db, driver: store.driver}).Save(snapshot.AISettings)
+	if err != nil {
+		return err
+	}
+	if err := (&SQLiteCanvasRepository{db: store.db, driver: store.driver, now: time.Now}).ReplaceAll(snapshot.Canvas); err != nil {
+		return err
+	}
+	if err := (&SQLiteSessionRecordRepository{db: store.db, driver: store.driver}).ReplaceAll(snapshot.SessionRecords); err != nil {
+		return err
+	}
+	status := &SQLiteImportStatusRepository{db: store.db, driver: store.driver}
+	for _, source := range []string{"workspaces.yaml", "item-index.yaml", "audit-log.jsonl", "navigation", "ai-settings.yaml", "canvases.yaml", "ai-session-records.yaml"} {
+		if err := status.MarkImportCompleted(source, time.Now().UTC()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *StorageSyncService) readDatabaseSnapshot() (storageSnapshot, error) {
+	config := s.config
+	config.StorageOption = StorageOptionDatabase
+	config.Driver = StorageDriverSQLite
+	config.DatabaseURL = ""
+	if config.SQLitePath == "" {
+		config.SQLitePath = s.paths.SQLiteDatabaseFile
+	}
+	store, err := openSQLStore(config)
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	snapshotFile, err := os.CreateTemp(filepath.Dir(config.SQLitePath), ".storage-snapshot-*.db")
+	if err != nil {
+		_ = store.Close()
+		return storageSnapshot{}, err
+	}
+	snapshotPath := snapshotFile.Name()
+	_ = snapshotFile.Close()
+	_ = os.Remove(snapshotPath)
+	defer os.Remove(snapshotPath)
+	if _, err := store.db.Exec(`VACUUM INTO ?`, snapshotPath); err != nil {
+		_ = store.Close()
+		return storageSnapshot{}, err
+	}
+	if err := store.Close(); err != nil {
+		return storageSnapshot{}, err
+	}
+	config.SQLitePath = snapshotPath
+	store, err = openSQLStore(config)
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	defer store.Close()
+	return readRepositorySnapshot(RepositoryBundle{
+		Workspaces:     newSQLiteWorkspaceRepository(store, s.paths, s.git),
+		Items:          &SQLiteItemRepository{db: store.db, driver: store.driver},
+		Audit:          &SQLiteAuditRepository{db: store.db, driver: store.driver, now: time.Now},
+		Navigation:     &SQLiteNavigationRepository{db: store.db, driver: store.driver, now: time.Now},
+		AISettings:     &SQLiteAISettingsRepository{db: store.db, driver: store.driver},
+		Canvas:         &SQLiteCanvasRepository{db: store.db, driver: store.driver, now: time.Now},
+		SessionRecords: &SQLiteSessionRecordRepository{db: store.db, driver: store.driver},
+	})
+}
+
+func readDataDirSnapshot(paths system.Paths) (storageSnapshot, error) {
+	snapshot, err := readRepositorySnapshot(RepositoryBundle{
+		Workspaces:     registry.New(paths.RegistryFile, nil),
+		Items:          itemindex.New(paths.PlanIndexFile),
+		Audit:          audit.New(paths.AuditLogFile),
+		Navigation:     navigation.New(paths.SavedFiltersFile, paths.RecentItemsFile),
+		AISettings:     ai.NewSettingsRepository(paths.AISettingsFile),
+		Canvas:         canvas.NewFileRepository(paths.CanvasFile),
+		SessionRecords: ai.NewFileSessionRecordRepository(paths.AISessionRecordsFile),
+	})
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	items, scans, err := readDataDirItemSnapshot(paths.PlanIndexFile)
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	snapshot.Items = items
+	snapshot.Scans = scans
+	return snapshot, nil
+}
+
+func readRepositorySnapshot(repositories RepositoryBundle) (storageSnapshot, error) {
+	workspaces, err := repositories.Workspaces.List()
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	items, scans, err := readItemSnapshot(repositories.Items)
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	events, err := repositories.Audit.Recent(0)
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	filters, err := repositories.Navigation.Filters()
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	recents, err := repositories.Navigation.Recents(0)
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	settings, err := repositories.AISettings.Load()
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	canvasSnapshot, err := repositories.Canvas.Snapshot()
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	sessionRecords, err := repositories.SessionRecords.Snapshot()
+	if err != nil {
+		return storageSnapshot{}, err
+	}
+	return storageSnapshot{Workspaces: workspaces, Items: items, Scans: scans, Audit: events, Filters: filters, Recents: recents, AISettings: settings, Canvas: canvasSnapshot, SessionRecords: sessionRecords}, nil
+}
+
+func readItemSnapshot(repository itemindex.Repository) ([]models.ItemDetail, []models.BranchScanMetadata, error) {
+	if sqlItems, ok := repository.(*SQLiteItemRepository); ok {
+		items, err := sqlItems.queryDetails(itemindex.Query{IncludeSnapshots: true})
+		if err != nil {
+			return nil, nil, err
+		}
+		scans, err := sqlItems.allBranchScans()
+		return items, scans, err
+	}
+	summaries, err := repository.Query(itemindex.Query{IncludeSnapshots: true})
+	if err != nil {
+		return nil, nil, err
+	}
+	items := make([]models.ItemDetail, 0, len(summaries))
+	scanKeys := map[string]bool{}
+	for _, summary := range summaries {
+		item, ok, err := repository.Get(summary.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !ok {
+			continue
+		}
+		items = append(items, item)
+		scanKeys[item.WorkspaceID+"\x00"+item.Branch] = true
+	}
+	scans := make([]models.BranchScanMetadata, 0, len(scanKeys))
+	for key := range scanKeys {
+		parts := strings.SplitN(key, "\x00", 2)
+		scan, ok, err := repository.BranchScan(parts[0], parts[1])
+		if err != nil {
+			return nil, nil, err
+		}
+		if ok {
+			scans = append(scans, scan)
+		}
+	}
+	sort.Slice(scans, func(i, j int) bool {
+		if scans[i].WorkspaceID == scans[j].WorkspaceID {
+			return scans[i].Branch < scans[j].Branch
+		}
+		return scans[i].WorkspaceID < scans[j].WorkspaceID
+	})
+	return items, scans, nil
+}
+
+func readDataDirItemSnapshot(path string) ([]models.ItemDetail, []models.BranchScanMetadata, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return []models.ItemDetail{}, []models.BranchScanMetadata{}, nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	var index fileIndexState
+	if err := yaml.Unmarshal(data, &index); err != nil {
+		return nil, nil, err
+	}
+	scans := []models.BranchScanMetadata{}
+	for workspaceID, branches := range index.BranchScans {
+		for branch, scan := range branches {
+			scan.WorkspaceID = workspaceID
+			scan.Branch = branch
+			scans = append(scans, scan)
+		}
+	}
+	sort.Slice(scans, func(i, j int) bool {
+		if scans[i].WorkspaceID == scans[j].WorkspaceID {
+			return scans[i].Branch < scans[j].Branch
+		}
+		return scans[i].WorkspaceID < scans[j].WorkspaceID
+	})
+	if index.Items == nil {
+		index.Items = []models.ItemDetail{}
+	}
+	return index.Items, scans, nil
+}
+
+func (r *SQLiteItemRepository) allBranchScans() ([]models.BranchScanMetadata, error) {
+	rows, err := querySQL(r.db, r.driver, `SELECT workspace_id, branch FROM branch_scans ORDER BY workspace_id, branch`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	type branchKey struct{ workspaceID, branch string }
+	keys := []branchKey{}
+	for rows.Next() {
+		var key branchKey
+		if err := rows.Scan(&key.workspaceID, &key.branch); err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	scans := make([]models.BranchScanMetadata, 0, len(keys))
+	for _, key := range keys {
+		scan, ok, err := r.BranchScan(key.workspaceID, key.branch)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			scans = append(scans, scan)
+		}
+	}
+	return scans, nil
+}
+
+func clearSQLAppState(store *SQLStore) error {
+	for _, table := range []string{"canvas_placements", "canvas_layouts", "ai_session_records", "workspaces", "indexed_items", "branch_scans", "scan_warnings", "audit_events", "saved_filters", "recent_items", "ai_settings", "knowledge_indexes", "import_status"} {
+		if _, err := execSQL(store.db, store.driver, "DELETE FROM "+table); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func writeDataDirSnapshot(paths system.Paths, snapshot storageSnapshot) error {
+	if err := writeYAMLFile(paths.RegistryFile, snapshot.Workspaces); err != nil {
+		return err
+	}
+	index := fileIndexState{Items: snapshot.Items, Warnings: []models.ScanWarning{}, Scans: map[string]time.Time{}, BranchScans: map[string]map[string]models.BranchScanMetadata{}}
+	for _, scan := range snapshot.Scans {
+		if index.BranchScans[scan.WorkspaceID] == nil {
+			index.BranchScans[scan.WorkspaceID] = map[string]models.BranchScanMetadata{}
+		}
+		index.BranchScans[scan.WorkspaceID][scan.Branch] = scan
+		index.Scans[scan.WorkspaceID] = scan.ScannedAt
+		for _, warning := range scan.Warnings {
+			warning.ItemPath = scan.WorkspaceID + ":" + scan.Branch + ":" + warning.ItemPath
+			index.Warnings = append(index.Warnings, warning)
+		}
+	}
+	if err := writeYAMLFile(paths.PlanIndexFile, index); err != nil {
+		return err
+	}
+	if err := writeAuditLog(paths.AuditLogFile, snapshot.Audit); err != nil {
+		return err
+	}
+	if err := writeYAMLFile(paths.SavedFiltersFile, snapshot.Filters); err != nil {
+		return err
+	}
+	if err := writeYAMLFile(paths.RecentItemsFile, snapshot.Recents); err != nil {
+		return err
+	}
+	if err := writeYAMLFile(paths.AISettingsFile, snapshot.AISettings); err != nil {
+		return err
+	}
+	if err := canvas.NewFileRepository(paths.CanvasFile).ReplaceAll(snapshot.Canvas); err != nil {
+		return err
+	}
+	return ai.NewFileSessionRecordRepository(paths.AISessionRecordsFile).ReplaceAll(snapshot.SessionRecords)
+}
+
+func writeYAMLFile(path string, value any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".storage-write-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
+}
+
+func writeAuditLog(path string, events []models.AuditEvent) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	writer := bufio.NewWriter(file)
+	for i := len(events) - 1; i >= 0; i-- {
+		data, err := json.Marshal(events[i])
+		if err != nil {
+			return err
+		}
+		if _, err := writer.Write(append(data, '\n')); err != nil {
+			return err
+		}
+	}
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+	return file.Sync()
+}
