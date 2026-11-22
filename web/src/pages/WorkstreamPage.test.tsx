@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { filterPlans, WorkstreamPage } from './WorkstreamPage';
+import { WorkstreamPage } from './WorkstreamPage';
+import { filterPlans } from '../features/workstream/filtering';
 import type { WorkstreamBranchLoadResult, ItemSummary, SourceMode } from '../lib/types';
 import { emptyFilters } from '../features/workstream/filtering';
 
