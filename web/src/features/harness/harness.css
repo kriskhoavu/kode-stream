@@ -2683,6 +2683,10 @@ button.hx-workbench-step:hover { background: var(--panel-soft); }
 .workspace-own-settings .ai-settings-section .settings-toggle-row > select {
 	flex: none;
 	width: min(320px, 50%);
+	/* A short provider name sits in the middle; the left padding matches the arrow's, so it is centred in the box. */
+	padding-left: 30px;
+	text-align: center;
+	text-align-last: center;
 }
 
 .workspace-own-settings .ai-settings-section .settings-actions {
