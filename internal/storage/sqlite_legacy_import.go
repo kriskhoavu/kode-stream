@@ -317,21 +317,12 @@ func importLegacyItemsAtomic(path string, state *AppOwnedState, repair bool) err
 	if done && !repair {
 		return nil
 	}
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return status.MarkImportCompleted("item-index.yaml", time.Now().UTC())
-	}
+	legacy, found, err := readLegacyItemIndex(path)
 	if err != nil {
 		return err
 	}
-	var legacy fileIndexState
-	if err := yaml.Unmarshal(data, &legacy); err != nil {
-		return err
-	}
-	for _, item := range legacy.Items {
-		if strings.TrimSpace(item.ID) == "" || strings.TrimSpace(item.WorkspaceID) == "" || strings.TrimSpace(item.Branch) == "" {
-			return errors.New("legacy item snapshot contains incomplete identity")
-		}
+	if !found {
+		return status.MarkImportCompleted("item-index.yaml", time.Now().UTC())
 	}
 	tx, err := repository.db.Begin()
 	if err != nil {
@@ -346,6 +337,44 @@ func importLegacyItemsAtomic(path string, state *AppOwnedState, repair bool) err
 			return err
 		}
 	}
+	workspaces, err := clearLegacyWorkspaces(tx, repository.driver, legacy)
+	if err != nil {
+		return err
+	}
+	if err := insertItemsRaw(tx, repository.driver, legacy.Items); err != nil {
+		return err
+	}
+	if err := insertLegacyScans(tx, repository.driver, legacy, workspaces); err != nil {
+		return err
+	}
+	return markImportCompletedTx(tx, repository.driver, "item-index.yaml")
+}
+
+// readLegacyItemIndex reads the legacy item index. found is false when the
+// file does not exist. Every item must name its id, workspace and branch.
+func readLegacyItemIndex(path string) (fileIndexState, bool, error) {
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return fileIndexState{}, false, nil
+	}
+	if err != nil {
+		return fileIndexState{}, false, err
+	}
+	var legacy fileIndexState
+	if err := yaml.Unmarshal(data, &legacy); err != nil {
+		return fileIndexState{}, false, err
+	}
+	for _, item := range legacy.Items {
+		if strings.TrimSpace(item.ID) == "" || strings.TrimSpace(item.WorkspaceID) == "" || strings.TrimSpace(item.Branch) == "" {
+			return fileIndexState{}, false, errors.New("legacy item snapshot contains incomplete identity")
+		}
+	}
+	return legacy, true, nil
+}
+
+// clearLegacyWorkspaces deletes the indexed rows of every workspace the
+// legacy index names, and returns those workspaces.
+func clearLegacyWorkspaces(tx *sql.Tx, driver string, legacy fileIndexState) (map[string]bool, error) {
 	workspaces := map[string]bool{}
 	for _, item := range legacy.Items {
 		workspaces[item.WorkspaceID] = true
@@ -355,24 +384,29 @@ func importLegacyItemsAtomic(path string, state *AppOwnedState, repair bool) err
 	}
 	for workspaceID := range workspaces {
 		for _, table := range []string{"indexed_items", "branch_scans", "scan_warnings"} {
-			if _, err := execTx(tx, repository.driver, `DELETE FROM `+table+` WHERE workspace_id = ?`, workspaceID); err != nil {
-				return err
+			if _, err := execTx(tx, driver, `DELETE FROM `+table+` WHERE workspace_id = ?`, workspaceID); err != nil {
+				return nil, err
 			}
 		}
 	}
-	if err := insertItemsRaw(tx, repository.driver, legacy.Items); err != nil {
-		return err
-	}
+	return workspaces, nil
+}
+
+const insertScanWarningSQL = `INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUES (?, ?, ?, ?, ?)`
+
+// insertLegacyScans inserts each branch scan with its warnings, then the
+// index-wide warnings of a known workspace that no scan already holds.
+func insertLegacyScans(tx *sql.Tx, driver string, legacy fileIndexState, workspaces map[string]bool) error {
 	warningKeys := map[string]bool{}
 	for workspaceID, branches := range legacy.BranchScans {
 		for branch, metadata := range branches {
 			metadata.WorkspaceID, metadata.Branch = workspaceID, branch
-			if err := insertBranchScan(tx, repository.driver, metadata); err != nil {
+			if err := insertBranchScan(tx, driver, metadata); err != nil {
 				return err
 			}
 			for _, warning := range metadata.Warnings {
 				warningKeys[workspaceID+"\x00"+branch+"\x00"+warning.ItemPath+"\x00"+warning.Message] = true
-				if _, err := execTx(tx, repository.driver, `INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUES (?, ?, ?, ?, ?)`, workspaceID, branch, warning.ItemPath, "", warning.Message); err != nil {
+				if _, err := execTx(tx, driver, insertScanWarningSQL, workspaceID, branch, warning.ItemPath, "", warning.Message); err != nil {
 					return err
 				}
 			}
@@ -386,11 +420,11 @@ func importLegacyItemsAtomic(path string, state *AppOwnedState, repair bool) err
 		if warningKeys[identity[0]+"\x00"+identity[1]+"\x00"+identity[2]+"\x00"+warning.Message] {
 			continue
 		}
-		if _, err := execTx(tx, repository.driver, `INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUES (?, ?, ?, ?, ?)`, identity[0], identity[1], identity[2], "", warning.Message); err != nil {
+		if _, err := execTx(tx, driver, insertScanWarningSQL, identity[0], identity[1], identity[2], "", warning.Message); err != nil {
 			return err
 		}
 	}
-	return markImportCompletedTx(tx, repository.driver, "item-index.yaml")
+	return nil
 }
 
 func insertItemsRaw(tx *sql.Tx, driverName string, items []models.ItemDetail) error {
