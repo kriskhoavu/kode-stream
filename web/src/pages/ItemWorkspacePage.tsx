@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MutableRefObject } from 'react';
 import { ArrowLeft, Bot, Code2, FilePlus2, FileText, FolderOpen, FolderPlus, GitCompare, GripVertical, Info, Ticket, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { useModalDialog } from '../components/overlay';
 import { preferredFile } from '../shared/domain/fileTree';
+import { CreateItemPathDialog, RenameItemPathDialog } from '../features/item-workspace/ItemPathDialogs';
 import { ItemQualityPanel } from '../features/item-workspace/ItemQualityPanel';
 import { useItemQuality } from '../features/item-workspace/useItemQuality';
 import { ItemGitPanel } from '../features/item-git/ItemGitPanel';
@@ -35,7 +35,6 @@ import { useItemSessions } from '../features/workstream/useItemSessions';
 import type { ExplorerLocation } from '../features/workstream-explorer/types';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
-import { ModalLayer } from '../components/ModalLayer';
 import { type Tab, type RightPanelTab, type DiffMode, type PendingConfirm, type DetailViewMode, type OpenItemFileTab } from '../features/item-workspace/itemWorkspaceTypes';
 import { fileDirectoryPaths, hasFile, currentGitPath, workspacePathForSelection, buildFileStateMap, normalizePath } from '../features/item-workspace/itemPaths';
 import { lastPathSegment, parentDirectoryPath } from '../shared/domain/paths';
@@ -77,13 +76,9 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const [rightWidth, setRightWidth] = useState(300);
   const [detailViewMode, setDetailViewMode] = useState<DetailViewMode>('plan');
   const [createPathKind, setCreatePathKind] = useState<'file' | 'directory' | null>(null);
-  const [createPathName, setCreatePathName] = useState('');
-  const [creatingPath, setCreatingPath] = useState(false);
   const [selectedDirectoryPath, setSelectedDirectoryPath] = useState('');
   const [selectedTreeNode, setSelectedTreeNode] = useState<{ path: string; type: 'file' | 'directory' } | null>(null);
-  const [renameName, setRenameName] = useState('');
   const [renameOpen, setRenameOpen] = useState(false);
-  const [renamingPath, setRenamingPath] = useState(false);
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
@@ -95,8 +90,6 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const [openTabs, setOpenTabs] = useState<OpenItemFileTab[]>([]);
   const [activeTabId, setActiveTabId] = useState('');
   const openTabsRef = useRef<OpenItemFileTab[]>([]);
-  const createPathDialog = useModalDialog(() => { setCreatePathKind(null); setCreatePathName(''); }, !creatingPath, Boolean(createPathKind));
-  const renamePathDialog = useModalDialog(() => { setRenameOpen(false); setRenameName(''); }, !renamingPath, renameOpen);
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -109,14 +102,13 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     setRecoveryHint(result.recoveryHint ?? '');
   };
 
-  const createItemPath = async () => {
-    if (!plan?.itemPath || !createPathKind || !createPathName.trim()) return;
+  const createItemPath = async (createPathName: string): Promise<boolean> => {
+    if (!plan?.itemPath || !createPathKind || !createPathName.trim()) return false;
     const parts = createPathName.trim().split('/');
     if (parts.some((part) => !part || part === '.' || part === '..')) {
       setError('Use a relative path without empty, ".", or ".." segments.');
-      return;
+      return false;
     }
-    setCreatingPath(true);
     setError('');
     try {
       const directoryParts = createPathKind === 'file' ? parts.slice(0, -1) : parts;
@@ -136,28 +128,25 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
         await api.createWorkspaceFile(plan.workspaceId, { parentPath, name: parts.at(-1)!, content: '' });
       }
       setFiles(await api.files(itemId));
-      setCreatePathKind(null);
-      setCreatePathName('');
       await onContentChanged?.();
       notifyReliabilityChanged();
+      return true;
     } catch (caught) {
       showOperationError(caught, `Could not create ${createPathKind}`);
-    } finally {
-      setCreatingPath(false);
+      return false;
     }
   };
 
-  const renameItemPath = async () => {
-    if (!plan?.itemPath || !selectedTreeNode || !renameName.trim()) return;
+  const renameItemPath = async (renameName: string): Promise<boolean> => {
+    if (!plan?.itemPath || !selectedTreeNode || !renameName.trim()) return false;
     const name = renameName.trim();
     if (name === '.' || name === '..' || name.includes('/') || name.includes('\\')) {
       setError('Rename must be a single file or directory name.');
-      return;
+      return false;
     }
     const separator = selectedTreeNode.path.lastIndexOf('/');
     const parent = separator >= 0 ? selectedTreeNode.path.slice(0, separator) : '';
     const destination = parent ? `${parent}/${name}` : name;
-    setRenamingPath(true);
     setError('');
     try {
       await api.renameWorkspacePath(plan.workspaceId, {
@@ -168,14 +157,12 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
       if (selectedTreeNode.type === 'file') editor.open(null);
       if (selectedDirectoryPath === selectedTreeNode.path) setSelectedDirectoryPath(destination);
       setSelectedTreeNode({ path: destination, type: selectedTreeNode.type });
-      setRenameName('');
-      setRenameOpen(false);
       await onContentChanged?.();
       notifyReliabilityChanged();
+      return true;
     } catch (caught) {
       showOperationError(caught, 'Could not rename path');
-    } finally {
-      setRenamingPath(false);
+      return false;
     }
   };
 
@@ -773,7 +760,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
             <div className="workspace-header-actions">
               {!leftCollapsed && <button className="icon-button" type="button" aria-label="New file" title="New file" onClick={() => setCreatePathKind('file')}><FilePlus2 size={16} /></button>}
               {!leftCollapsed && <button className="icon-button" type="button" aria-label="New folder" title="New folder" onClick={() => setCreatePathKind('directory')}><FolderPlus size={16} /></button>}
-              {!leftCollapsed && <button className="icon-button" type="button" aria-label="Rename selected path" title="Rename" disabled={!selectedTreeNode} onClick={() => { setRenameName(selectedTreeNode?.path.split('/').at(-1) ?? ''); setRenameOpen(true); }}><Pencil size={16} /></button>}
+              {!leftCollapsed && <button className="icon-button" type="button" aria-label="Rename selected path" title="Rename" disabled={!selectedTreeNode} onClick={() => setRenameOpen(true)}><Pencil size={16} /></button>}
               <button className="icon-button" type="button" title={leftCollapsed ? 'Expand files' : 'Collapse files'} onClick={() => setLeftCollapsed((value) => !value)}>
                 {leftCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
               </button>
@@ -858,36 +845,8 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
         </aside>
       </div>
       )}
-      {createPathKind && (
-        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPath) { setCreatePathKind(null); setCreatePathName(''); } }}>
-          <section ref={createPathDialog.ref} className="modal-panel" role="dialog" aria-modal="true" aria-label={`Create new ${createPathKind}`}>
-            <header><h2>New {createPathKind === 'file' ? 'file' : 'folder'}</h2></header>
-            <div className="metadata-form">
-              <p>Parent: {selectedDirectoryPath || 'item root'}</p>
-              <label>Relative path<input data-autofocus value={createPathName} onChange={(event) => setCreatePathName(event.target.value)} placeholder={createPathKind === 'file' ? 'schema.json' : 'api'} /></label>
-            </div>
-            <footer className="modal-actions">
-              <button className="ghost" type="button" disabled={creatingPath} onClick={() => { setCreatePathKind(null); setCreatePathName(''); }}>Cancel</button>
-              <button className="primary" type="button" disabled={creatingPath || !createPathName.trim()} onClick={() => void createItemPath()}>{creatingPath ? 'Creating...' : 'Create'}</button>
-            </footer>
-          </section>
-        </div></ModalLayer>
-      )}
-      {renameOpen && selectedTreeNode && (
-        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !renamingPath) { setRenameOpen(false); setRenameName(''); } }}>
-          <section ref={renamePathDialog.ref} className="modal-panel" role="dialog" aria-modal="true" aria-label="Rename path">
-            <header><h2>Rename {selectedTreeNode.type}</h2></header>
-            <div className="metadata-form">
-              <p>Current: {selectedTreeNode.path}</p>
-              <label>Name<input data-autofocus value={renameName} onChange={(event) => setRenameName(event.target.value)} /></label>
-            </div>
-            <footer className="modal-actions">
-              <button className="ghost" type="button" disabled={renamingPath} onClick={() => { setRenameOpen(false); setRenameName(''); }}>Cancel</button>
-              <button className="primary" type="button" disabled={renamingPath || !renameName.trim()} onClick={() => void renameItemPath()}>{renamingPath ? 'Renaming...' : 'Rename'}</button>
-            </footer>
-          </section>
-        </div></ModalLayer>
-      )}
+      {createPathKind && <CreateItemPathDialog kind={createPathKind} parent={selectedDirectoryPath} onCancel={() => setCreatePathKind(null)} onCreate={createItemPath} />}
+      {renameOpen && selectedTreeNode && <RenameItemPathDialog node={selectedTreeNode} onCancel={() => setRenameOpen(false)} onRename={renameItemPath} />}
       {revertDialogOpen && file && (
         <ConfirmDialog
           title="Revert file"
