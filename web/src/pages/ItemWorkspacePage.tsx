@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useHorizontalDrag } from '../components/useHorizontalDrag';
-import { useOpenFileTabs } from '../features/item-workspace/useOpenFileTabs';
+import { useFileTabs } from '../features/file-editor/useFileTabs';
 import type { CSSProperties, MutableRefObject } from 'react';
 import { ArrowLeft, Bot, Code2, FilePlus2, FileText, FolderOpen, FolderPlus, GitCompare, GripVertical, Info, Ticket, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -13,7 +13,7 @@ import { useItemGit } from '../features/item-git/useItemGit';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api } from '../shared/api';
-import type { FileNode, GitChange, ItemDetail, ItemMetadataUpdateInput, ItemStatus, WorkspaceConfig } from '../lib/types';
+import type { FileContent, FileNode, GitChange, ItemDetail, ItemMetadataUpdateInput, ItemStatus, WorkspaceConfig } from '../lib/types';
 import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -39,7 +39,7 @@ import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicke
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import { type Tab, type RightPanelTab, type DiffMode, type PendingConfirm, type DetailViewMode, type OpenItemFileTab } from '../features/item-workspace/itemWorkspaceTypes';
 import { fileDirectoryPaths, hasFile, currentGitPath, workspacePathForSelection, buildFileStateMap, normalizePath } from '../features/item-workspace/itemPaths';
-import { parentDirectoryPath } from '../shared/domain/paths';
+import { lastPathSegment, parentDirectoryPath } from '../shared/domain/paths';
 import { visibleItemWarnings } from '../features/item-workspace/itemFormat';
 import { DiffPanel } from '../features/item-workspace/DiffPanel';
 import { TreeNode } from '../features/item-workspace/FileTreeNode';
@@ -89,8 +89,8 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const fileTreeRef = useRef<HTMLDivElement | null>(null);
 	const contentSearch = useContentSearch({ kind: 'item', itemId });
   const [workspaceExplorerLocation, setWorkspaceExplorerLocation] = useState<ExplorerLocation>();
-  const fileTabs = useOpenFileTabs();
-  const { openTabs, activeTabId } = fileTabs;
+  const fileTabs = useFileTabs(itemTabKey);
+  const { openTabs, activeKey: activeTabId } = fileTabs;
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -204,7 +204,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
           const nextFile = await api.file(itemId, first.id, undefined, controller.signal);
           if (controller.signal.aborted) return;
           editor.open(nextFile);
-          fileTabs.remember(nextFile);
+          fileTabs.remember(itemTab(nextFile));
         } else {
           setSelectedDirectoryPath('');
           setSelectedTreeNode(null);
@@ -283,7 +283,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     try {
       const nextFile = await api.file(itemId, fileId);
       editor.open(nextFile);
-      fileTabs.remember(nextFile);
+      fileTabs.remember(itemTab(nextFile));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File failed to load');
     }
@@ -325,6 +325,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     if (tabToClose.id === activeTabId && dirtyFile && !(await editor.saveNow())) return;
     const { next: nextTab } = fileTabs.close(tabToClose);
     if (nextTab) {
+      fileTabs.activate(nextTab.id);
       setSelectedDirectoryPath('');
       setSelectedTreeNode({ path: nextTab.path, type: 'file' });
       await loadFile(nextTab.id);
@@ -818,6 +819,12 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
       )}
     </section>
   );
+}
+
+const itemTabKey = (tab: OpenItemFileTab) => tab.id;
+
+function itemTab(file: FileContent): OpenItemFileTab {
+  return { id: file.id, path: file.path, editable: file.editable, name: lastPathSegment(file.path) };
 }
 
 function clearTimer(ref: MutableRefObject<number | null>) {

@@ -1,6 +1,7 @@
 import { lastPathSegment, parentDirectoryPath } from '../shared/domain/paths';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHorizontalDrag } from '../components/useHorizontalDrag';
+import { useFileTabs } from '../features/file-editor/useFileTabs';
 import type { CSSProperties, ReactNode } from 'react';
 import { CaseSensitive, Clipboard, Code2, Eye, GitCompare, FilePlus2, FolderPlus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, Search, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -23,6 +24,8 @@ import { ExplorerInspector } from '../features/workstream-explorer/ExplorerInspe
 import { ExplorerTreeRow, ExplorerUnifiedSearchResults, ExplorerPathDialog, ExplorerEmpty, ExplorerDiff } from '../features/workstream-explorer/ExplorerParts';
 import { type EditorTab, type PathDialog, type ExplorerUnifiedResult, type OpenWorkspaceFileTab, type ExplorerRightPanelProps } from '../features/workstream-explorer/explorerPageTypes';
 import { boundedNumber, boundedLeftPanelWidth, boundedRightPanelWidth, tabKey, restrictRowsToRoot } from '../features/workstream-explorer/explorerLayout';
+
+const workspaceTabKey = (tab: OpenWorkspaceFileTab) => tabKey(tab.workspaceId, tab.path);
 
 export function WorkstreamExplorer({ workspaces, location, onLocationChange, embedded = false, treeRootPath, showModeSelector = true, embeddedHeaderContent, leftPanelContent, mainContent, agentArea, rightPanel }: {
   workspaces: WorkspaceConfig[];
@@ -54,15 +57,14 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [leftWidth, setLeftWidth] = useState(() => boundedNumber(readStringPreference('workstreamExplorer.leftWidth'), 400, boundedLeftPanelWidth));
   const [rightWidth, setRightWidth] = useState(() => boundedNumber(readStringPreference('workstreamExplorer.rightWidth'), 300, boundedRightPanelWidth));
-  const [openTabs, setOpenTabs] = useState<OpenWorkspaceFileTab[]>([]);
-  const [activeTabKey, setActiveTabKey] = useState('');
+  const fileTabs = useFileTabs(workspaceTabKey);
+  const { openTabs, activeKey: activeTabKey, activeTab } = fileTabs;
   const [searchIndex, setSearchIndex] = useState(0);
   const [pathDialog, setPathDialog] = useState<PathDialog | null>(null);
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const treeRef = useRef<HTMLDivElement | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
   const startDrag = useHorizontalDrag();
-  const openTabsRef = useRef<OpenWorkspaceFileTab[]>([]);
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
   const rightPanelOpen = rightPanel ? !rightPanel.collapsed : inspectorOpen;
   const rightPanelTitle = rightPanel?.title ?? 'Inspector';
@@ -79,7 +81,6 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     void expandPath(location.workspaceId, normalizedTreeRootPath, 'directory');
   }, [expandPath, location?.workspaceId, normalizedTreeRootPath]);
   const selectedRow = visibleRows.find((row) => explorerNodeId(row.workspaceId, row.node.path) === explorer.selection?.nodeId);
-  const activeTab = useMemo(() => openTabs.find((tab) => tabKey(tab.workspaceId, tab.path) === activeTabKey) ?? null, [activeTabKey, openTabs]);
 	const pathSearch = useWorkspacePathSearch({ workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
 	const contentSearch = useContentSearch({ kind: 'explorer', mode: explorer.mode, workspaceId: location?.workspaceId, includeIgnored: explorer.showIgnored });
 	const searchResults = useMemo<ExplorerUnifiedResult[]>(() => [
@@ -101,18 +102,9 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     onError: (caught) => showError(caught, 'File save failed')
   });
 
-  useEffect(() => {
-    openTabsRef.current = openTabs;
-  }, [openTabs]);
-
   const refreshAfterBranchSwitch = useCallback(async (workspaceId: string) => {
     if (location?.workspaceId === workspaceId) {
-      const nextTabs = openTabsRef.current.filter((tab) => tab.workspaceId !== workspaceId);
-      setOpenTabs(nextTabs);
-      setActiveTabKey((current) => {
-        if (!current.startsWith(`${workspaceId}:`)) return current;
-        return nextTabs[0] ? tabKey(nextTabs[0].workspaceId, nextTabs[0].path) : '';
-      });
+      const nextTabs = fileTabs.retain((tab) => tab.workspaceId !== workspaceId);
       if (!nextTabs.some((tab) => tabKey(tab.workspaceId, tab.path) === activeTabKey)) {
         editor.open(null);
         setDiff('');
@@ -146,20 +138,6 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     }
   };
 
-  const rememberOpenTab = (file: { path: string; editable: boolean }, workspaceId: string) => {
-    const nextTab = { workspaceId, path: file.path, editable: file.editable, name: lastPathSegment(file.path) };
-    setOpenTabs((current) => {
-      const existingIndex = current.findIndex((tab) => tab.workspaceId === workspaceId && tab.path === file.path);
-      if (existingIndex >= 0) {
-        const next = current.slice();
-        next[existingIndex] = nextTab;
-        return next;
-      }
-      return [...current, nextTab];
-    });
-    setActiveTabKey(tabKey(workspaceId, file.path));
-  };
-
   const loadFile = async (targetWorkspaceId = activeTab?.workspaceId, targetPath = activeTab?.path) => {
     if (!targetWorkspaceId || !targetPath) {
       editor.open(null);
@@ -171,7 +149,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     try {
       const nextFile = await api.workspaceFile(targetWorkspaceId, targetPath);
       editor.open(nextFile);
-      rememberOpenTab(nextFile, targetWorkspaceId);
+      fileTabs.remember({ workspaceId: targetWorkspaceId, path: nextFile.path, editable: nextFile.editable, name: lastPathSegment(nextFile.path) });
       await loadDiff(targetWorkspaceId, targetPath);
     } catch (caught) {
       editor.open(null);
@@ -328,17 +306,12 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const closeTab = async (tab: OpenWorkspaceFileTab) => {
     const key = tabKey(tab.workspaceId, tab.path);
     if (key === activeTabKey && editor.dirty && !(await editor.saveNow())) return;
-    const currentTabs = openTabsRef.current;
-    const index = currentTabs.findIndex((item) => tabKey(item.workspaceId, item.path) === key);
-    const remaining = currentTabs.filter((item) => tabKey(item.workspaceId, item.path) !== key);
-    const nextTab = key === activeTabKey ? remaining[index] ?? remaining[index - 1] ?? null : activeTab;
-    setOpenTabs(remaining);
+    const { next: nextTab } = fileTabs.close(tab);
     if (nextTab) {
       // As in activateTab: the location effect loads the next tab and makes it active.
       await explorer.expandToPath(nextTab.workspaceId, nextTab.path, 'file');
       return;
     }
-    setActiveTabKey('');
     editor.open(null);
     setDiff('');
     if (location?.workspaceId === tab.workspaceId && location.path === tab.path) {
