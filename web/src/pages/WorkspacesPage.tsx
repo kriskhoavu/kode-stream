@@ -1,16 +1,15 @@
 import { type DragEvent, type FormEvent, type RefObject, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Download, ExternalLink, FolderGit2, FolderOpen, HardDrive, Pencil, Plus, RotateCw, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, ExternalLink, FolderGit2, FolderOpen, HardDrive, Plus, RotateCw, Trash2, Upload, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../shared/api';
 import type { RuntimeContext, WorkspaceConfig, SourceSurface, SystemConfigPaths } from '../lib/types';
-import { sourcePaths, sourceSurfaces, workspaceSources } from '../lib/sources';
+import { workspaceSources } from '../lib/sources';
 import { lastPathSegment } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
 import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSettings';
 import { SettingsFileDialog, type SettingsFileMode } from '../features/settings/SettingsFileDialog';
-import { HarnessSettingsSection } from '../features/workstream/HarnessSettingsSection';
 import { useModalDialog } from '../components/overlay';
 import { ModalLayer } from '../components/ModalLayer';
 import { useWorkspaceRegistrationDraft } from '../features/workspaces/useWorkspaceRegistrationDraft';
@@ -19,13 +18,13 @@ import { WorkspaceImportReview, WorkspaceImportResults } from '../features/works
 import { CloudAgentRegistration } from '../features/workspaces/CloudAgentRegistration';
 import { SourceSettingsDialog } from '../features/workspaces/SourceSettingsDialog';
 import { useWorkspaceEdit } from '../features/workspaces/useWorkspaceEdit';
+import { sourceSurfaceLabels, WorkspaceGeneralSection, WorkspaceIntegrations, WorkspaceSourcesSection } from '../features/workspaces/WorkspaceDetailSections';
 import { type WorkspaceNotice, WorkspaceNoticePanel, scanNotice, scanSummary, scanWarnings } from '../features/workspaces/workspaceNotice';
 import { errorMessage, buildWorkspaceInput, normalizeKnowledgeSettings, inferWorkspaceNameFromRemoteURL, workspaceRemovalMessage, pathFromDrop, settingsEditorFromResult, toggleSourceSurface, type SettingsEditorState } from '../features/workspaces/workspaceDraft';
-import { SourcesField, BranchField, KnowledgeSettingsFields, RuntimeSettingsFields, KnowledgeRoots, JiraConnectionFields, OverviewSection } from '../features/workspaces/workspaceFields';
-import { type WorkspaceDetailTab, detailTabs, detailTabLabels, type OverviewSectionKey, workspaceDetailSubtitle, isIntegrationEditSection, integrationSaveLabel } from '../features/workspaces/workspaceDetailTabs';
+import { SourcesField, BranchField, JiraConnectionFields, OverviewSection } from '../features/workspaces/workspaceFields';
+import { type WorkspaceDetailTab, detailTabs, detailTabLabels, type OverviewSectionKey, workspaceDetailSubtitle, isIntegrationEditSection } from '../features/workspaces/workspaceDetailTabs';
 
 
-const sourceSurfaceLabels: Record<SourceSurface, string> = { workstream: 'Workstream', knowledge: 'Knowledge' };
 
 const maxRegistrationLogChars = 256 * 1024;
 const localRuntimeContext: RuntimeContext = {
@@ -76,7 +75,8 @@ const busy = pendingOperations.length > 0;
       ? current.includes(operation) ? current : [...current, operation]
       : current.filter((item) => item !== operation));
   };
-  const { editingId, editingSection, editDraft, setEditDraft, startEdit, discardEdit, confirmDiscardEdit, saveEdit } = useWorkspaceEdit({ setBusy, onNotice: setNotice, onChanged });
+  const edit = useWorkspaceEdit({ setBusy, onNotice: setNotice, onChanged });
+  const { editingId, editingSection, discardEdit, confirmDiscardEdit } = edit;
 
 
   useEffect(() => {
@@ -517,56 +517,11 @@ const busy = pendingOperations.length > 0;
 
                 {activeDetailTab === 'overview' && <section className="workspace-overview-sections">
                   <OverviewSection title="General" collapsed={collapsedOverviewSections.general} onToggle={() => toggleOverviewSection('general')}>
-                    {editingId === repo.id && editingSection === 'general' ? <>
-                      <div className="repo-edit-form">
-                        <label className="repo-field">Workspace Name<input value={editDraft.name} onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })} /></label>
-						<label className="repo-field">Local Path<input value={editDraft.path} disabled={Boolean(repo.clonePathManaged)} onChange={(event) => setEditDraft({ ...editDraft, path: event.target.value })} />{repo.clonePathManaged && <small>Managed clone paths are immutable; remove and register the workspace again to use another checkout.</small>}</label>
-                        <BranchField value={editDraft.baselineBranch} onChange={(value) => setEditDraft({ ...editDraft, baselineBranch: value })} />
-                      </div>
-                      <div className="repo-row-actions">
-                        <button className="secondary" type="button" onClick={discardEdit} disabled={busy}>Cancel</button>
-                        <button className="primary" type="button" onClick={() => saveEdit(repo)} disabled={busy}>Save general settings</button>
-                      </div>
-                    </> : <>
-                      <dl className="workspace-overview-grid">
-                        <div><dt>Location</dt><dd>{repo.location === 'cloud_agent' ? (repo.localRootLabel || 'Cloud Agent workspace') : repo.location === 'cloud_remote_snapshot' ? 'Remote Snapshot (read-only)' : <button className="repo-path-link" type="button" onClick={() => revealPath(repo.path)} title={repo.path}>{repo.path}</button>}</dd></div>
-                        <div><dt>Base branch</dt><dd>{repo.baselineBranch}</dd></div>
-                        <div><dt>Registration</dt><dd>{repo.location === 'cloud_agent' ? 'Cloud Agent' : repo.location === 'cloud_remote_snapshot' ? 'Remote Snapshot' : repo.registrationMode === 'remote_clone' ? 'Remote clone' : repo.registrationMode === 'existing_workspace' ? 'Imported workspace' : 'Local folder'}</dd></div>
-                        {repo.agentId && <div><dt>Agent</dt><dd>{repo.agentId}</dd></div>}
-						{repo.location === 'cloud_remote_snapshot' && <><div><dt>Repository</dt><dd>{repo.providerRepository || 'Not selected'}</dd></div><div><dt>Ref</dt><dd>{repo.selectedRef || 'Not selected'}</dd></div><div><dt>Commit</dt><dd>{repo.resolvedCommitSha || 'Resolved when opened'}</dd></div></>}
-                        {repo.scanStatus && <div><dt>Scan</dt><dd>{repo.scanStatus}</dd></div>}
-                        {repo.remoteUrl && <div><dt>Remote URL</dt><dd>{repo.remoteUrl}</dd></div>}
-                        <div><dt>Created</dt><dd>{repo.createdAt ? new Date(repo.createdAt).toLocaleString() : 'Unknown'}</dd></div>
-                      </dl>
-                      <div className="repo-row-actions workspace-detail-actions">
-						{repo.location !== 'cloud_agent' && repo.location !== 'cloud_remote_snapshot' && <button className="secondary" type="button" onClick={() => revealPath(repo.path)}><ExternalLink size={16} /> Reveal folder</button>}
-						{repo.location !== 'cloud_agent' && repo.location !== 'cloud_remote_snapshot' && <button className="primary" type="button" onClick={() => startEdit(repo, 'general')}><Pencil size={16} /> Edit general</button>}
-                      </div>
-						{repo.location === 'cloud_remote_snapshot' && <p className="workspace-inline-notice">This is a read-only provider snapshot. Run local Git or terminal work on your machine; Cloud cannot launch or observe that terminal.</p>}
-                    </>}
+                    <WorkspaceGeneralSection repo={repo} edit={edit} busy={busy} onReveal={(path) => void revealPath(path)} />
                   </OverviewSection>
 
                   <OverviewSection title="Sources" collapsed={collapsedOverviewSections.sources} onToggle={() => toggleOverviewSection('sources')}>
-                    {editingId === repo.id && editingSection === 'sources' ? <>
-                      <SourcesField value={editDraft.sources} onChange={(value) => setEditDraft({ ...editDraft, sources: value })} />
-                      <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)}>Save sources</button></div>
-                    </> : <>
-                      <div className="workspace-source-list">
-                        {workspaceSources(repo).map((source) => <div className="workspace-source-row" key={source.path}>
-                          <div><strong>{source.path}</strong><span>Workspace source directory</span></div>
-                          <fieldset className="workspace-source-shown-in" aria-label={`Shown in for ${source.path}`}>
-                            <legend>Shown in</legend>
-                            {sourceSurfaces.map((surface) => <label key={surface}>
-                              <input type="checkbox" checked={source.shownIn.includes(surface)} disabled={!canWrite || busy || (source.shownIn.length === 1 && source.shownIn[0] === surface)} onChange={() => void saveShownIn(repo, source.path, surface)} />
-                              {sourceSurfaceLabels[surface]}
-                            </label>)}
-                          </fieldset>
-                          <button className="secondary" type="button" onClick={() => void openSourceSettings(repo, source.path)} disabled={!canWrite}><SlidersHorizontal size={15} /> Configure structure</button>
-                        </div>)}
-                        {sourcePaths(repo).length === 0 && <div className="empty-inline">No sources configured.</div>}
-                      </div>
-                      <div className="workspace-detail-actions"><button className="primary" type="button" onClick={() => startEdit(repo, 'sources')} disabled={!canWrite}><Pencil size={16} /> Edit sources</button></div>
-                    </>}
+                    <WorkspaceSourcesSection repo={repo} edit={edit} busy={busy} canWrite={canWrite} onShownIn={(path, surface) => void saveShownIn(repo, path, surface)} onConfigure={(path) => void openSourceSettings(repo, path)} />
                   </OverviewSection>
                 </section>}
 
@@ -575,16 +530,7 @@ const busy = pendingOperations.length > 0;
                 </section>}
 
                 {activeDetailTab === 'integrations' && <section className="workspace-detail-section">
-                  {editingId === repo.id && isIntegrationEditSection(editingSection) ? <>
-                    {editingSection === 'jira' && <JiraConnectionFields value={editDraft.jira} onChange={(value) => setEditDraft({ ...editDraft, jira: value })} workspaceId={repo.id} />}
-                    {editingSection === 'knowledge' && <KnowledgeSettingsFields value={editDraft.knowledge} onChange={(value) => setEditDraft({ ...editDraft, knowledge: value })} />}
-                    {editingSection === 'runtime' && <RuntimeSettingsFields value={editDraft.runtime} onChange={(value) => setEditDraft({ ...editDraft, runtime: value })} />}
-                    <div className="repo-row-actions"><button className="secondary" type="button" onClick={discardEdit} disabled={busy}>Cancel</button><button className="primary" type="button" onClick={() => saveEdit(repo)} disabled={busy}>{integrationSaveLabel(editingSection)}</button></div>
-                  </> : <><div className="workspace-integration-card">
-                    <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
-                    <button className="secondary" type="button" onClick={() => startEdit(repo, 'jira')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
-                  </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'knowledge')}>Configure</button></div><div className="workspace-integration-card"><div><strong>Runtime and verification</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => startEdit(repo, 'runtime')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div>
-                  {showHarness && <HarnessSettingsSection key={`${repo.id}:${settingsImports}`} workspaceId={repo.id} part="sources" />}</>}
+                  <WorkspaceIntegrations repo={repo} edit={edit} busy={busy} showHarness={showHarness} settingsKey={`${repo.id}:${settingsImports}`} />
                 </section>}
 
                 {activeDetailTab === 'agents' && <WorkspaceOwnSettings key={`${repo.id}:${settingsImports}`} workspace={repo} showHarness={showHarness} />}
