@@ -101,94 +101,138 @@ func (a *Access) searchContentRoot(ctx context.Context, workspace models.Workspa
 	if err != nil {
 		return err
 	}
-	type directory struct{ path, full string }
-	queue := []directory{{cleanRoot, fullRoot}}
-	for len(queue) > 0 {
-		if err := ctx.Err(); err != nil {
+	search := &contentRootSearch{ctx: ctx, access: a, workspace: workspace, request: request, budget: budget, response: response}
+	search.queue = []searchDirectory{{cleanRoot, fullRoot}}
+	return search.run()
+}
+
+type searchDirectory struct{ path, full string }
+
+// contentRootSearch walks one search root breadth first, within the budget
+// shared by every root of a request.
+type contentRootSearch struct {
+	ctx       context.Context
+	access    *Access
+	workspace models.WorkspaceConfig
+	request   models.WorkspaceContentSearchRequest
+	budget    *models.WorkspaceContentSearchBudget
+	response  *models.WorkspaceContentSearchResponse
+	queue     []searchDirectory
+}
+
+func (s *contentRootSearch) run() error {
+	for len(s.queue) > 0 {
+		if err := s.ctx.Err(); err != nil {
 			return err
 		}
-		current := queue[0]
-		queue = queue[1:]
-		entries, err := os.ReadDir(current.full)
-		if err != nil {
-			response.SkippedFiles++
-			continue
-		}
-		sort.SliceStable(entries, func(i, j int) bool { return naturalLess(entries[i].Name(), entries[j].Name()) })
-		paths := make([]string, len(entries))
-		for i, entry := range entries {
-			paths[i] = joinRelative(current.path, entry.Name())
-		}
-		ignored := map[string]bool{}
-		if a.ignore != nil && len(paths) > 0 {
-			ignored, err = a.ignore.Ignored(workspace.Path, paths)
-			if err != nil {
-				return err
-			}
-		}
-		for i, entry := range entries {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			path := paths[i]
-			if protected(path) || (ignored[path] && !request.IncludeIgnored) {
-				continue
-			}
-			_, full, err := resolve(workspace.Path, path, entry.IsDir())
-			if err != nil {
-				continue
-			}
-			info, err := os.Stat(full)
-			if err != nil {
-				response.SkippedFiles++
-				continue
-			}
-			if info.IsDir() {
-				queue = append(queue, directory{path, full})
-				continue
-			}
-			if !info.Mode().IsRegular() {
-				response.SkippedFiles++
-				continue
-			}
-			if budget.FilesVisited >= budget.MaxFiles {
-				response.Truncated = true
-				return nil
-			}
-			budget.FilesVisited++
-			if info.Size() > budget.MaxFileSize {
-				response.SkippedFiles++
-				continue
-			}
-			if budget.BytesRead+info.Size() > budget.MaxBytes {
-				response.Truncated = true
-				return nil
-			}
-			data, changed, err := readStableContentFile(full, info)
-			if err != nil || changed || fileaccess.IsBinary(data) {
-				response.SkippedFiles++
-				continue
-			}
-			budget.BytesRead += int64(len(data))
-			classification := fileaccess.ClassifyPath(path)
-			matches, exhausted, err := contentLineMatches(ctx, data, request.Query, request.CaseSensitive, budget.MaxSnippetLength, budget.MaxResults-budget.Results)
-			if err != nil {
-				return err
-			}
-			for _, match := range matches {
-				match.ID = fmt.Sprintf("%s:%s:%d:%d", workspace.ID, fileid.Encode(path), match.LineNumber, match.ColumnStart)
-				match.WorkspaceID, match.WorkspaceName = workspace.ID, workspace.Name
-				match.Path, match.Name, match.Kind, match.Language, match.Ignored = path, filepath.Base(path), classification.Kind, classification.Language, ignored[path]
-				response.Results = append(response.Results, match)
-				budget.Results++
-			}
-			if exhausted {
-				response.Truncated = true
-				return nil
-			}
+		current := s.queue[0]
+		s.queue = s.queue[1:]
+		stop, err := s.visitDirectory(current)
+		if stop || err != nil {
+			return err
 		}
 	}
 	return nil
+}
+
+// visitDirectory searches a directory's files in natural order and queues
+// its subdirectories. stop means the budget ran out.
+func (s *contentRootSearch) visitDirectory(current searchDirectory) (bool, error) {
+	entries, err := os.ReadDir(current.full)
+	if err != nil {
+		s.response.SkippedFiles++
+		return false, nil
+	}
+	sort.SliceStable(entries, func(i, j int) bool { return naturalLess(entries[i].Name(), entries[j].Name()) })
+	paths := make([]string, len(entries))
+	for i, entry := range entries {
+		paths[i] = joinRelative(current.path, entry.Name())
+	}
+	ignored := map[string]bool{}
+	if s.access.ignore != nil && len(paths) > 0 {
+		ignored, err = s.access.ignore.Ignored(s.workspace.Path, paths)
+		if err != nil {
+			return false, err
+		}
+	}
+	for i, entry := range entries {
+		if err := s.ctx.Err(); err != nil {
+			return false, err
+		}
+		path := paths[i]
+		if protected(path) || (ignored[path] && !s.request.IncludeIgnored) {
+			continue
+		}
+		stop, err := s.visitEntry(path, entry.IsDir(), ignored[path])
+		if stop || err != nil {
+			return stop, err
+		}
+	}
+	return false, nil
+}
+
+func (s *contentRootSearch) visitEntry(path string, isDir, ignored bool) (bool, error) {
+	_, full, err := resolve(s.workspace.Path, path, isDir)
+	if err != nil {
+		return false, nil
+	}
+	info, err := os.Stat(full)
+	if err != nil {
+		s.response.SkippedFiles++
+		return false, nil
+	}
+	if info.IsDir() {
+		s.queue = append(s.queue, searchDirectory{path, full})
+		return false, nil
+	}
+	if !info.Mode().IsRegular() {
+		s.response.SkippedFiles++
+		return false, nil
+	}
+	return s.searchFile(path, full, info, ignored)
+}
+
+// searchFile reads one regular file within the budget and appends its
+// matching lines. stop means the budget ran out.
+func (s *contentRootSearch) searchFile(path, full string, info os.FileInfo, ignored bool) (bool, error) {
+	budget, response := s.budget, s.response
+	if budget.FilesVisited >= budget.MaxFiles {
+		response.Truncated = true
+		return true, nil
+	}
+	budget.FilesVisited++
+	if info.Size() > budget.MaxFileSize {
+		response.SkippedFiles++
+		return false, nil
+	}
+	if budget.BytesRead+info.Size() > budget.MaxBytes {
+		response.Truncated = true
+		return true, nil
+	}
+	data, changed, err := readStableContentFile(full, info)
+	if err != nil || changed || fileaccess.IsBinary(data) {
+		response.SkippedFiles++
+		return false, nil
+	}
+	budget.BytesRead += int64(len(data))
+	classification := fileaccess.ClassifyPath(path)
+	matches, exhausted, err := contentLineMatches(s.ctx, data, s.request.Query, s.request.CaseSensitive, budget.MaxSnippetLength, budget.MaxResults-budget.Results)
+	if err != nil {
+		return false, err
+	}
+	workspace := s.workspace
+	for _, match := range matches {
+		match.ID = fmt.Sprintf("%s:%s:%d:%d", workspace.ID, fileid.Encode(path), match.LineNumber, match.ColumnStart)
+		match.WorkspaceID, match.WorkspaceName = workspace.ID, workspace.Name
+		match.Path, match.Name, match.Kind, match.Language, match.Ignored = path, filepath.Base(path), classification.Kind, classification.Language, ignored
+		response.Results = append(response.Results, match)
+		budget.Results++
+	}
+	if exhausted {
+		response.Truncated = true
+		return true, nil
+	}
+	return false, nil
 }
 
 func readStableContentFile(path string, before os.FileInfo) ([]byte, bool, error) {
