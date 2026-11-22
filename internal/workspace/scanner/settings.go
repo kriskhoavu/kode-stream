@@ -13,6 +13,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/atomicfile"
 )
 
 const SourceStructureSettingsFile = "workspace-settings.yaml"
@@ -267,39 +268,7 @@ func atomicWriteSettings(target string, data []byte) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(target), ".workspace-settings-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(temporaryPath, target); err != nil {
-		return err
-	}
-	directory, err := os.Open(filepath.Dir(target))
-	if err != nil {
-		return err
-	}
-	if err := directory.Sync(); err != nil {
-		_ = directory.Close()
-		return err
-	}
-	return directory.Close()
+	return atomicfile.Replace(target, ".workspace-settings-*", data, mode)
 }
 
 // ReadSourceStructureSettingsFile reads the file at path as it is, to restore

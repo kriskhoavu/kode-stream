@@ -10,6 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/atomicfile"
 	gitadapter "kode-stream/internal/git"
 	"kode-stream/internal/workspace/scanner"
 )
@@ -221,37 +222,7 @@ func atomicWritePlan(path string, data []byte) error {
 	} else if !os.IsNotExist(err) {
 		return err
 	}
-	dir := filepath.Dir(path)
-	temporary, err := os.CreateTemp(dir, ".plan.yaml-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(temporaryPath, path); err != nil {
-		return err
-	}
-	directory, err := os.Open(dir)
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
-	return directory.Sync()
+	return atomicfile.Replace(path, ".plan.yaml-*", data, mode)
 }
 
 func compactPlanMetadata(root string, meta *planYAML) {

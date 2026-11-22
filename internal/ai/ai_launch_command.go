@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"kode-stream/internal/filesystem/atomicfile"
 )
 
 func writeWrapper(wrapperDir, workspace, executable string, args []string, checkpoint verificationCheckpoint) (string, error) {
@@ -48,24 +50,7 @@ func checkpointCommand(checkpoint verificationCheckpoint) string {
 }
 
 func writeAtomic(path string, data []byte, mode os.FileMode) error {
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".ai-session-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryPath, path)
+	return atomicfile.Replace(path, ".ai-session-*", data, mode)
 }
 
 func expand(value string, values map[string]string) string {

@@ -9,6 +9,8 @@ import (
 	"sync"
 
 	"gopkg.in/yaml.v3"
+
+	"kode-stream/internal/filesystem/atomicfile"
 )
 
 const indexSchemaVersion = 1
@@ -132,43 +134,12 @@ func (s *Store) save(index persistedIndex) error {
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return statErr
 	}
-	temporary, err := os.CreateTemp(directory, ".knowledge-index-*.tmp")
+	temporaryPath, err := atomicfile.WriteTemp(directory, ".knowledge-index-*.tmp", mode, data, atomicfile.Hooks{AfterWrite: s.hooks.afterWrite, AfterSync: s.hooks.afterSync, AfterClose: s.hooks.afterClose})
+	if temporaryPath != "" {
+		defer os.Remove(temporaryPath)
+	}
 	if err != nil {
 		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		temporary.Close()
-		return err
-	}
-	if s.hooks.afterWrite != nil {
-		if err := s.hooks.afterWrite(); err != nil {
-			_ = temporary.Close()
-			return err
-		}
-	}
-	if err := temporary.Sync(); err != nil {
-		temporary.Close()
-		return err
-	}
-	if s.hooks.afterSync != nil {
-		if err := s.hooks.afterSync(); err != nil {
-			_ = temporary.Close()
-			return err
-		}
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if s.hooks.afterClose != nil {
-		if err := s.hooks.afterClose(); err != nil {
-			return err
-		}
 	}
 	if err := os.Rename(temporaryPath, s.path); err != nil {
 		return err
@@ -219,37 +190,7 @@ func removeIndex(path string) error {
 }
 
 func restoreIndex(path string, data []byte, mode os.FileMode) error {
-	directory := filepath.Dir(path)
-	temporary, err := os.CreateTemp(directory, ".knowledge-index-restore-*.tmp")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(temporaryPath, path); err != nil {
-		return err
-	}
-	parent, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	defer parent.Close()
-	return parent.Sync()
+	return atomicfile.Replace(path, ".knowledge-index-restore-*.tmp", data, mode)
 }
 
 func sortWikis(wikis []KnowledgeWiki) []KnowledgeWiki {

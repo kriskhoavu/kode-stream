@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"kode-stream/internal/filesystem/atomicfile"
 )
 
 type Paths struct {
@@ -235,36 +237,7 @@ func atomicWriteFile(path string, data []byte, mode os.FileMode) error {
 }
 
 func atomicWriteFileWithRename(path string, data []byte, mode os.FileMode, rename func(string, string) error) error {
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".bootstrap-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := rename(temporaryPath, path); err != nil {
-		return err
-	}
-	directory, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
-	return directory.Sync()
+	return atomicfile.ReplaceWith(path, ".bootstrap-*", data, mode, rename)
 }
 
 func readBootstrapSettings(settingsPath string) (bootstrapSettings, error) {

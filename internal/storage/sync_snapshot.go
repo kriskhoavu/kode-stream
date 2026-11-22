@@ -16,6 +16,7 @@ import (
 	"kode-stream/internal/audit"
 	"kode-stream/internal/canvas"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/atomicfile"
 	itemindex "kode-stream/internal/item/index"
 	"kode-stream/internal/navigation"
 	"kode-stream/internal/system"
@@ -398,28 +399,7 @@ func writeYAMLFile(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".storage-write-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(0o600); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryPath, path)
+	return atomicfile.Replace(path, ".storage-write-*", data, 0o600)
 }
 
 func writeAuditLog(path string, events []models.AuditEvent) error {

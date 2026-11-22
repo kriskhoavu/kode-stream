@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"kode-stream/internal/filesystem/atomicfile"
 	"kode-stream/internal/filesystem/pathguard"
 )
 
@@ -100,7 +101,7 @@ func replaceExisting(root, relative string, content []byte, expectedHash string,
 	if err != nil {
 		return Result{}, err
 	}
-	temporaryPath, err := writeTemporary(directory, initial.Mode().Perm(), content, hooks)
+	temporaryPath, err := atomicfile.WriteTemp(directory, ".kode-stream-write-*", initial.Mode().Perm(), content, atomicfile.Hooks{AfterWrite: hooks.afterWrite, AfterSync: hooks.afterSync, AfterClose: hooks.afterClose})
 	if temporaryPath != "" {
 		defer os.Remove(temporaryPath)
 	}
@@ -120,14 +121,6 @@ func replaceExisting(root, relative string, content []byte, expectedHash string,
 		return Result{}, err
 	}
 	return Result{Path: full, Hash: hash(content), Mode: initial.Mode().Perm()}, nil
-}
-
-// runHook calls a failure hook when one is set.
-func runHook(hook func() error) error {
-	if hook == nil {
-		return nil
-	}
-	return hook()
 }
 
 // readExisting reads a regular, non-symlink file no larger than maxBytes,
@@ -161,32 +154,12 @@ func readExisting(full string, maxBytes int64) (os.FileInfo, []byte, error) {
 	return initial, current, nil
 }
 
-// writeTemporary writes content to a synced, closed temporary file beside
-// the target. It returns the temporary path whenever one was created, so the
-// caller removes it on every path.
-func writeTemporary(directory string, mode os.FileMode, content []byte, hooks failureHooks) (string, error) {
-	temporary, err := os.CreateTemp(directory, ".kode-stream-write-*")
-	if err != nil {
-		return "", err
+// runHook calls a failure hook when one is set.
+func runHook(hook func() error) error {
+	if hook == nil {
+		return nil
 	}
-	path := temporary.Name()
-	steps := []func() error{
-		func() error { return temporary.Chmod(mode) },
-		func() error { _, err := temporary.Write(content); return err },
-		func() error { return runHook(hooks.afterWrite) },
-		temporary.Sync,
-		func() error { return runHook(hooks.afterSync) },
-	}
-	for _, step := range steps {
-		if err := step(); err != nil {
-			_ = temporary.Close()
-			return path, err
-		}
-	}
-	if err := temporary.Close(); err != nil {
-		return path, err
-	}
-	return path, runHook(hooks.afterClose)
+	return hook()
 }
 
 // requireUnchanged refuses publication when the target or its parent changed
@@ -225,37 +198,7 @@ func publishRename(directory string, hooks failureHooks) error {
 }
 
 func restore(target string, data []byte, mode os.FileMode) error {
-	directory := filepath.Dir(target)
-	temporary, err := os.CreateTemp(directory, ".kode-stream-restore-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(temporaryPath, target); err != nil {
-		return err
-	}
-	dir, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-	return dir.Sync()
+	return atomicfile.Replace(target, ".kode-stream-restore-*", data, mode)
 }
 
 func hash(data []byte) string {

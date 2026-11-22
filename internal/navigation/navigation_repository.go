@@ -14,6 +14,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"kode-stream/internal/common/models"
+	"kode-stream/internal/filesystem/atomicfile"
 )
 
 type NavigationRepository struct {
@@ -297,36 +298,7 @@ func writeYAML(path string, value any) error {
 	if err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".navigation-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(0o600); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(temporaryPath, path); err != nil {
-		return err
-	}
-	directory, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	defer directory.Close()
-	return directory.Sync()
+	return atomicfile.Replace(path, ".navigation-*", data, 0o600)
 }
 
 func normalizeOwner(owner string) string {
