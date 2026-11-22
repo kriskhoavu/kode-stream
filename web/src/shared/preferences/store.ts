@@ -34,6 +34,11 @@ export function readStringPreference(key: string, fallback = '', source = storag
   }
 }
 
+/** A preference stored as '1' (on) or '0' (off). */
+export function readTogglePreference(key: string, source = storage()): boolean {
+  return readStringPreference(key, '', source) === '1';
+}
+
 export function writePreference(key: string, value: unknown, source = storage()): boolean {
   try {
     const serialized = typeof value === 'string' ? value : JSON.stringify(value);

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useModalDialog } from '../components/overlay';
-import { readStringPreference, writePreference } from '../shared/preferences/store';
+import { readStringPreference, writePreference, readTogglePreference } from '../shared/preferences/store';
 import { RecentGitActivity } from '../components/RecentGitActivity';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
@@ -561,7 +561,7 @@ function ExplorerInspector({ workspace, row, file }: { workspace?: WorkspaceConf
   const [git, setGit] = useState<GitStatus | null>(null);
   const [activity, setActivity] = useState<GitActivityEntry[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(() => readStoredToggle('explorer.inspector.gitActivityOpen'));
+  const [activityOpen, setActivityOpen] = useState(() => readTogglePreference('explorer.inspector.gitActivityOpen'));
   const [health, setHealth] = useState<WorkspaceHealth | null>(null);
   const [item, setItem] = useState<ItemSummary | null>(null);
   const activityPath = row?.node.type === 'file' || row?.node.type === 'directory'
@@ -668,6 +668,3 @@ function restrictRowsToRoot(rows: VisibleExplorerRow[], workspaceId: string | un
     }));
 }
 
-function readStoredToggle(key: string): boolean {
-  return readStringPreference(key) === '1';
-}

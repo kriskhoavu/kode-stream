@@ -25,12 +25,12 @@ import {
 } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useModalDialog } from '../components/overlay';
-import { readStringPreference, writePreference } from '../shared/preferences/store';
-import { RecentGitActivity } from '../components/RecentGitActivity';
+import { ItemGitPanel } from '../features/item-git/ItemGitPanel';
+import { useItemGit } from '../features/item-git/useItemGit';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api, statusLabels } from '../shared/api';
-import type { FileContent, FileNode, GitActivityEntry, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile, WorkspaceConfig, WorkspaceTreeEntry } from '../lib/types';
+import type { FileContent, FileNode, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile, WorkspaceConfig, WorkspaceTreeEntry } from '../lib/types';
 import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import type { DiffFile } from '../shared/domain/diff';
@@ -73,15 +73,6 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const [files, setFiles] = useState<FileNode[]>([]);
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
   const [savingMetadata, setSavingMetadata] = useState(false);
-  const [gitStatus, setGitStatus] = useState<GitStatus | null>(null);
-  const [gitActivity, setGitActivity] = useState<GitActivityEntry[]>([]);
-  const [gitActivityLoading, setGitActivityLoading] = useState(false);
-  const [gitLoading, setGitLoading] = useState(false);
-  const [gitMessage, setGitMessage] = useState('');
-  const [selectedGitPaths, setSelectedGitPaths] = useState<string[]>([]);
-  const [branchName, setBranchName] = useState('');
-  const [gitBusy, setGitBusy] = useState('');
-  const [gitActivityOpen, setGitActivityOpen] = useState(() => readStoredToggle('item.details.gitActivityOpen'));
   const [diff, setDiff] = useState('');
   const [diffMode, setDiffMode] = useState<DiffMode>('review');
   const [revertingFile, setRevertingFile] = useState(false);
@@ -123,8 +114,6 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const verificationTestsAbortRef = useRef<AbortController | undefined>(undefined);
   const e2eRunbooksAbortRef = useRef<AbortController | undefined>(undefined);
   const specPickerAbortRef = useRef<AbortController | undefined>(undefined);
-  const gitStatusAbortRef = useRef<AbortController | undefined>(undefined);
-  const gitActivityAbortRef = useRef<AbortController | undefined>(undefined);
   const [contentSearchIndex, setContentSearchIndex] = useState(0);
   const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const fileTreeRef = useRef<HTMLDivElement | null>(null);
@@ -319,8 +308,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
       owner: plan.owner ?? '',
       tags: plan.tags
     });
-    void loadGitStatus(plan.workspaceId);
-    return () => gitStatusAbortRef.current?.abort();
+    void git.loadStatus();
   }, [plan]);
 
   useEffect(() => {
@@ -517,6 +505,13 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const diffFiles = useMemo(() => parseGitDiff(diff), [diff]);
   const selectedGitPath = useMemo(() => currentGitPath(plan, file), [plan, file]);
   const activityPath = plan?.itemPath || '';
+  const git = useItemGit({
+    workspaceId: plan?.workspaceId,
+    activityPath,
+    onChanged: () => onContentChanged?.(),
+    onProblem: (problem) => 'result' in problem ? showGitResultError(problem.result) : showOperationError(problem.caught, problem.fallback)
+  });
+  const gitStatus = git.status;
   const selectedFileHasDiff = Boolean(selectedGitPath && diffFiles.some((item) => item.path === selectedGitPath || item.oldPath === selectedGitPath));
   const hasFiles = useMemo(() => hasFile(files), [files]);
   const visibleWarnings = useMemo(() => visibleItemWarnings(plan), [plan]);
@@ -581,48 +576,6 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     resizeCleanupRef.current = cancel;
   };
 
-  const loadGitStatus = async (workspaceId: string) => {
-    gitStatusAbortRef.current?.abort();
-    const controller = new AbortController();
-    gitStatusAbortRef.current = controller;
-    setGitLoading(true);
-    try {
-      const status = await api.gitStatus(workspaceId, controller.signal);
-      if (!controller.signal.aborted) setGitStatus(status);
-    } catch {
-      if (!controller.signal.aborted) setGitStatus(null);
-    } finally {
-      if (!controller.signal.aborted) setGitLoading(false);
-      if (gitStatusAbortRef.current === controller) gitStatusAbortRef.current = undefined;
-    }
-  };
-
-  const loadGitActivity = async (workspaceId: string, path: string) => {
-    gitActivityAbortRef.current?.abort();
-    const controller = new AbortController();
-    gitActivityAbortRef.current = controller;
-    setGitActivityLoading(true);
-    try {
-      const activity = await api.gitActivity(workspaceId, { path: path || undefined, limit: 8, signal: controller.signal });
-      if (!controller.signal.aborted) setGitActivity(activity);
-    } catch {
-      if (!controller.signal.aborted) setGitActivity([]);
-    } finally {
-      if (!controller.signal.aborted) setGitActivityLoading(false);
-      if (gitActivityAbortRef.current === controller) gitActivityAbortRef.current = undefined;
-    }
-  };
-
-  useEffect(() => {
-    if (!plan) {
-      setGitActivity([]);
-      setGitActivityLoading(false);
-      return;
-    }
-    void loadGitActivity(plan.workspaceId, activityPath);
-    return () => gitActivityAbortRef.current?.abort();
-  }, [plan?.workspaceId, activityPath]);
-
   const loadDiff = async () => {
     try {
       const payload = await api.diff(itemId);
@@ -632,80 +585,15 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     }
   };
 
-  const runGitOperation = async (operation: 'fetch' | 'pull' | 'push') => {
-    if (!plan) return;
-    setGitBusy(operation);
-    setError('');
-    try {
-      const result = operation === 'fetch'
-        ? await api.gitFetch(plan.workspaceId)
-        : operation === 'pull'
-			? await api.gitPull(plan.workspaceId, {})
-          : await api.gitPush(plan.workspaceId);
-      setGitStatus(result.status);
-      await loadGitActivity(plan.workspaceId, activityPath);
-      if (operation === 'pull') await onContentChanged?.();
-      if (!result.ok) showGitResultError(result);
-      else notifyReliabilityChanged();
-    } catch (err) {
-      showOperationError(err, `${operation} failed`);
-    } finally {
-      setGitBusy('');
-    }
-  };
-
   const refreshGitDetails = async () => {
     if (!plan) return;
     setError('');
     setRecoveryHint('');
     await Promise.all([
-      loadGitStatus(plan.workspaceId),
-      loadGitActivity(plan.workspaceId, activityPath),
+      git.loadStatus(),
+      git.loadActivity(),
       loadDiff()
     ]);
-  };
-
-  const commitSelectedPaths = async () => {
-    if (!plan) return;
-    setGitBusy('commit');
-    setError('');
-    try {
-      const result = await api.gitCommit(plan.workspaceId, { message: gitMessage, paths: selectedGitPaths });
-      setGitStatus(result.status);
-      await loadGitActivity(plan.workspaceId, activityPath);
-      setGitMessage('');
-      setSelectedGitPaths([]);
-      await onContentChanged?.();
-      if (!result.ok) showGitResultError(result);
-      else notifyReliabilityChanged();
-    } catch (err) {
-      showOperationError(err, 'Commit failed');
-    } finally {
-      setGitBusy('');
-    }
-  };
-
-  const createAndSwitchBranch = async () => {
-    if (!plan || !branchName.trim()) return;
-    setGitBusy('branch');
-    setError('');
-    try {
-      const result = await api.createBranch(plan.workspaceId, { name: branchName.trim(), checkout: true });
-      setGitStatus(result.status);
-      await loadGitActivity(plan.workspaceId, activityPath);
-      setBranchName('');
-      await onContentChanged?.();
-      if (!result.ok) showGitResultError(result);
-      else notifyReliabilityChanged();
-    } catch (err) {
-      showOperationError(err, 'Branch operation failed');
-    } finally {
-      setGitBusy('');
-    }
-  };
-
-  const toggleGitPath = (path: string) => {
-    setSelectedGitPaths((current) => current.includes(path) ? current.filter((item) => item !== path) : [...current, path]);
   };
 
   const openGitChangePath = (change: GitChange) => {
@@ -774,7 +662,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const scheduleFileChangeRefresh = () => {
     clearTimer(autoSaveRefreshTimerRef);
     autoSaveRefreshTimerRef.current = window.setTimeout(() => {
-      if (plan) void loadGitStatus(plan.workspaceId);
+      if (plan) void git.loadStatus();
       void loadDiff();
     }, 700);
   };
@@ -788,7 +676,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
       const updated = await api.file(itemId, file.id);
       editor.open(updated);
       await loadDiff();
-      await loadGitStatus(plan.workspaceId);
+      await git.loadStatus();
       await onContentChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Revert failed');
@@ -806,7 +694,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
 		const result = await api.saveMetadata(itemId, { ...metadataDraft, expectedRevision: plan.metadataRevision });
 		setPlan(result.item);
 		if (result.refreshRequired) setRecoveryHint(result.refreshError || 'The change was committed; reload the item to refresh its index.');
-      if (plan) await loadGitStatus(plan.workspaceId);
+      if (plan) await git.loadStatus();
       await onContentChanged?.();
       notifyReliabilityChanged();
     } catch (err) {
@@ -1103,56 +991,10 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     </section>
   );
 
-  const gitPanel = gitStatus ? (
-    <section className="git-panel git-side-panel">
-      <div className="git-summary">
-        <span>{gitStatus.branch}</span>
-        <span>{gitStatus.ahead} ahead</span>
-        <span>{gitStatus.behind} behind</span>
-      </div>
-      <div className="workspace-actions">
-        <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('fetch')}>{gitBusy === 'fetch' ? 'Fetching...' : 'Fetch'}</button>
-        <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('pull')}>{gitBusy === 'pull' ? 'Pulling...' : 'Pull'}</button>
-        <button className="secondary" type="button" disabled={Boolean(gitBusy)} onClick={() => runGitOperation('push')}>{gitBusy === 'push' ? 'Pushing...' : 'Push'}</button>
-      </div>
-      <div className="git-changes">
-        {gitStatus.changes.length === 0 && <span>No local changes</span>}
-        {gitStatus.changes.map((change) => (
-          <div className="git-change-row" key={`${change.status}-${change.path}`}>
-            <input type="checkbox" aria-label={`Select ${change.path} for commit`} checked={selectedGitPaths.includes(change.path)} onChange={() => toggleGitPath(change.path)} />
-            <span>{change.status}</span>
-            <button className="git-change-path" type="button" title={change.path} onClick={() => openGitChangePath(change)}>{change.path}</button>
-          </div>
-        ))}
-      </div>
-      <textarea className="commit-message" value={gitMessage} onChange={(event) => setGitMessage(event.target.value)} placeholder="Commit message" />
-      <button className="primary" type="button" disabled={Boolean(gitBusy) || selectedGitPaths.length === 0 || !gitMessage.trim()} onClick={commitSelectedPaths}>
-        {gitBusy === 'commit' ? 'Committing...' : 'Commit Selected'}
-      </button>
-      <div className="branch-create-row">
-        <input value={branchName} onChange={(event) => setBranchName(event.target.value)} placeholder="New Branch" />
-        <button className="secondary" type="button" disabled={Boolean(gitBusy) || !branchName.trim()} onClick={createAndSwitchBranch}>
-          {gitBusy === 'branch' ? 'Creating...' : 'Create Branch'}
-        </button>
-      </div>
-      <details className="recent-activity-panel" open={gitActivityOpen} onToggle={(event) => {
-        const open = event.currentTarget.open;
-        setGitActivityOpen(open);
-        writePreference('item.details.gitActivityOpen', open ? '1' : '0');
-      }}>
-        <summary>
-          <span>Recent Activity</span>
-          <small>{gitActivity.length} events</small>
-        </summary>
-        <RecentGitActivity entries={gitActivity} loading={gitActivityLoading} emptyLabel="No activity found for this item." pathLabel={activityPath || 'workspace'} />
-      </details>
-    </section>
-  ) : (
-    <div className="metadata-callout git-side-panel">
-      <strong>Git status unavailable</strong>
-      <span>Refresh the workspace or scan the source to load Git information.</span>
-    </div>
+  const gitPanel = (
+    <ItemGitPanel git={git} className="git-panel git-side-panel" activityOpenPreference="item.details.gitActivityOpen" branchPlaceholder="New Branch" onOpenPath={openGitChangePath} unavailable={{ className: 'metadata-callout git-side-panel', hint: 'Refresh the workspace or scan the source to load Git information.' }} />
   );
+
 
   const workItemPanelContent = (
     <>
@@ -1280,7 +1122,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
             type="button"
             aria-label={gitStatus?.dirty ? 'Refresh Git status, activity, and diff; local changes present' : 'Refresh Git status, activity, and diff'}
             title={gitStatus?.dirty ? 'Local changes present. Refresh Git status, activity, and diff.' : 'Refresh Git status, activity, and diff'}
-            disabled={gitLoading || !plan}
+            disabled={git.statusLoading || !plan}
             onClick={() => void refreshGitDetails()}
           >
             <RefreshCw size={18} />
@@ -1735,10 +1577,6 @@ function parentDirectoryPath(path: string): string {
   const normalized = path.replace(/\/+$/, '');
   const separator = normalized.lastIndexOf('/');
   return separator >= 0 ? normalized.slice(0, separator) : '';
-}
-
-function readStoredToggle(key: string): boolean {
-  return readStringPreference(key) === '1';
 }
 
 function visibleItemWarnings(plan: ItemDetail | null): { itemPath?: string; message: string }[] {

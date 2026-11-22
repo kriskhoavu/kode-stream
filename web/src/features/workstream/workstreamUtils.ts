@@ -1,5 +1,4 @@
 import type { MutableRefObject } from 'react';
-import { readStringPreference } from '../../shared/preferences/store';
 import { ApiError } from '../../shared/api';
 
 export function clearTimeoutRef(ref: MutableRefObject<number | null>) {
@@ -16,10 +15,6 @@ export function operationErrorMessage(caught: unknown, fallback: string) {
 
 export function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
-}
-
-export function readStoredToggle(key: string): boolean {
-  return readStringPreference(key) === '1';
 }
 
 export function sameJSON(left: unknown, right: unknown): boolean {
