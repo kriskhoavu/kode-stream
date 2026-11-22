@@ -1,44 +1,21 @@
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MutableRefObject, RefObject } from 'react';
-import {
-  ArrowLeft,
-  Bot,
-  ChevronDown,
-  Code2,
-  File as FileIcon,
-  FilePlus2,
-  FileText,
-  FolderOpen,
-  FolderPlus,
-  GitCompare,
-  GripVertical,
-  Info,
-  Ticket,
-  RotateCcw,
-  PanelLeftClose,
-  PanelLeftOpen,
-  PanelRightClose,
-  PanelRightOpen,
-  Pencil,
-  RefreshCw,
-  X,
-} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, MutableRefObject } from 'react';
+import { ArrowLeft, Bot, Code2, FilePlus2, FileText, FolderOpen, FolderPlus, GitCompare, GripVertical, Info, Ticket, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useModalDialog } from '../components/overlay';
-import { firstFile, preferredFile } from '../shared/domain/fileTree';
+import { preferredFile } from '../shared/domain/fileTree';
+import { ItemQualityPanel } from '../features/item-workspace/ItemQualityPanel';
+import { useItemQuality } from '../features/item-workspace/useItemQuality';
 import { ItemGitPanel } from '../features/item-git/ItemGitPanel';
 import { useItemGit } from '../features/item-git/useItemGit';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
-import { ApiError, api, statusLabels } from '../shared/api';
-import type { FileContent, FileNode, GitChange, GitStatus, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, VerificationJob, VerificationTestSelection, VerifyProfile, WorkspaceConfig, WorkspaceTreeEntry } from '../lib/types';
+import { ApiError, api } from '../shared/api';
+import type { FileContent, FileNode, GitChange, ItemDetail, ItemMetadataUpdateInput, ItemStatus, WorkspaceConfig } from '../lib/types';
 import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
-import type { DiffFile } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
-import { FileStateIcon } from '../features/file-tree/FileStateIcon';
-import type { TreeFileState } from '../features/file-tree/FileStateIcon';
 import { ContentSearchInput, ContentSearchResults } from '../features/content-search/ContentSearch';
 import { useContentSearch } from '../features/content-search/useContentSearch';
 import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../lib/types';
@@ -56,18 +33,15 @@ import type { HarnessRunTab as HarnessRunTabId, ItemView } from '../app/router';
 import '../features/harness/harness.css';
 import { useItemSessions } from '../features/workstream/useItemSessions';
 import type { ExplorerLocation } from '../features/workstream-explorer/types';
-import { E2EQualityPanel } from '../features/e2e-testing/E2EQualityPanel';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
-import { providerLabel } from '../features/ai-session/providerDisplay';
 import { ModalLayer } from '../components/ModalLayer';
-
-type Tab = 'preview' | 'raw' | 'diff';
-type RightPanelTab = 'info' | 'jira' | 'quality' | 'agents';
-type DiffMode = 'review' | 'raw';
-type PendingConfirm = { title: string; message: string; confirmLabel: string; danger?: boolean; onConfirm: () => void };
-type DetailViewMode = 'plan' | 'workspace' | 'git';
-type OpenItemFileTab = { id: string; path: string; name: string; editable: boolean };
+import { type Tab, type RightPanelTab, type DiffMode, type PendingConfirm, type DetailViewMode, type OpenItemFileTab } from '../features/item-workspace/itemWorkspaceTypes';
+import { fileDirectoryPaths, hasFile, currentGitPath, workspacePathForSelection, buildFileStateMap, normalizePath, lastPathSegment, parentDirectoryPath } from '../features/item-workspace/itemPaths';
+import { visibleItemWarnings } from '../features/item-workspace/itemFormat';
+import { DiffPanel } from '../features/item-workspace/DiffPanel';
+import { TreeNode } from '../features/item-workspace/FileTreeNode';
+import { EmptyDocumentState, StatusBadge } from '../features/item-workspace/ItemBadges';
 
 export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, workspaces, onBack, onContentChanged, allowEmbeddedAISessions = true }: { itemId: string; /** `run` shows the item's harness run whole, full width. */ view?: ItemView; onViewChange?: (view?: ItemView) => void; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onContentChanged?: () => void | Promise<void>; allowEmbeddedAISessions?: boolean }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
@@ -112,34 +86,14 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
-  const verificationTestsAbortRef = useRef<AbortController | undefined>(undefined);
-  const e2eRunbooksAbortRef = useRef<AbortController | undefined>(undefined);
-  const specPickerAbortRef = useRef<AbortController | undefined>(undefined);
   const [contentSearchIndex, setContentSearchIndex] = useState(0);
   const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const fileTreeRef = useRef<HTMLDivElement | null>(null);
 	const contentSearch = useContentSearch({ kind: 'item', itemId });
-  const [verificationJob, setVerificationJob] = useState<VerificationJob | null>(null);
-  const [verificationBusy, setVerificationBusy] = useState(false);
-  const [verificationError, setVerificationError] = useState('');
-  const [verificationTests, setVerificationTests] = useState<ItemVerificationTests | null>(null);
-  const [e2eRunbooks, setE2ERunbooks] = useState<{ runbooks: import('../lib/types').E2ERunbook[]; diagnostic?: string }>({ runbooks: [] });
-  const [verificationTestsBusy, setVerificationTestsBusy] = useState(false);
-  const [automationLaunchBusy, setAutomationLaunchBusy] = useState(false);
-  const [manualSpec, setManualSpec] = useState('');
-  const [specPickerOpen, setSpecPickerOpen] = useState(false);
-  const [specPickerPath, setSpecPickerPath] = useState('');
-  const [specPickerEntries, setSpecPickerEntries] = useState<WorkspaceTreeEntry[]>([]);
-  const [specPickerSelected, setSpecPickerSelected] = useState<string[]>([]);
-  const [specPickerLoading, setSpecPickerLoading] = useState(false);
-  const [specPickerError, setSpecPickerError] = useState('');
-  const [artifactPreview, setArtifactPreview] = useState<{ title: string; path: string; content: string; loading: boolean; error: string } | null>(null);
   const [workspaceExplorerLocation, setWorkspaceExplorerLocation] = useState<ExplorerLocation>();
   const [openTabs, setOpenTabs] = useState<OpenItemFileTab[]>([]);
   const [activeTabId, setActiveTabId] = useState('');
   const openTabsRef = useRef<OpenItemFileTab[]>([]);
-  const artifactDialog = useModalDialog(() => setArtifactPreview(null), true, Boolean(artifactPreview));
-  const specPickerDialog = useModalDialog(() => setSpecPickerOpen(false), true, specPickerOpen);
   const createPathDialog = useModalDialog(() => { setCreatePathKind(null); setCreatePathName(''); }, !creatingPath, Boolean(createPathKind));
   const renamePathDialog = useModalDialog(() => { setRenameOpen(false); setRenameName(''); }, !renamingPath, renameOpen);
 
@@ -312,55 +266,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     void git.loadStatus();
   }, [plan]);
 
-  useEffect(() => {
-    verificationTestsAbortRef.current?.abort();
-    if (!plan) {
-      setVerificationTests(null);
-      setVerificationTestsBusy(false);
-      return;
-    }
-    const controller = new AbortController();
-    verificationTestsAbortRef.current = controller;
-    setVerificationTestsBusy(true);
-    const loadVerificationTests = api.itemVerificationTests;
-    if (typeof loadVerificationTests !== 'function') {
-      setVerificationTests(null);
-      setVerificationTestsBusy(false);
-      verificationTestsAbortRef.current = undefined;
-      return;
-    }
-    void loadVerificationTests(plan.id, controller.signal)
-      .then((tests) => { if (!controller.signal.aborted) setVerificationTests(tests); })
-      .catch(() => { if (!controller.signal.aborted) setVerificationTests(null); })
-      .finally(() => {
-        if (!controller.signal.aborted) setVerificationTestsBusy(false);
-        if (verificationTestsAbortRef.current === controller) verificationTestsAbortRef.current = undefined;
-      });
-    return () => controller.abort();
-  }, [plan?.id]);
 
-  const loadE2ERunbooks = () => {
-    e2eRunbooksAbortRef.current?.abort();
-    if (!plan) {
-      setE2ERunbooks({ runbooks: [] });
-      return;
-    }
-    const load = api.itemE2ERunbooks;
-    if (typeof load !== 'function') { setE2ERunbooks({ runbooks: [] }); return; }
-    const controller = new AbortController();
-    e2eRunbooksAbortRef.current = controller;
-    void load(plan.id, controller.signal)
-      .then((result) => { if (!controller.signal.aborted) setE2ERunbooks(result ?? { runbooks: [] }); })
-      .catch(() => { if (!controller.signal.aborted) setE2ERunbooks({ runbooks: [], diagnostic: 'E2E coverage could not be loaded.' }); })
-      .finally(() => {
-        if (e2eRunbooksAbortRef.current === controller) e2eRunbooksAbortRef.current = undefined;
-      });
-  };
-
-  useEffect(() => {
-    loadE2ERunbooks();
-    return () => e2eRunbooksAbortRef.current?.abort();
-  }, [plan?.id]);
 
   useEffect(() => {
     if (!plan) {
@@ -376,36 +282,18 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
         });
   }, [plan?.workspaceId, plan?.itemPath]);
 
-  useEffect(() => {
-    if (!plan || !verificationJob || verificationJob.status === 'failed' || verificationJob.status === 'passed') return;
-    const controller = new AbortController();
-    let inFlight = false;
-    const timer = window.setInterval(() => {
-      if (inFlight) return;
-      inFlight = true;
-      void api.verificationJob(plan.workspaceId, verificationJob.id, controller.signal)
-        .then((job) => {
-          if (controller.signal.aborted) return;
-          setVerificationJob(job);
-        })
-        .catch(() => undefined)
-        .finally(() => { inFlight = false; });
-    }, 1000);
-    return () => {
-      controller.abort();
-      window.clearInterval(timer);
-    };
-  }, [plan?.workspaceId, verificationJob?.id, verificationJob?.status]);
 
+  // One listener for the page's life: it reads whether metadata is unsaved through a ref.
+  const dirtyMetadataRef = useRef(false);
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (!dirtyMetadata) return;
+      if (!dirtyMetadataRef.current) return;
       event.preventDefault();
       event.returnValue = '';
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  });
+  }, []);
 
   const loadFile = async (fileId: string) => {
     try {
@@ -502,6 +390,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     (metadataDraft.owner ?? '') !== (plan?.owner ?? '') ||
     (metadataDraft.tags ?? []).join('\n') !== (plan?.tags ?? []).join('\n')
   );
+  dirtyMetadataRef.current = dirtyMetadata;
   const dirty = dirtyMetadata;
   const diffFiles = useMemo(() => parseGitDiff(diff), [diff]);
   const selectedGitPath = useMemo(() => currentGitPath(plan, file), [plan, file]);
@@ -525,6 +414,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
    * landing in the window is dispatched into a detached button and lost.
    */
   const workspaceConfig = useMemo(() => plan ? workspaces.find((workspace) => workspace.id === plan.workspaceId) ?? null : null, [plan, workspaces]);
+  const quality = useItemQuality({ plan, workspaceConfig, workspaces });
   const explorerWorkspaces = useMemo(() => workspaceConfig ? [workspaceConfig] : [], [workspaceConfig]);
 	const checkoutBranches = useWorkspaceBranches(explorerWorkspaces);
   const currentCheckoutBranch = gitStatus?.branch || plan?.branch || workspaceConfig?.baselineBranch || '';
@@ -705,297 +595,11 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     }
   };
 
-  const runVerification = async (profile: VerifyProfile) => {
-    if (!plan) return;
-    setVerificationBusy(true);
-    setVerificationError('');
-    try {
-      const job = await api.createVerificationJob(plan.workspaceId, { profile, trigger: 'manual_checkpoint', terminalMode: 'embedded' });
-      setVerificationJob(job);
-    } catch (err) {
-      setVerificationError(err instanceof Error ? err.message : 'Failed to start verification');
-    } finally {
-      setVerificationBusy(false);
-    }
-  };
 
-  const saveVerificationTests = async (selection: VerificationTestSelection) => {
-    if (!plan) return null;
-    setVerificationTestsBusy(true);
-    setVerificationError('');
-    try {
-		const tests = await api.saveItemVerificationTests(plan.id, { ...selection, expectedRevision: verificationTests?.selection.revision ?? plan.metadataRevision });
-      setVerificationTests(tests);
-      return tests;
-    } catch (err) {
-      setVerificationError(err instanceof Error ? err.message : 'Failed to save automation tests');
-      return null;
-    } finally {
-      setVerificationTestsBusy(false);
-    }
-  };
-
-  const selectedSpecs = verificationTests?.selection.selectedSpecs ?? [];
-  const automationEnvironment = verificationTests?.selection.environment || workspaceConfig?.runtime?.automation?.defaultEnvironment || 'local';
-  const automationDisplayMode = verificationTests?.selection.displayMode === 'visible' ? 'visible' : 'silent';
-  const automationJobActive = verificationJob?.mode === 'automation' && (verificationJob.status === 'queued' || verificationJob.status === 'running');
-  const automationRunBusy = automationLaunchBusy || automationJobActive;
-  const automationRepoPath = workspaceConfig?.runtime?.automation?.repositoryPath ?? '';
-  const automationWorkspace = useMemo(() => {
-    const target = normalizeLocalPath(automationRepoPath);
-    if (!target) return undefined;
-    return workspaces.find((workspace) => normalizeLocalPath(workspace.path) === target);
-  }, [automationRepoPath, workspaces]);
-  const setSelectedSpecs = async (specs: string[]) => {
-    await saveVerificationTests({ selectedSpecs: specs, environment: automationEnvironment, displayMode: automationDisplayMode });
-  };
-  const addSelectedSpec = async (spec: string) => {
-    const clean = spec.trim();
-    if (!clean || selectedSpecs.includes(clean)) return;
-    await setSelectedSpecs([...selectedSpecs, clean]);
-  };
-  const removeSelectedSpec = async (spec: string) => {
-    await setSelectedSpecs(selectedSpecs.filter((candidate) => candidate !== spec));
-  };
-  const saveAutomationEnvironment = async (environment: string) => {
-    await saveVerificationTests({ selectedSpecs, environment, displayMode: automationDisplayMode });
-  };
-  const saveAutomationDisplayMode = async (displayMode: 'silent' | 'visible') => {
-    await saveVerificationTests({ selectedSpecs, environment: automationEnvironment, displayMode });
-  };
-  const addManualSpec = async () => {
-    const clean = manualSpec.trim();
-    if (!clean) return;
-    await addSelectedSpec(clean);
-    setManualSpec('');
-  };
-  const openSpecPicker = () => {
-    setSpecPickerPath('');
-    setSpecPickerSelected([]);
-    setSpecPickerError('');
-    setSpecPickerOpen(true);
-  };
-  const loadSpecPickerDirectory = async (path: string) => {
-    if (!automationWorkspace) return;
-    specPickerAbortRef.current?.abort();
-    const controller = new AbortController();
-    specPickerAbortRef.current = controller;
-    setSpecPickerLoading(true);
-    setSpecPickerError('');
-    try {
-      const listing = await api.workspaceTree(automationWorkspace.id, path, false, false, controller.signal);
-      if (controller.signal.aborted) return;
-      setSpecPickerPath(listing.path);
-      setSpecPickerEntries(listing.entries.filter((entry) => entry.type === 'directory' || isAutomationSpecPath(entry.path)));
-    } catch (err) {
-      if (!controller.signal.aborted) setSpecPickerError(err instanceof Error ? err.message : 'Failed to browse automation specs');
-    } finally {
-      if (!controller.signal.aborted) setSpecPickerLoading(false);
-      if (specPickerAbortRef.current === controller) specPickerAbortRef.current = undefined;
-    }
-  };
-  const togglePickerSpec = (path: string) => {
-    setSpecPickerSelected((current) => current.includes(path) ? current.filter((spec) => spec !== path) : [...current, path]);
-  };
-  const addPickedSpecs = async () => {
-    const nextSpecs = [...selectedSpecs];
-    specPickerSelected.forEach((spec) => {
-      if (!nextSpecs.includes(spec)) nextSpecs.push(spec);
-    });
-    await setSelectedSpecs(nextSpecs);
-    setSpecPickerOpen(false);
-    setSpecPickerSelected([]);
-  };
-
-  useEffect(() => {
-    if (!specPickerOpen || !automationWorkspace) {
-      specPickerAbortRef.current?.abort();
-      setSpecPickerLoading(false);
-      return;
-    }
-    void loadSpecPickerDirectory(specPickerPath);
-    return () => specPickerAbortRef.current?.abort();
-  }, [specPickerOpen, automationWorkspace?.id, specPickerPath]);
-
-  const runAutomationVerification = async () => {
-    if (!plan) return;
-    setVerificationBusy(true);
-    setAutomationLaunchBusy(true);
-    setVerificationError('');
-    try {
-      const tests = await saveVerificationTests({ selectedSpecs, environment: automationEnvironment, displayMode: automationDisplayMode });
-      const specs = tests?.selection.selectedSpecs ?? selectedSpecs;
-      const environment = tests?.selection.environment || automationEnvironment;
-      const displayMode = tests?.selection.displayMode === 'visible' ? 'visible' : automationDisplayMode;
-      const job = await api.createVerificationJob(plan.workspaceId, { mode: 'automation', environment, displayMode, selectedSpecs: specs, trigger: 'manual_checkpoint', terminalMode: 'embedded' });
-      setVerificationJob(job);
-    } catch (err) {
-      setVerificationError(err instanceof Error ? err.message : 'Failed to start automation verification');
-    } finally {
-      setVerificationBusy(false);
-      setAutomationLaunchBusy(false);
-    }
-  };
-
-  const rerunVerification = async (profile?: VerifyProfile) => {
-    if (!plan || !verificationJob) return;
-    setVerificationBusy(true);
-    setVerificationError('');
-    try {
-      const job = await api.rerunVerificationJob(plan.workspaceId, verificationJob.id, profile);
-      setVerificationJob(job);
-    } catch (err) {
-      setVerificationError(err instanceof Error ? err.message : 'Failed to rerun verification');
-    } finally {
-      setVerificationBusy(false);
-    }
-  };
-
-  const artifactAbsolutePath = (artifact: { root?: string; path: string }) => {
-    // Older job payloads do not carry the automation root. The workspace runtime
-    // configuration remains the authoritative compatible fallback for their locators.
-    const root = artifact.root === 'automation' ? verificationJob?.automationRepoPath || automationRepoPath : workspaceConfig?.path;
-    if (!root || artifact.path.startsWith('/') || artifact.path.includes('..')) return '';
-    return `${root.replace(/\/$/, '')}/${artifact.path}`;
-  };
-
-  const openArtifactPath = async (artifact: { root?: string; path: string }) => {
-    const path = artifactAbsolutePath(artifact);
-    if (!path) {
-      setVerificationError('Could not resolve the artifact path safely.');
-      return;
-    }
-    try {
-      await api.openPath(path);
-    } catch {
-      setVerificationError(`Could not open artifact path: ${path}`);
-    }
-  };
-
-  const previewArtifact = async (kind: string, artifact: { root?: string; path: string }) => {
-    if (!plan) return;
-    const absolutePath = artifactAbsolutePath(artifact);
-    setArtifactPreview({ title: kind, path: artifact.path, content: '', loading: true, error: '' });
-    if (artifact.root !== 'workspace' || !absolutePath) {
-      setArtifactPreview({ title: kind, path: artifact.path, content: '', loading: false, error: 'Preview unavailable for this artifact path. Use Open to view it externally.' });
-      return;
-    }
-    try {
-      const file = await api.workspaceFile(plan.workspaceId, artifact.path);
-      setArtifactPreview({ title: kind, path: artifact.path, content: file.content, loading: false, error: '' });
-    } catch (caught) {
-      setArtifactPreview({ title: kind, path: artifact.path, content: '', loading: false, error: caught instanceof Error ? caught.message : 'Could not load artifact preview' });
-    }
-  };
-
-  const qualityPanel = (
-    <section className="metadata-callout quality-panel" aria-label="Quality">
-      <div className="verification-header">
-        <strong>Quality</strong>
-        {verificationJob && <span className={`verification-trigger-badge ${verificationTriggerTone(verificationJob)}`}>{verificationTriggerLabel(verificationJob)}</span>}
-      </div>
-      <div className="verification-actions">
-        <button className="secondary" type="button" onClick={() => void runVerification('smoke')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run smoke verify</button>
-        <button className="secondary" type="button" onClick={() => void runVerification('critical')} disabled={verificationBusy || !plan?.workspaceId || !workspaceConfig?.runtime}>Run critical verify</button>
-        <button className="secondary" type="button" onClick={() => void rerunVerification()} disabled={verificationBusy || !verificationJob}>Re-run latest</button>
-      </div>
-      {!plan?.workspaceId && <span className="verification-note">No workspace selected.</span>}
-      {plan?.workspaceId && !workspaceConfig?.runtime && <span className="verification-note">Runtime not configured for this workspace.</span>}
-      {workspaceConfig?.runtime && !workspaceConfig.runtime.automation?.enabled && <span className="verification-note">Automation tests are not configured for this workspace.</span>}
-      {workspaceConfig?.runtime?.automation?.enabled && (
-        <div className="automation-test-panel">
-          <div className="quality-section-heading">
-            <strong>Automation</strong>
-            <span>Environment and card-linked specs</span>
-          </div>
-          <label className="repo-field">Automation environment<input value={automationEnvironment} onChange={(event) => void saveAutomationEnvironment(event.target.value)} placeholder="local" /></label>
-          <div className="automation-mode-field">
-            <span>Run mode</span>
-            <div className="segmented-control automation-mode-toggle" role="tablist" aria-label="Automation run mode">
-              <button type="button" className={automationDisplayMode === 'silent' ? 'active' : ''} aria-selected={automationDisplayMode === 'silent'} onClick={() => void saveAutomationDisplayMode('silent')}>Silent</button>
-              <button type="button" className={automationDisplayMode === 'visible' ? 'active' : ''} aria-selected={automationDisplayMode === 'visible'} onClick={() => void saveAutomationDisplayMode('visible')}>Visible browser</button>
-            </div>
-          </div>
-          <div className="quality-section-heading compact">
-            <strong>Selected specs</strong>
-            {!automationWorkspace && <span>Register the automation repository as a workspace to browse specs.</span>}
-          </div>
-          <div className="automation-spec-list" aria-label="Selected automation specs">
-            {selectedSpecs.length ? selectedSpecs.map((spec) => <span className="automation-spec-chip" key={spec}>{spec}<button type="button" aria-label={`Remove ${spec}`} onClick={() => void removeSelectedSpec(spec)}>×</button></span>) : <span className="verification-note">No selected specs.</span>}
-          </div>
-          <div className="path-input-row manual-spec-row">
-            <input aria-label="Manual automation spec" value={manualSpec} onChange={(event) => setManualSpec(event.target.value)} placeholder="Repo-relative spec path" />
-            <button className="secondary" type="button" onClick={() => void addManualSpec()} disabled={!manualSpec.trim()}>Add spec</button>
-            <button className="secondary browse-specs-action" type="button" onClick={openSpecPicker} disabled={!automationWorkspace}>Browse</button>
-          </div>
-          <div className="automation-action-row">
-            <button className={automationRunBusy ? 'secondary automation-run-action progress-button active' : 'secondary automation-run-action'} type="button" onClick={() => void runAutomationVerification()} disabled={automationRunBusy || verificationTestsBusy || !plan?.workspaceId || !workspaceConfig?.runtime?.automation?.enabled || selectedSpecs.length === 0}>
-              <span>{automationRunBusy ? (automationDisplayMode === 'visible' ? 'Starting browser...' : 'Running automation...') : 'Run automation tests'}</span>
-              {automationRunBusy && <span className="button-progress-bar" aria-hidden="true" />}
-            </button>
-          </div>
-          <div className="automation-suggestions">
-            <div className="quality-subsection-heading">
-              <strong>Suggested specs</strong>
-              <span>From automation-test in plan.yaml</span>
-            </div>
-            {verificationTests?.discoveredSpecs?.length ? (
-              <div className="automation-discovered-specs" aria-label="Suggested automation specs">
-                {verificationTests.discoveredSpecs.map((spec) => {
-                  const selected = selectedSpecs.includes(spec.path);
-                  return (
-                    <article className={selected ? 'automation-suggestion-card selected' : 'automation-suggestion-card'} key={`${spec.path}-${spec.sourcePath ?? ''}`}>
-                      <div>
-                        <strong>{spec.path}</strong>
-                        <span>{spec.runner}{spec.sourcePath ? ` · ${spec.sourcePath}` : ''}</span>
-                      </div>
-                      <button className="secondary" type="button" disabled={selected} onClick={() => void addSelectedSpec(spec.path)}>
-                        {selected ? 'Selected' : 'Select'}
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : <span className="verification-note">No suggested specs from plan.yaml.</span>}
-          </div>
-        </div>
-      )}
-		{plan?.workspaceId && <E2EQualityPanel workspaceId={plan.workspaceId} runbooks={e2eRunbooks.runbooks} diagnostic={e2eRunbooks.diagnostic} onRefresh={loadE2ERunbooks} />}
-      {verificationBusy && <span className="verification-note">Starting verification...</span>}
-      {verificationError && <span className="error" role="alert">{verificationError}</span>}
-      {verificationJob && <span className="verification-status">{verificationJob.mode === 'automation' ? 'automation' : verificationJob.profile} · {verificationJob.status}{verificationJob.failureType ? ` (${verificationJob.failureType})` : ''}</span>}
-      {verificationJob && <span className="verification-note">{verificationTriggerDescription(verificationJob)}</span>}
-      {verificationJob?.steps?.length ? (
-        <div className="verification-steps">
-          {verificationJob.steps.map((step) => (
-            <span className={`verification-step ${step.status === 'ok' ? 'ok' : 'failed'}`} key={`${step.step}-${step.at}`}>{step.step}: {step.status}</span>
-          ))}
-        </div>
-      ) : null}
-      {verificationJob?.artifacts?.length ? (
-        <div className="verification-artifacts">
-          {verificationJob.artifacts.map((artifact) => (
-            <article className="verification-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
-              <div className="verification-artifact-meta">
-                <strong>{formatArtifactKind(artifact.kind, artifact.path)}</strong>
-                <span>{artifact.path}</span>
-                <small>{formatBytes(artifact.sizeBytes)} · {formatAt(artifact.createdAt)}</small>
-              </div>
-              <div className="verification-artifact-actions">
-                <button className="secondary" type="button" onClick={() => void previewArtifact(formatArtifactKind(artifact.kind, artifact.path), artifact)}>Preview</button>
-                <button className="secondary" type="button" onClick={() => void openArtifactPath(artifact)}>Open</button>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : null}
-    </section>
-  );
 
   const gitPanel = (
     <ItemGitPanel git={git} className="git-panel git-side-panel" activityOpenPreference="item.details.gitActivityOpen" branchPlaceholder="New Branch" onOpenPath={openGitChangePath} unavailable={{ className: 'metadata-callout git-side-panel', hint: 'Refresh the workspace or scan the source to load Git information.' }} />
   );
-
 
   const workItemPanelContent = (
     <>
@@ -1054,7 +658,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
         </>
       )}
       {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
-      {rightPanelTab === 'quality' && qualityPanel}
+      {rightPanelTab === 'quality' && <ItemQualityPanel quality={quality} plan={plan} workspaceConfig={workspaceConfig} />}
       {rightPanelTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={setAgentFocus} onError={setError} allowEmbedded={allowEmbeddedAISessions} harnessRun={harnessRun} mode={agentsMode} onModeChange={setAgentsMode} onLaunched={(result) => { void Promise.resolve(reloadAgents()).then(() => setAgentFocus({ kind: 'session', id: result.session.id })); }} />}
       {error && (
         <div className="operation-error">
@@ -1253,61 +857,6 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
         </aside>
       </div>
       )}
-      {artifactPreview && (
-        <ModalLayer><section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setArtifactPreview(null); }}>
-          <div ref={artifactDialog.ref as RefObject<HTMLDivElement>} className="modal-panel artifact-preview-modal" role="dialog" aria-modal="true" aria-label="Artifact preview">
-            <header>
-              <div>
-                <h2>{artifactPreview.title}</h2>
-                <span>{artifactPreview.path}</span>
-              </div>
-            </header>
-            {artifactPreview.loading && <p>Loading preview...</p>}
-            {!artifactPreview.loading && artifactPreview.error && <p className="error">{artifactPreview.error}</p>}
-            {!artifactPreview.loading && !artifactPreview.error && <pre className="artifact-preview-content">{artifactPreview.content || 'No text content available.'}</pre>}
-            <div className="modal-actions">
-              <button data-autofocus className="secondary" type="button" onClick={() => void openArtifactPath({ root: 'workspace', path: artifactPreview.path })}>Open externally</button>
-              <button className="primary" type="button" onClick={() => setArtifactPreview(null)}>Close</button>
-            </div>
-          </div>
-        </section></ModalLayer>
-      )}
-      {specPickerOpen && (
-        <ModalLayer><section className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSpecPickerOpen(false); }}>
-          <div ref={specPickerDialog.ref as RefObject<HTMLDivElement>} className="modal-panel spec-picker-modal" role="dialog" aria-modal="true" aria-label="Browse automation specs">
-            <header>
-              <div>
-                <h2>Browse automation specs</h2>
-                <span>{automationWorkspace?.name ?? 'Automation repository'} / {specPickerPath || 'root'}</span>
-              </div>
-              <button data-autofocus className="icon-button" type="button" aria-label="Close spec browser" onClick={() => setSpecPickerOpen(false)}><X size={16} /></button>
-            </header>
-            {specPickerPath && (
-              <button className="secondary spec-picker-up" type="button" onClick={() => setSpecPickerPath(parentPath(specPickerPath))}>Up one folder</button>
-            )}
-            {specPickerError && <p className="error" role="alert">{specPickerError}</p>}
-            <div className="spec-picker-list" aria-label="Automation spec files">
-              {specPickerLoading && <span className="verification-note">Loading specs...</span>}
-              {!specPickerLoading && specPickerEntries.length === 0 && <span className="verification-note">No spec files in this folder.</span>}
-              {!specPickerLoading && specPickerEntries.map((entry) => entry.type === 'directory' ? (
-                <button className="spec-picker-row directory" type="button" key={entry.path} onClick={() => setSpecPickerPath(entry.path)}>
-                  <FolderOpen size={15} /> <span>{entry.name}</span>
-                </button>
-              ) : (
-                <label className="spec-picker-row" key={entry.path}>
-                  <input type="checkbox" checked={specPickerSelected.includes(entry.path)} disabled={selectedSpecs.includes(entry.path)} onChange={() => togglePickerSpec(entry.path)} />
-                  <span>{entry.path}</span>
-                  {selectedSpecs.includes(entry.path) && <small>Selected</small>}
-                </label>
-              ))}
-            </div>
-            <footer className="modal-actions">
-              <button className="secondary" type="button" onClick={() => setSpecPickerOpen(false)}>Cancel</button>
-              <button className="primary" type="button" disabled={specPickerSelected.length === 0 || verificationTestsBusy} onClick={() => void addPickedSpecs()}>Add {specPickerSelected.length || ''} spec{specPickerSelected.length === 1 ? '' : 's'}</button>
-            </footer>
-          </div>
-        </section></ModalLayer>
-      )}
       {createPathKind && (
         <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPath) { setCreatePathKind(null); setCreatePathName(''); } }}>
           <section ref={createPathDialog.ref} className="modal-panel" role="dialog" aria-modal="true" aria-label={`Create new ${createPathKind}`}>
@@ -1363,279 +912,8 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   );
 }
 
-function EmptyDocumentState({ hasFiles }: { hasFiles: boolean }) {
-  return (
-    <div className="document-empty">
-      <FileText size={22} />
-      <strong>{hasFiles ? 'Select a file' : 'No files found'}</strong>
-      <span>{hasFiles ? 'Choose a file from the explorer to preview its content.' : 'This item folder does not contain any readable files yet.'}</span>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: ItemDetail['status'] }) {
-  return <span className={`status-badge ${status}`}>{statusLabel(status)}</span>;
-}
-
-function statusLabel(status: ItemDetail['status']): string {
-  return statusLabels[status] ?? status;
-}
-
 function clearTimer(ref: MutableRefObject<number | null>) {
   if (ref.current === null) return;
   window.clearTimeout(ref.current);
   ref.current = null;
-}
-
-function DiffPanel({ diff, files, mode, selectedPath, selectedFileHasDiff, reverting, onModeChange, onRevertFile }: {
-  diff: string;
-  files: DiffFile[];
-  mode: DiffMode;
-  selectedPath: string;
-  selectedFileHasDiff: boolean;
-  reverting: boolean;
-  onModeChange: (mode: DiffMode) => void;
-  onRevertFile: () => void;
-}) {
-  const shownFiles = selectedPath ? files.filter((item) => item.path === selectedPath || item.oldPath === selectedPath) : files;
-  const reviewFiles = shownFiles.length > 0 ? shownFiles : files;
-  return (
-    <section className="diff-panel">
-      <header className="diff-toolbar">
-        <div className="diff-mode-switch" role="tablist" aria-label="Diff view mode">
-          <button type="button" className={mode === 'review' ? 'active' : ''} onClick={() => onModeChange('review')}>Review</button>
-          <button type="button" className={mode === 'raw' ? 'active' : ''} onClick={() => onModeChange('raw')}>Git</button>
-        </div>
-        <div className="diff-actions">
-          <span>{files.length} changed file{files.length === 1 ? '' : 's'}</span>
-          <button className="danger-action" type="button" disabled={!selectedFileHasDiff || reverting} onClick={onRevertFile}>
-            <RotateCcw size={15} /> {reverting ? 'Reverting...' : 'Revert File'}
-          </button>
-        </div>
-      </header>
-      {mode === 'raw' && <pre className="diff-view">{diff || 'No local changes.'}</pre>}
-      {mode === 'review' && (
-        <div className="diff-review">
-          {reviewFiles.length === 0 && <div className="document-empty"><GitCompare size={22} /><strong>No local changes</strong><span>The selected plan has no Git diff.</span></div>}
-          {reviewFiles.map((item) => (
-            <article className={item.path === selectedPath ? 'diff-file active' : 'diff-file'} key={`${item.oldPath ?? item.path}-${item.path}`}>
-              <header>
-                <strong>{item.path}</strong>
-                {item.oldPath && item.oldPath !== item.path && <span>renamed from {item.oldPath}</span>}
-                <div>
-                  <span className="diff-add">+{item.additions}</span>
-                  <span className="diff-delete">-{item.deletions}</span>
-                </div>
-              </header>
-              <div className="diff-lines">
-                {item.lines.map((line, index) => (
-                  <div className={`diff-line ${line.type}`} key={`${item.path}-${index}`}>
-                    <span className="line-number">{line.oldLine ?? ''}</span>
-                    <span className="line-number">{line.newLine ?? ''}</span>
-                    <code>{line.text || ' '}</code>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-const TreeNode = memo(function TreeNode({ node, onOpen, activePath, depth, fileStateByPath, selectedDirectoryPath, onSelectDirectory, onSelectFile }: { node: FileNode; onOpen: (id: string) => void; activePath?: string; depth: number; fileStateByPath: Map<string, TreeFileState>; selectedDirectoryPath: string; onSelectDirectory: (path: string) => void; onSelectFile: (path: string) => void }) {
-  const indent = { '--tree-indent': `${depth * 14}px` } as CSSProperties & Record<'--tree-indent', string>;
-  const [expanded, setExpanded] = useState(true);
-
-  if (node.type === 'directory') {
-    return (
-      <details open={expanded} className="tree-dir">
-        <summary className={selectedDirectoryPath === node.path ? 'tree-row tree-row-dir active' : 'tree-row tree-row-dir'} style={indent} title={node.path} onClick={(event) => { event.preventDefault(); onSelectDirectory(node.path); }} onDoubleClick={(event) => { event.preventDefault(); setExpanded((value) => !value); }}>
-          <ChevronDown className="tree-chevron" size={14} />
-          <FolderOpen className="tree-icon" size={16} />
-          <span className="tree-label">{node.name}</span>
-        </summary>
-        <div className="tree-children">
-          {node.children?.map((child) => <TreeNode node={child} key={child.id} onOpen={onOpen} activePath={activePath} depth={depth + 1} fileStateByPath={fileStateByPath} selectedDirectoryPath={selectedDirectoryPath} onSelectDirectory={onSelectDirectory} onSelectFile={onSelectFile} />)}
-        </div>
-      </details>
-    );
-  }
-  const state = fileStateByPath.get(normalizePath(node.path));
-  return (
-    <button className={activePath === node.path ? 'tree-row tree-file active' : 'tree-row tree-file'} style={indent} title={node.path} onClick={() => { onSelectFile(node.path); onOpen(node.id); }}>
-      <span className="tree-spacer" />
-      <FileIcon className="tree-icon" size={16} />
-      <span className="tree-label">{node.name}</span>
-      {state && <FileStateIcon state={state} />}
-    </button>
-  );
-});
-
-function fileDirectoryPaths(nodes: FileNode[]): Set<string> {
-  const paths = new Set<string>();
-  const visit = (entries: FileNode[]) => entries.forEach((node) => {
-    if (node.type !== 'directory') return;
-    paths.add(node.path);
-    visit(node.children ?? []);
-  });
-  visit(nodes);
-  return paths;
-}
-
-function hasFile(nodes: FileNode[]): boolean {
-  return firstFile(nodes) !== null;
-}
-
-function currentGitPath(plan: ItemDetail | null, file: FileContent | null): string {
-  if (!plan?.itemPath || !file?.path) return '';
-  return `${plan.itemPath.replace(/\/$/, '')}/${file.path.replace(/^\//, '')}`;
-}
-
-function workspacePathForSelection(plan: ItemDetail | null, file: FileContent | null): string | undefined {
-  const itemPath = normalizePath(plan?.itemPath ?? '');
-  const filePath = normalizePath(file?.path ?? '');
-  if (itemPath && filePath) return `${itemPath}/${filePath}`;
-  return itemPath || undefined;
-}
-
-function buildFileStateMap(plan: ItemDetail | null, gitStatus: GitStatus | null, file: FileContent | null, dirtyFile: boolean): Map<string, TreeFileState> {
-  const stateByPath = new Map<string, TreeFileState>();
-  const itemPath = normalizePath(plan?.itemPath ?? '');
-  for (const change of gitStatus?.changes ?? []) {
-    const localPath = localItemPath(itemPath, change);
-    if (localPath) stateByPath.set(localPath, change.status);
-  }
-  if (dirtyFile && file?.path) {
-    stateByPath.set(normalizePath(file.path), 'unsaved');
-  }
-  return stateByPath;
-}
-
-function localItemPath(itemPath: string, change: GitChange): string {
-  const path = normalizePath(change.path);
-  const oldPath = normalizePath(change.oldPath ?? '');
-  return stripItemPath(path, itemPath) || stripItemPath(oldPath, itemPath);
-}
-
-function stripItemPath(path: string, itemPath: string): string {
-  if (!path) return '';
-  if (!itemPath) return path;
-  if (path === itemPath) return '';
-  return path.startsWith(`${itemPath}/`) ? path.slice(itemPath.length + 1) : '';
-}
-
-function normalizePath(path: string): string {
-  return path.replace(/^\/+/, '').replace(/\/+$/, '');
-}
-
-function normalizeLocalPath(path: string): string {
-  return path.trim().replace(/\/+$/, '');
-}
-
-function parentPath(path: string): string {
-  const parts = normalizePath(path).split('/').filter(Boolean);
-  parts.pop();
-  return parts.join('/');
-}
-
-function isAutomationSpecPath(path: string): boolean {
-  return /\.(?:cy|spec|test)\.(?:ts|tsx|js|jsx)$/i.test(normalizePath(path));
-}
-
-function lastPathSegment(path: string): string {
-  const normalized = path.replace(/\/+$/, '');
-  const separator = normalized.lastIndexOf('/');
-  return separator >= 0 ? normalized.slice(separator + 1) : normalized;
-}
-
-function parentDirectoryPath(path: string): string {
-  const normalized = path.replace(/\/+$/, '');
-  const separator = normalized.lastIndexOf('/');
-  return separator >= 0 ? normalized.slice(0, separator) : '';
-}
-
-function visibleItemWarnings(plan: ItemDetail | null): { itemPath?: string; message: string }[] {
-  if (!plan?.warnings?.length) return [];
-  return plan.warnings.filter((warning) => !isIgnorableWarning(warning.message));
-}
-
-function isIgnorableWarning(message: string): boolean {
-  const normalized = message.toLowerCase();
-  return normalized.includes("plan.yaml") && normalized.includes("does not exist in");
-}
-
-function formatBytes(value: number): string {
-  if (!Number.isFinite(value) || value <= 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let size = value;
-  let index = 0;
-  while (size >= 1024 && index < units.length - 1) {
-    size /= 1024;
-    index += 1;
-  }
-  return `${size.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
-}
-
-function formatAt(value?: string): string {
-  if (!value) return 'Unknown time';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-function formatArtifactKind(kind: string, path: string): string {
-  const fileName = path.split('/').at(-1)?.toLowerCase() ?? '';
-  if (kind === 'automation_log' || fileName === 'automation.log') return 'Automation log';
-  if (kind === 'verify_log' || fileName === 'verify.log') return 'Verification log';
-  if (kind === 'runtime_log' || fileName === 'runtime.log') return 'Runtime setup log';
-  if (kind === 'playwright_trace') return 'Playwright trace';
-  if (kind === 'playwright_video') return 'Playwright video';
-  if (kind === 'playwright_screenshot') return 'Screenshot';
-  if (kind === 'playwright_report') return 'Test report';
-  return kind.replaceAll('_', ' ');
-}
-
-function verificationTriggerLabel(job: VerificationJob): string {
-  const mode = job.terminalMode ? ` (${job.terminalMode})` : '';
-  if (job.trigger?.startsWith('checkpoint:')) {
-    const eventType = job.trigger.slice('checkpoint:'.length);
-    return `${eventType}${mode}`;
-  }
-  if (job.trigger === 'rerun') {
-    return `rerun${mode}`;
-  }
-  if (job.trigger === 'manual_checkpoint') {
-    return `manual${mode}`;
-  }
-  return `${job.trigger || 'manual'}${mode}`;
-}
-
-function verificationTriggerDescription(job: VerificationJob): string {
-  const provider = job.provider ? ` via ${providerLabel(job.provider)}` : '';
-  if (job.trigger?.startsWith('checkpoint:')) {
-    const eventType = job.trigger.slice('checkpoint:'.length).replaceAll('_', ' ');
-    return `Auto verification from ${eventType}${provider}${job.sessionId ? ` (session ${job.sessionId})` : ''}.`;
-  }
-  if (job.trigger === 'rerun') {
-    return `Re-run requested${provider}${job.sessionId ? ` (session ${job.sessionId})` : ''}.`;
-  }
-  return `Manual verification request${provider}.`;
-}
-
-function verificationTriggerTone(job: VerificationJob): 'manual' | 'rerun' | 'auto-embedded' | 'auto-external' | 'auto' {
-  if (job.trigger === 'rerun') {
-    return 'rerun';
-  }
-  if (job.trigger?.startsWith('checkpoint:')) {
-    if (job.terminalMode === 'embedded') {
-      return 'auto-embedded';
-    }
-    if (job.terminalMode === 'external') {
-      return 'auto-external';
-    }
-    return 'auto';
-  }
-  return 'manual';
 }
