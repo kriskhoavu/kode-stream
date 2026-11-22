@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { RunWorkbench, buildTree } from './RunWorkbench';
+import { RunWorkbench } from './RunWorkbench';
+import { buildTree } from './workbench/WorkbenchTrees';
 import { createFixtureClient } from './fixture';
 
 afterEach(cleanup);

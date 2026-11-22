@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { HarnessApproval, HarnessRun, HarnessRunDetail } from '../../lib/types';
-import type { WorkbenchRequest } from './RunWorkbench';
+import type { WorkbenchRequest } from './workbench/workbenchTypes';
 import { StopRunButton, canStopRun } from './StopRunButton';
 import type { HarnessRunTab } from '../../app/router';
 import type { HarnessState } from './harnessState';
