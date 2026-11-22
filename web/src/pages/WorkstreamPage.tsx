@@ -3,9 +3,8 @@ import type { CSSProperties, RefObject } from 'react';
 import { BookmarkPlus, Bot, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FacetMenu, SelectedFilters } from '../components/FacetMenu';
 import { useModalDialog } from '../components/overlay';
-import { writePreference } from '../shared/preferences/store';
 import { api, statusLabels, statusOrder } from '../shared/api';
-import type { WorkstreamBranchLoadResult, GitStatus, ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
+import type { WorkstreamBranchLoadResult, ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
 import { sourcesShownIn } from '../lib/sources';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
@@ -37,7 +36,9 @@ import '../features/harness/harness.css';
 import '../features/workstream/harnessCards.css';
 import { ModalLayer } from '../components/ModalLayer';
 import { type NewWorkItemDraft } from '../features/workstream/newWorkItem';
-import { type BoardKind, type BoardLayout, boardKinds, boardLayouts, boardKindPreference, layoutPreferences, taskColumnLabels, taskStartColumn, readBoardKind, readBoardLayout } from '../features/workstream/boardPreferences';
+import { useBoardView } from '../features/workstream/useBoardView';
+import { useWorkspaceGitInfo } from '../features/workstream/useWorkspaceGitInfo';
+import { boardKinds, boardLayouts, taskColumnLabels, taskStartColumn } from '../features/workstream/boardPreferences';
 import { unique } from '../features/workstream/workstreamUtils';
 import { WorkstreamColumn } from '../features/workstream/WorkstreamColumn';
 import { PlanCard } from '../features/workstream/PlanCard';
@@ -76,9 +77,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   // Holds a just-created item until a reload reports it, so a rescan that has
   // not caught up yet cannot make the new card flash and vanish.
   const pendingCreatedItemRef = useRef<ItemSummary | null>(null);
-  const [workspaceGitStatus, setWorkspaceGitStatus] = useState<GitStatus | null>(null);
-  const [workspaceBranchCurrent, setWorkspaceBranchCurrent] = useState('');
-  const [workspaceBranchList, setWorkspaceBranchList] = useState<string[]>([]);
+  const { gitStatus: workspaceGitStatus, currentBranch: workspaceBranchCurrent, branches: workspaceBranchList } = useWorkspaceGitInfo(workspace?.id);
   const [selectedBranch, setSelectedBranch] = useState('');
   const [branchContext, setBranchContext] = useState<WorkstreamBranchLoadResult | null>(null);
   const { byItem: itemAgents, reload: reloadItemAgents } = useItemSessions(workspace?.id, selectedBranch);
@@ -87,12 +86,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const harnessJoin = useMemo(() => joinHarness(items, harness.state, workspace?.id), [items, harness.state, workspace?.id]);
   // Tasks and plans never share the board: Tasks shows what the harness holds, Plans what the branch holds.
   // Without the harness there are no tasks, so the board shows plans.
-  const [boardKind, setBoardKindState] = useState<BoardKind>(() => readBoardKind());
-  const setBoardKind = (kind: BoardKind) => { setBoardKindState(kind); writePreference(boardKindPreference, kind); };
-  const shownKind: BoardKind = harnessOn ? boardKind : 'plans';
-  const [layouts, setLayouts] = useState<Record<BoardKind, BoardLayout>>(() => ({ tasks: readBoardLayout('tasks'), plans: readBoardLayout('plans') }));
-  const setLayout = (layout: BoardLayout) => { setLayouts((current) => ({ ...current, [shownKind]: layout })); writePreference(layoutPreferences[shownKind], layout); };
-  const shownLayout = layouts[shownKind];
+  const { setBoardKind, shownKind, shownLayout, setLayout } = useBoardView(harnessOn);
   const tasksShown = shownKind === 'tasks';
   const boardTaskCards = useMemo(() => taskCards(items, harness.state, workspace?.id), [items, harness.state, workspace?.id]);
   const taskWorkById = useMemo(() => new Map(boardTaskCards.map((card) => [card.item.id, card.work])), [boardTaskCards]);
@@ -219,35 +213,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     const timer = window.setTimeout(() => setCreatedItemId(''), 2600);
     return () => window.clearTimeout(timer);
   }, [createdItemId]);
-
-  useEffect(() => {
-    if (!workspace) {
-      setWorkspaceGitStatus(null);
-      setWorkspaceBranchCurrent('');
-      setWorkspaceBranchList([]);
-      return;
-    }
-    const controller = new AbortController();
-    api.gitStatus(workspace.id, controller.signal)
-      .then((status) => {
-        if (!controller.signal.aborted) setWorkspaceGitStatus(status);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setWorkspaceGitStatus(null);
-      });
-    api.workspaceBranches(workspace.id, controller.signal)
-      .then((response) => {
-        if (controller.signal.aborted) return;
-        setWorkspaceBranchCurrent(response.current);
-        setWorkspaceBranchList(response.branches);
-      })
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        setWorkspaceBranchCurrent('');
-        setWorkspaceBranchList([]);
-      });
-    return () => controller.abort();
-  }, [workspace?.id]);
 
   const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
   const filteredPlans = useMemo(() => filterPlans(boardItems, tasksShown ? { ...filters, workedBy: [] } : filters, text, workspace, workedByOf), [boardItems, tasksShown, filters, text, workspace, workedByOf]);
