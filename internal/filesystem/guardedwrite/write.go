@@ -87,30 +87,9 @@ func replaceExisting(root, relative string, content []byte, expectedHash string,
 		return Result{}, err
 	}
 	defer lockPath(full)()
-	initial, err := os.Lstat(full)
+	initial, current, err := readExisting(full, maxBytes)
 	if err != nil {
 		return Result{}, err
-	}
-	if !initial.Mode().IsRegular() || initial.Mode()&os.ModeSymlink != 0 {
-		return Result{}, ErrUnsafePath
-	}
-	if initial.Size() > maxBytes {
-		return Result{}, ErrTooLarge
-	}
-	file, err := os.Open(full)
-	if err != nil {
-		return Result{}, err
-	}
-	current, readErr := io.ReadAll(io.LimitReader(file, maxBytes+1))
-	closeErr := file.Close()
-	if readErr != nil {
-		return Result{}, readErr
-	}
-	if closeErr != nil {
-		return Result{}, closeErr
-	}
-	if int64(len(current)) > maxBytes {
-		return Result{}, ErrTooLarge
 	}
 	if hash(current) != expectedHash {
 		return Result{}, ErrStale
@@ -121,83 +100,128 @@ func replaceExisting(root, relative string, content []byte, expectedHash string,
 	if err != nil {
 		return Result{}, err
 	}
-	temporary, err := os.CreateTemp(directory, ".kode-stream-write-*")
+	temporaryPath, err := writeTemporary(directory, initial.Mode().Perm(), content, hooks)
+	if temporaryPath != "" {
+		defer os.Remove(temporaryPath)
+	}
 	if err != nil {
 		return Result{}, err
 	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	fail := func(cause error) (Result, error) {
-		_ = temporary.Close()
-		return Result{}, cause
-	}
-	if err := temporary.Chmod(initial.Mode().Perm()); err != nil {
-		return fail(err)
-	}
-	if _, err := temporary.Write(content); err != nil {
-		return fail(err)
-	}
-	if hooks.afterWrite != nil {
-		if err := hooks.afterWrite(); err != nil {
-			return fail(err)
-		}
-	}
-	if err := temporary.Sync(); err != nil {
-		return fail(err)
-	}
-	if hooks.afterSync != nil {
-		if err := hooks.afterSync(); err != nil {
-			return fail(err)
-		}
-	}
-	if err := temporary.Close(); err != nil {
+	if err := requireUnchanged(full, initial, directory, realDirectory); err != nil {
 		return Result{}, err
-	}
-	if hooks.afterClose != nil {
-		if err := hooks.afterClose(); err != nil {
-			return Result{}, err
-		}
-	}
-	currentInfo, err := os.Lstat(full)
-	if err != nil || !os.SameFile(initial, currentInfo) || currentInfo.Mode()&os.ModeSymlink != 0 {
-		return Result{}, fmt.Errorf("%w: target changed during write", ErrUnsafePath)
-	}
-	currentDirectory, err := filepath.EvalSymlinks(directory)
-	if err != nil || currentDirectory != realDirectory {
-		return Result{}, fmt.Errorf("%w: parent changed during write", ErrUnsafePath)
 	}
 	if err := os.Rename(temporaryPath, full); err != nil {
 		return Result{}, err
 	}
-	rollback := func(cause error) (Result, error) {
+	if err := publishRename(directory, hooks); err != nil {
 		if restoreErr := restore(full, current, initial.Mode().Perm()); restoreErr != nil {
-			return Result{}, fmt.Errorf("write failed: %v; original restoration failed: %w", cause, restoreErr)
+			return Result{}, fmt.Errorf("write failed: %v; original restoration failed: %w", err, restoreErr)
 		}
-		return Result{}, cause
+		return Result{}, err
 	}
-	if hooks.afterRename != nil {
-		if err := hooks.afterRename(); err != nil {
-			return rollback(err)
+	return Result{Path: full, Hash: hash(content), Mode: initial.Mode().Perm()}, nil
+}
+
+// runHook calls a failure hook when one is set.
+func runHook(hook func() error) error {
+	if hook == nil {
+		return nil
+	}
+	return hook()
+}
+
+// readExisting reads a regular, non-symlink file no larger than maxBytes,
+// bounding the read before it allocates.
+func readExisting(full string, maxBytes int64) (os.FileInfo, []byte, error) {
+	initial, err := os.Lstat(full)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !initial.Mode().IsRegular() || initial.Mode()&os.ModeSymlink != 0 {
+		return nil, nil, ErrUnsafePath
+	}
+	if initial.Size() > maxBytes {
+		return nil, nil, ErrTooLarge
+	}
+	file, err := os.Open(full)
+	if err != nil {
+		return nil, nil, err
+	}
+	current, readErr := io.ReadAll(io.LimitReader(file, maxBytes+1))
+	closeErr := file.Close()
+	if readErr != nil {
+		return nil, nil, readErr
+	}
+	if closeErr != nil {
+		return nil, nil, closeErr
+	}
+	if int64(len(current)) > maxBytes {
+		return nil, nil, ErrTooLarge
+	}
+	return initial, current, nil
+}
+
+// writeTemporary writes content to a synced, closed temporary file beside
+// the target. It returns the temporary path whenever one was created, so the
+// caller removes it on every path.
+func writeTemporary(directory string, mode os.FileMode, content []byte, hooks failureHooks) (string, error) {
+	temporary, err := os.CreateTemp(directory, ".kode-stream-write-*")
+	if err != nil {
+		return "", err
+	}
+	path := temporary.Name()
+	steps := []func() error{
+		func() error { return temporary.Chmod(mode) },
+		func() error { _, err := temporary.Write(content); return err },
+		func() error { return runHook(hooks.afterWrite) },
+		temporary.Sync,
+		func() error { return runHook(hooks.afterSync) },
+	}
+	for _, step := range steps {
+		if err := step(); err != nil {
+			_ = temporary.Close()
+			return path, err
 		}
+	}
+	if err := temporary.Close(); err != nil {
+		return path, err
+	}
+	return path, runHook(hooks.afterClose)
+}
+
+// requireUnchanged refuses publication when the target or its parent changed
+// since the target was read.
+func requireUnchanged(full string, initial os.FileInfo, directory, realDirectory string) error {
+	currentInfo, err := os.Lstat(full)
+	if err != nil || !os.SameFile(initial, currentInfo) || currentInfo.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("%w: target changed during write", ErrUnsafePath)
+	}
+	currentDirectory, err := filepath.EvalSymlinks(directory)
+	if err != nil || currentDirectory != realDirectory {
+		return fmt.Errorf("%w: parent changed during write", ErrUnsafePath)
+	}
+	return nil
+}
+
+// publishRename makes a completed rename durable by syncing the parent
+// directory. An error means the caller restores the original content.
+func publishRename(directory string, hooks failureHooks) error {
+	if err := runHook(hooks.afterRename); err != nil {
+		return err
 	}
 	dir, err := os.Open(directory)
 	if err != nil {
-		return rollback(err)
+		return err
 	}
 	if err := dir.Sync(); err != nil {
 		_ = dir.Close()
-		return rollback(err)
+		return err
 	}
-	if hooks.afterDirectory != nil {
-		if err := hooks.afterDirectory(); err != nil {
-			_ = dir.Close()
-			return rollback(err)
-		}
+	if err := runHook(hooks.afterDirectory); err != nil {
+		_ = dir.Close()
+		return err
 	}
-	if err := dir.Close(); err != nil {
-		return rollback(err)
-	}
-	return Result{Path: full, Hash: hash(content), Mode: initial.Mode().Perm()}, nil
+	return dir.Close()
 }
 
 func restore(target string, data []byte, mode os.FileMode) error {
