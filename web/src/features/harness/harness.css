@@ -1673,10 +1673,11 @@ a.hx-source:hover {
 	font-size: 12px;
 }
 
-/* A model field's label line: the label, and beside the Hard one its explainer. */
+/* A model field's label line: the label, and at the right end of the Hard one its explainer. */
 .hx-model-label {
 	display: flex;
 	align-items: baseline;
+	justify-content: space-between;
 	gap: 10px;
 	position: relative;
 }
