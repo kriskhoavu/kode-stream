@@ -28,11 +28,9 @@ import { AgentPane, AgentsTab, useHeldAgentSessions, type AgentFocus, type Agent
 import { HarnessRunTab } from '../features/workstream/HarnessRunTab';
 import { takeOverByHand } from '../features/workstream/takeOver';
 import { useBoardHarness } from '../features/workstream/useBoardHarness';
-import { queueOrder, workForItem } from '../features/workstream/harnessJoin';
-import { RunView } from '../features/harness/RunView';
-import { RunDrawer } from '../features/harness/RunDrawer';
-import { RunPagePath, RunWorkbench } from '../features/harness/RunWorkbench';
-import type { HarnessRunTab as HarnessRunTabId, ItemView } from '../app/router';
+import { workForItem } from '../features/workstream/harnessJoin';
+import { ItemRunView } from '../features/item-workspace/ItemRunView';
+import type { ItemView } from '../app/router';
 import '../features/harness/harness.css';
 import { useItemSessions } from '../features/workstream/useItemSessions';
 import type { ExplorerLocation } from '../features/workstream-explorer/types';
@@ -68,7 +66,6 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const harness = useBoardHarness();
   const work = useMemo(() => workForItem(plan, harness.state), [plan, harness.state]);
   const [agentsMode, setAgentsMode] = useState<AgentsMode>('run');
-  const [runTab, setRunTab] = useState<{ tab: HarnessRunTabId; agentRunId?: string } | undefined>();
   const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => setAgentFocus({ kind: 'harness', id })} onOpenPlan={(id) => setAgentFocus({ kind: 'harness-plan', id })} onOpenFull={onViewChange ? () => onViewChange('run') : undefined} onTakeOver={() => void takeOverByHand(work, harness).then(({ agentRunId }) => { if (agentRunId) { setAgentFocus({ kind: 'harness', id: agentRunId }); } else { setAgentsMode('sessions'); setAgentFocus({ kind: 'launch' }); } })} /> : undefined;
   const paneHarness: AgentPaneHarness = { client: harness.client, run: work?.run, detail: work?.run ? harness.state.details[work.run.id] : undefined, reload: () => (work?.run ? harness.loadRun(work.run.id) : Promise.resolve()) };
   const [error, setError] = useState('');
@@ -578,23 +575,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   }
 
   if (view === 'run' && work?.run) {
-    const run = work.run;
-    return (
-      <section className="workspace-page item-run-page hx" aria-label="Harness run, full width">
-        <header className="workspace-header">
-          <div className="workspace-header-main">
-            <button className="ghost" type="button" onClick={() => (onViewChange ? onViewChange(undefined) : goBack())}><ArrowLeft size={16} /> Back to the card</button>
-          </div>
-          <div className="workspace-header-title">
-            <h1>{plan.title}</h1>
-            <RunPagePath run={harness.state.runs[run.id] ?? run} lead={<><span className="workspace-item-path-segment">{plan.scope}</span><span className="workspace-item-path-separator">/</span><span className="workspace-item-path-segment">{plan.identifier}</span></>} />
-          </div>
-          <div className="workspace-header-actions" />
-        </header>
-        <RunView state={harness.state} runId={run.id} onSelectRun={() => undefined} onRefresh={() => void harness.refresh()} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onCancel={harness.cancelRun} onOpenTab={(tab, agentRunId) => setRunTab({ tab, agentRunId })} workbench={(detail, request) => <RunWorkbench client={harness.client} detail={detail} request={request} />} />
-        {runTab && <RunDrawer state={harness.state} client={harness.client} taskId={work.task.id} tab={runTab.tab} agentRunId={runTab.agentRunId} queue={queueOrder(harness.state, work.task.workspaceId)} onTabChange={(tab) => setRunTab({ tab })} onClose={() => setRunTab(undefined)} onCancel={harness.cancelRun} loadRun={harness.loadRun} onApprove={harness.approve} onReject={harness.reject} onPin={harness.pin} onMove={() => undefined} onSetQuestions={harness.setQuestions} askDefault={harness.state.status?.askQuestions ?? true} />}
-      </section>
-    );
+    return <ItemRunView plan={plan} work={{ ...work, run: work.run }} harness={harness} onBack={() => (onViewChange ? onViewChange(undefined) : goBack())} />;
   }
 
   return (
