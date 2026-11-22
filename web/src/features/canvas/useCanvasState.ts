@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../shared/api';
-import type { CanvasNode, CanvasPlacementPatch, CanvasPosition, CanvasProjection, CanvasSize, CanvasViewport } from '../../lib/types';
+import { acceptSaved, countRetries, rebaseConflicts, type DirtyPlacement } from './placementQueue';
+import type { CanvasNode, CanvasPosition, CanvasProjection, CanvasSize, CanvasViewport } from '../../lib/types';
 
-interface DirtyPlacement {
-	patch: CanvasPlacementPatch;
-	mutation: number;
-	retries: number;
-}
 
 export function useCanvasState(workspaceId?: string) {
 	const [projection, setProjectionState] = useState<CanvasProjection>();
@@ -140,9 +136,7 @@ export function useCanvasState(workspaceId?: string) {
 		try {
 			const saved = await api.patchCanvasPlacements(current.layout.id, batch.map((entry) => entry.patch), controller.signal);
 			if (controller.signal.aborted || projectionRef.current?.layout.id !== current.layout.id) return;
-			for (const entry of batch) {
-				if (dirtyRef.current.get(entry.patch.nodeId)?.mutation === entry.mutation) dirtyRef.current.delete(entry.patch.nodeId);
-			}
+			acceptSaved(dirtyRef.current, batch);
 			setConflicts((previous) => previous.filter((id) => dirtyRef.current.has(id)));
 			setError('');
 			setSaveStatus(dirtyRef.current.size > 0 ? 'saving' : 'saved');
@@ -168,33 +162,9 @@ export function useCanvasState(workspaceId?: string) {
 					if (controller.signal.aborted) return;
 					// The next normal refresh will reconcile the layout; conflicts stay unobtrusive.
 				}
-				let rebased = false;
-				let exhausted = false;
-				for (const nodeId of affected) {
-					const entry = dirtyRef.current.get(nodeId);
-					if (!entry) continue;
-					if (entry.retries >= 2) {
-						dirtyRef.current.delete(nodeId);
-						exhausted = true;
-						continue;
-					}
-					entry.retries += 1;
-					if (!latest) {
-						// No fresh layout to rebase onto. Keep the position pending on its
-						// current revision rather than dropping it: a failed refetch must
-						// not lose the move any more than a conflict does.
-						rebased = true;
-						continue;
-					}
-					const revision = latest.nodes.find((node) => node.id === nodeId)?.revision;
-					if (revision === undefined) {
-						// The node no longer exists in the layout, so there is nothing to place.
-						dirtyRef.current.delete(nodeId);
-						continue;
-					}
-					entry.patch = { ...entry.patch, expectedRevision: revision };
-					rebased = true;
-				}
+				// Without a fresh layout a change stays pending on its current revision: a failed
+				// refetch must not lose the move any more than a conflict does.
+				const { rebased, exhausted } = rebaseConflicts(dirtyRef.current, affected, latest);
 				setError(exhausted ? 'Some positions could not be saved because the layout changed elsewhere. Reload to see the current arrangement.' : '');
 				setSaveStatus(dirtyRef.current.size > 0 ? 'saving' : 'saved');
 				// `rebased` covers entries kept for another attempt; the size check keeps
@@ -202,13 +172,7 @@ export function useCanvasState(workspaceId?: string) {
 				if (rebased || dirtyRef.current.size > 0) setDirtyVersion((version) => version + 1);
 				return;
 			}
-			let retry = false;
-			for (const entry of batch) {
-				const currentEntry = dirtyRef.current.get(entry.patch.nodeId);
-				if (!currentEntry || currentEntry.mutation !== entry.mutation || currentEntry.retries >= 2) continue;
-				currentEntry.retries += 1;
-				retry = true;
-			}
+			const retry = countRetries(dirtyRef.current, batch);
 			setError(retry ? 'Could not save positions yet. Retrying…' : messageFrom(caught));
 			if (retry) placementRetryTimer.current = setTimeout(() => setDirtyVersion((version) => version + 1), 300 * (batch[0]?.retries + 1));
 		} finally {
