@@ -259,6 +259,9 @@ func TestEnrichPassesLiteralArgumentsRescansAndBoundsOutput(t *testing.T) {
 	if err != nil || !result.OK || !result.LogTruncated || len(result.Log) != maxActionLogBytes {
 		t.Fatalf("result=%#v err=%v", result, err)
 	}
+	if len(result.Wikis) != 1 || result.Wikis[0].Root != "docs" {
+		t.Fatalf("the result does not report the rescanned wikis: %#v", result.Wikis)
+	}
 	argument, err := os.ReadFile(filepath.Join(workspace, "args.txt"))
 	if err != nil {
 		t.Fatal(err)

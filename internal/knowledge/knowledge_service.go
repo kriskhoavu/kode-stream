@@ -231,12 +231,11 @@ func (s *KnowledgeService) Enrich(ctx context.Context, workspaceID string, confi
 			return fmt.Errorf("enrichment timed out: %w", runContext.Err())
 		}
 		committed = true
-		wikis, detectErr := s.detector.DetectWorkspace(actionContext, workspace)
+		detected, detectErr := s.detector.DetectWorkspace(actionContext, workspace)
 		if detectErr != nil {
 			return detectErr
 		}
-		wikis, detectErr = s.stampWikis(workspace, wikis)
-		if detectErr != nil {
+		if wikis, detectErr = s.stampWikis(workspace, detected); detectErr != nil {
 			return detectErr
 		}
 		return s.store.ReplaceWorkspace(workspaceID, wikis)
