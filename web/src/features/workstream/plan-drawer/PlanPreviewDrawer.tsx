@@ -92,13 +92,9 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
       autoSaveRefreshAbortRef.current?.abort();
       const controller = new AbortController();
       autoSaveRefreshAbortRef.current = controller;
-      api.diff(itemId, controller.signal)
-        .then((payload) => {
-          if (!controller.signal.aborted && isCurrent()) setDiff(payload.diff || 'No local changes.');
-        })
-        .catch(() => {
-          if (!controller.signal.aborted && isCurrent()) setDiff('No diff available.');
-        });
+      void itemDiffText(itemId, controller.signal).then((text) => {
+        if (!controller.signal.aborted && isCurrent()) setDiff(text);
+      });
       void git.loadStatus();
     }, 600);
   };
@@ -158,10 +154,8 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     }).catch((err: Error) => {
       if (!controller.signal.aborted) setError(err.message);
     });
-    api.diff(itemId, controller.signal).then((payload) => {
-      if (!controller.signal.aborted) setDiff(payload.diff || 'No local changes.');
-    }).catch(() => {
-      if (!controller.signal.aborted) setDiff('No diff available.');
+    void itemDiffText(itemId, controller.signal).then((text) => {
+      if (!controller.signal.aborted) setDiff(text);
     });
     return () => {
       controller.abort();
@@ -189,7 +183,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
       void git.loadStatus();
     }).catch(() => undefined);
     api.files(itemId, undefined, controller.signal).then((tree) => { if (isCurrent()) setFiles((current) => sameJSON(current, tree) ? current : tree); }).catch(() => undefined);
-    api.diff(itemId, controller.signal).then((payload) => { if (isCurrent()) setDiff(payload.diff || 'No local changes.'); }).catch(() => undefined);
+    void itemDiffText(itemId, controller.signal, null).then((text) => { if (isCurrent() && text !== null) setDiff(text); });
     return () => controller.abort();
   }, [refreshKey]);
 
@@ -376,6 +370,11 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
       </aside>
     </>
   );
+}
+
+/** An item's diff as the Diff tab shows it; `failed` when it cannot be read. */
+function itemDiffText<T extends string | null = string>(itemId: string, signal: AbortSignal, failed: T = 'No diff available.' as T): Promise<string | T> {
+  return api.diff(itemId, signal).then((payload) => payload.diff || 'No local changes.', () => failed);
 }
 
 export function flattenFileOptions(nodes: FileNode[], parentPath = ''): DrawerFileOption[] {
