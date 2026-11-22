@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useHorizontalDrag } from '../components/useHorizontalDrag';
+import { useOpenFileTabs } from '../features/item-workspace/useOpenFileTabs';
 import type { CSSProperties, MutableRefObject } from 'react';
 import { ArrowLeft, Bot, Code2, FilePlus2, FileText, FolderOpen, FolderPlus, GitCompare, GripVertical, Info, Ticket, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -12,7 +13,7 @@ import { useItemGit } from '../features/item-git/useItemGit';
 import { StatusMenu } from '../components/StatusMenu';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { ApiError, api } from '../shared/api';
-import type { FileContent, FileNode, GitChange, ItemDetail, ItemMetadataUpdateInput, ItemStatus, WorkspaceConfig } from '../lib/types';
+import type { FileNode, GitChange, ItemDetail, ItemMetadataUpdateInput, ItemStatus, WorkspaceConfig } from '../lib/types';
 import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../lib/vocabulary';
 import { parseGitDiff } from '../shared/domain/diff';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
@@ -38,7 +39,7 @@ import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicke
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import { type Tab, type RightPanelTab, type DiffMode, type PendingConfirm, type DetailViewMode, type OpenItemFileTab } from '../features/item-workspace/itemWorkspaceTypes';
 import { fileDirectoryPaths, hasFile, currentGitPath, workspacePathForSelection, buildFileStateMap, normalizePath } from '../features/item-workspace/itemPaths';
-import { lastPathSegment, parentDirectoryPath } from '../shared/domain/paths';
+import { parentDirectoryPath } from '../shared/domain/paths';
 import { visibleItemWarnings } from '../features/item-workspace/itemFormat';
 import { DiffPanel } from '../features/item-workspace/DiffPanel';
 import { TreeNode } from '../features/item-workspace/FileTreeNode';
@@ -88,9 +89,8 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const fileTreeRef = useRef<HTMLDivElement | null>(null);
 	const contentSearch = useContentSearch({ kind: 'item', itemId });
   const [workspaceExplorerLocation, setWorkspaceExplorerLocation] = useState<ExplorerLocation>();
-  const [openTabs, setOpenTabs] = useState<OpenItemFileTab[]>([]);
-  const [activeTabId, setActiveTabId] = useState('');
-  const openTabsRef = useRef<OpenItemFileTab[]>([]);
+  const fileTabs = useOpenFileTabs();
+  const { openTabs, activeTabId } = fileTabs;
 
   const showOperationError = (caught: unknown, fallback: string) => {
     setError(caught instanceof Error ? caught.message : fallback);
@@ -178,10 +178,6 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const { file, content: editorContent, setContent: setEditorContent, dirty: dirtyFile, state: autoSaveState } = editor;
 
   useEffect(() => {
-    openTabsRef.current = openTabs;
-  }, [openTabs]);
-
-  useEffect(() => {
     const controller = new AbortController();
     setError('');
     setRecoveryHint('');
@@ -189,8 +185,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     setFiles([]);
     setDiff('');
     editor.open(null);
-    setOpenTabs([]);
-    setActiveTabId('');
+    fileTabs.reset();
     void (async () => {
       try {
         const nextPlan = await api.item(itemId, controller.signal);
@@ -209,7 +204,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
           const nextFile = await api.file(itemId, first.id, undefined, controller.signal);
           if (controller.signal.aborted) return;
           editor.open(nextFile);
-          rememberOpenTab(nextFile);
+          fileTabs.remember(nextFile);
         } else {
           setSelectedDirectoryPath('');
           setSelectedTreeNode(null);
@@ -288,24 +283,10 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     try {
       const nextFile = await api.file(itemId, fileId);
       editor.open(nextFile);
-      rememberOpenTab(nextFile);
+      fileTabs.remember(nextFile);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'File failed to load');
     }
-  };
-
-  const rememberOpenTab = (nextFile: FileContent) => {
-    const nextTab = { id: nextFile.id, path: nextFile.path, editable: nextFile.editable, name: lastPathSegment(nextFile.path) };
-    setOpenTabs((current) => {
-      const existingIndex = current.findIndex((tab) => tab.id === nextTab.id);
-      if (existingIndex >= 0) {
-        const next = current.slice();
-        next[existingIndex] = nextTab;
-        return next;
-      }
-      return [...current, nextTab];
-    });
-    setActiveTabId(nextTab.id);
   };
 
   const openFile = async (fileId: string) => {
@@ -336,25 +317,19 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     setMatchContext(null);
     setSelectedDirectoryPath('');
     setSelectedTreeNode({ path: tabToOpen.path, type: 'file' });
-    setActiveTabId(tabToOpen.id);
+    fileTabs.activate(tabToOpen.id);
     await loadFile(tabToOpen.id);
   };
 
   const closeTab = async (tabToClose: OpenItemFileTab) => {
     if (tabToClose.id === activeTabId && dirtyFile && !(await editor.saveNow())) return;
-    const currentTabs = openTabsRef.current;
-    const index = currentTabs.findIndex((tab) => tab.id === tabToClose.id);
-    const remaining = currentTabs.filter((tab) => tab.id !== tabToClose.id);
-    const nextTab = tabToClose.id === activeTabId ? remaining[index] ?? remaining[index - 1] ?? null : currentTabs.find((tab) => tab.id === activeTabId) ?? null;
-    setOpenTabs(remaining);
+    const { next: nextTab } = fileTabs.close(tabToClose);
     if (nextTab) {
-      setActiveTabId(nextTab.id);
       setSelectedDirectoryPath('');
       setSelectedTreeNode({ path: nextTab.path, type: 'file' });
       await loadFile(nextTab.id);
       return;
     }
-    setActiveTabId('');
     editor.open(null);
     setSelectedTreeNode(parentDirectoryPath(tabToClose.path) ? { path: parentDirectoryPath(tabToClose.path), type: 'directory' } : null);
     setSelectedDirectoryPath(parentDirectoryPath(tabToClose.path));
