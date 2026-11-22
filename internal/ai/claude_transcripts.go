@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -9,7 +8,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 
@@ -74,15 +72,6 @@ type claudeTranscriptScan struct {
 	needles  string
 	mentions []string
 }
-
-// claudeTranscriptCache keeps each file's scan until the file changes, so a
-// board polling every few seconds re-reads only the conversations still moving.
-type claudeTranscriptCache struct {
-	mu    sync.Mutex
-	scans map[string]claudeTranscriptScan
-}
-
-var transcriptCache = &claudeTranscriptCache{scans: map[string]claudeTranscriptScan{}}
 
 func claudeConfigDir() (string, error) {
 	if dir := strings.TrimSpace(os.Getenv("CLAUDE_CONFIG_DIR")); dir != "" {
@@ -299,82 +288,6 @@ func claudeConversationOf(recordID string) (string, bool) {
 	return conversation, true
 }
 
-func (c *claudeTranscriptCache) scan(path string, info os.FileInfo, needles []string) (claudeTranscriptScan, error) {
-	c.mu.Lock()
-	cached, ok := c.scans[path]
-	c.mu.Unlock()
-	if ok && cached.size == info.Size() && cached.modified.Equal(info.ModTime()) && (needles == nil || cached.needles == needlesKey(needles)) {
-		return cached, nil
-	}
-	scan := claudeTranscriptScan{size: info.Size(), modified: info.ModTime(), needles: needlesKey(needles), summary: ClaudeTranscript{SessionID: strings.TrimSuffix(filepath.Base(path), ".jsonl"), ItemIDs: []string{}}}
-	pending := map[string]bool{}
-	for _, needle := range needles {
-		pending[needle] = true
-	}
-	err := readTranscriptLines(path, func(line claudeTranscriptLine, _ []byte) {
-		if scan.cwd == "" && line.Cwd != "" {
-			scan.cwd = line.Cwd
-		}
-		if line.GitBranch != "" {
-			scan.summary.Branch = line.GitBranch
-		}
-		if !line.Timestamp.IsZero() {
-			if scan.summary.StartedAt.IsZero() {
-				scan.summary.StartedAt = line.Timestamp
-			}
-			scan.summary.LastActiveAt = line.Timestamp
-		}
-		if _, ok := transcriptTurn(line); ok {
-			scan.summary.Messages++
-		}
-		authored := authoredText(line)
-		for needle := range pending {
-			if len(authored) > 0 && mentions(authored, needle) {
-				scan.mentions = append(scan.mentions, needle)
-				delete(pending, needle)
-			}
-		}
-	})
-	if err != nil {
-		return claudeTranscriptScan{}, err
-	}
-	if scan.summary.LastActiveAt.IsZero() {
-		scan.summary.LastActiveAt = info.ModTime()
-	}
-	if needles != nil {
-		c.mu.Lock()
-		c.scans[path] = scan
-		c.mu.Unlock()
-	}
-	return scan, nil
-}
-
-// needlesKey records which items a cached scan searched for, so a changed item
-// list rescans the file.
-func needlesKey(needles []string) string { return "\x00" + strings.Join(needles, "\x00") }
-
-func readTranscriptLines(path string, visit func(claudeTranscriptLine, []byte)) error {
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 0, 64<<10), claudeTranscriptMaxLine)
-	for scanner.Scan() {
-		raw := scanner.Bytes()
-		var line claudeTranscriptLine
-		if json.Unmarshal(raw, &line) != nil {
-			continue
-		}
-		visit(line, raw)
-	}
-	if errors.Is(scanner.Err(), bufio.ErrTooLong) {
-		return nil
-	}
-	return scanner.Err()
-}
-
 func transcriptTurn(line claudeTranscriptLine) (ClaudeTurn, bool) {
 	if (line.Type != "user" && line.Type != "assistant") || line.IsSidechain || line.IsMeta || line.Message == nil {
 		return ClaudeTurn{}, false
@@ -449,61 +362,6 @@ func authoredText(line claudeTranscriptLine) []byte {
 	return text.Bytes()
 }
 
-// transcriptNeedles are the strings that tie a conversation to an item: its
-// repository path, and its identifier when that is ticket-like. A plain-word
-// identifier such as a wiki section's "platform" would match any conversation.
-func transcriptNeedles(items []models.ItemSummary) []string {
-	seen := map[string]bool{}
-	needles := []string{}
-	for _, item := range items {
-		identifier := strings.TrimSpace(item.Identifier)
-		if !strings.ContainsAny(identifier, "0123456789") {
-			identifier = ""
-		}
-		for _, needle := range []string{strings.Trim(item.ItemPath, "/"), identifier} {
-			if len(needle) >= 3 && !seen[needle] {
-				seen[needle] = true
-				needles = append(needles, needle)
-			}
-		}
-	}
-	sort.Strings(needles)
-	return needles
-}
-
-func matchedItemIDs(items []models.ItemSummary, found []string) []string {
-	mentioned := map[string]bool{}
-	for _, needle := range found {
-		mentioned[needle] = true
-	}
-	ids := []string{}
-	for _, item := range items {
-		if mentioned[strings.Trim(item.ItemPath, "/")] || mentioned[strings.TrimSpace(item.Identifier)] {
-			ids = append(ids, item.ID)
-		}
-	}
-	return ids
-}
-
-// mentions finds needle as a whole token: PM-04 does not match PM-042.
-func mentions(raw []byte, needle string) bool {
-	for offset := 0; ; {
-		index := bytes.Index(raw[offset:], []byte(needle))
-		if index < 0 {
-			return false
-		}
-		start, end := offset+index, offset+index+len(needle)
-		if (start == 0 || !isTokenByte(raw[start-1])) && (end == len(raw) || !isTokenByte(raw[end])) {
-			return true
-		}
-		offset = start + 1
-	}
-}
-
-func isTokenByte(b byte) bool {
-	return b == '-' || b == '_' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
-}
-
 func sameDirectory(a, b string) bool {
 	if a == "" || b == "" {
 		return false
@@ -514,112 +372,4 @@ func sameDirectory(a, b string) bool {
 	resolvedA, errA := filepath.EvalSymlinks(a)
 	resolvedB, errB := filepath.EvalSymlinks(b)
 	return errA == nil && errB == nil && resolvedA == resolvedB
-}
-
-const claudeActivityMaxText = 600
-
-// ReadClaudeTranscriptActivity is ReadClaudeTranscriptTail with the model's
-// work between its words: each tool call as a "tool" turn naming the tool and
-// what it was given, and each thinking block as a "thinking" turn. Tool output
-// stays out, since a page or command result says nothing about what the model
-// decided. The harness Live tab reads this so a person can follow an agent that
-// has no terminal.
-func ReadClaudeTranscriptActivity(path string, limit int) ([]ClaudeTurn, error) {
-	if limit <= 0 || limit > ClaudeTranscriptMaxTail {
-		limit = ClaudeTranscriptMaxTail
-	}
-	turns := []ClaudeTurn{}
-	err := readTranscriptLines(path, func(line claudeTranscriptLine, _ []byte) {
-		for _, turn := range transcriptActivity(line) {
-			turns = append(turns, turn)
-			if len(turns) > limit {
-				turns = turns[1:]
-			}
-		}
-	})
-	if errors.Is(err, os.ErrNotExist) {
-		return turns, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return turns, nil
-}
-
-// transcriptActivity returns a line's turns in order: thinking, text and tool
-// calls as the model wrote them, or the person's text.
-func transcriptActivity(line claudeTranscriptLine) []ClaudeTurn {
-	if (line.Type != "user" && line.Type != "assistant") || line.IsSidechain || line.IsMeta || line.Message == nil {
-		return nil
-	}
-	var plain string
-	if json.Unmarshal(line.Message.Content, &plain) == nil {
-		if turn, ok := transcriptTurn(line); ok {
-			return []ClaudeTurn{turn}
-		}
-		return nil
-	}
-	var blocks []struct {
-		Type     string          `json:"type"`
-		Text     string          `json:"text"`
-		Thinking string          `json:"thinking"`
-		Name     string          `json:"name"`
-		Input    json.RawMessage `json:"input"`
-	}
-	if json.Unmarshal(line.Message.Content, &blocks) != nil {
-		return nil
-	}
-	turns := []ClaudeTurn{}
-	add := func(role, text string) {
-		text = strings.TrimSpace(text)
-		if text == "" {
-			return
-		}
-		if runes := []rune(text); len(runes) > claudeTurnMaxText {
-			text = string(runes[:claudeTurnMaxText]) + "…"
-		}
-		turns = append(turns, ClaudeTurn{Role: role, Text: text, At: line.Timestamp})
-	}
-	for _, block := range blocks {
-		switch block.Type {
-		case "text":
-			if line.Type == "user" && strings.HasPrefix(strings.TrimSpace(block.Text), "<") {
-				continue
-			}
-			add(line.Type, block.Text)
-		case "thinking":
-			add("thinking", block.Thinking)
-		case "tool_use":
-			add("tool", toolCallText(block.Name, block.Input))
-		}
-	}
-	return turns
-}
-
-// toolCallText is one line for a tool call: the tool, then the argument a
-// person would ask about first (a path, a command, a pattern), else the input.
-func toolCallText(name string, input json.RawMessage) string {
-	var fields map[string]json.RawMessage
-	if json.Unmarshal(input, &fields) != nil || len(fields) == 0 {
-		return name
-	}
-	for _, key := range []string{"description", "command", "file_path", "path", "pattern", "query", "url", "prompt", "skill"} {
-		var value string
-		if raw, ok := fields[key]; ok && json.Unmarshal(raw, &value) == nil && strings.TrimSpace(value) != "" {
-			return name + " · " + clipText(value, claudeActivityMaxText)
-		}
-	}
-	compact := bytes.Buffer{}
-	if json.Compact(&compact, input) != nil {
-		return name
-	}
-	return name + " · " + clipText(compact.String(), claudeActivityMaxText)
-}
-
-func clipText(text string, max int) string {
-	text = strings.TrimSpace(text)
-	if runes := []rune(text); len(runes) > max {
-		return string(runes[:max]) + "…"
-	}
-	return text
 }
