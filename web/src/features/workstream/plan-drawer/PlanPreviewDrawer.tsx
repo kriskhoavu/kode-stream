@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ItemMetadataFields, isMetadataDirty, metadataDraftFrom } from '../../item-metadata/itemMetadata';
+import { ItemMetadataEditor, isMetadataDirty, metadataDraftFrom } from '../../item-metadata/itemMetadata';
 import { Bot, PanelRightClose, PanelRightOpen, Code2, FileText, GitBranch, GripVertical, Info, RefreshCw, Ticket, X } from 'lucide-react';
 import { FileMenu } from '../../../components/FileMenu';
 import { useResizableDrawer } from '../../../components/useResizableDrawer';
@@ -12,7 +12,7 @@ import { ContentViewer } from '../../content-viewer/ContentViewer';
 import { JiraItemPanel } from '../../jira/JiraItemPanel';
 import { api, statusLabels } from '../../../shared/api';
 import type { FileNode, ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../../../lib/types';
-import { isDocumentationMetadataSource, labels, metadataSourceLabel } from '../../../lib/vocabulary';
+import { labels, metadataSourceLabel } from '../../../lib/vocabulary';
 import { notifyReliabilityChanged } from '../../reliability/hooks';
 import { AgentPane, AgentsTab, agentFocusKey, useHeldAgentSessions, type AgentFocus, type AgentPaneHarness, type AgentsMode } from '../AgentsPanel';
 import { HarnessRunTab } from '../HarnessRunTab';
@@ -361,13 +361,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
                     <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
                     <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
                   </dl>
-                  {!isDocumentationMetadataSource(plan?.metadataSource) && (
-                    <ItemMetadataFields draft={metadataDraft} onChange={setMetadataDraft} showScope={false} className="metadata-form drawer-metadata-form" />
-                  )}
-                  <div className="workspace-actions">
-                    <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || isDocumentationMetadataSource(plan?.metadataSource)} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
-                  </div>
-                  {(plan?.tags?.length ?? 0) > 0 && <div className="tags">{plan?.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>}
+                  <ItemMetadataEditor plan={plan} draft={metadataDraft} onChange={setMetadataDraft} dirty={dirtyMetadata} saving={savingMetadata} onSave={saveMetadata} showScope={false} formClassName="metadata-form drawer-metadata-form" />
                 </>
               )}
               {sideTab === 'git' && (

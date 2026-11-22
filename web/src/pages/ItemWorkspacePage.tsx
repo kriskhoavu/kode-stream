@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ItemMetadataFields, isMetadataDirty, metadataDraftFrom } from '../features/item-metadata/itemMetadata';
+import { ItemMetadataEditor, isMetadataDirty, metadataDraftFrom } from '../features/item-metadata/itemMetadata';
 import { useHorizontalDrag } from '../components/useHorizontalDrag';
 import { useFileTabs } from '../features/file-editor/useFileTabs';
 import { createItemPath, relativePathParts, renamedPath, renameItemPath } from '../features/item-workspace/itemPathActions';
@@ -540,13 +540,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
             <dt>Author</dt><dd>{plan?.author || plan?.owner || 'Unknown'}</dd>
             <dt>Files</dt><dd>{plan?.counts.files ?? files.length}</dd>
           </dl>
-          {!isDocumentationMetadataSource(plan?.metadataSource) && (
-            <ItemMetadataFields draft={metadataDraft} onChange={setMetadataDraft} className="metadata-form" />
-          )}
-          <div className="workspace-actions">
-            <button className="save-action save-metadata-action" type="button" disabled={!dirtyMetadata || savingMetadata || isDocumentationMetadataSource(plan?.metadataSource)} onClick={saveMetadata}>{savingMetadata ? 'Saving...' : 'Save Metadata'}</button>
-          </div>
-          <div className="tags">{(plan?.tags ?? []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+          <ItemMetadataEditor plan={plan} draft={metadataDraft} onChange={setMetadataDraft} dirty={dirtyMetadata} saving={savingMetadata} onSave={saveMetadata} formClassName="metadata-form" />
           {visibleWarnings.length ? (
             <div className="plan-warnings">
               <h3>Warnings</h3>
