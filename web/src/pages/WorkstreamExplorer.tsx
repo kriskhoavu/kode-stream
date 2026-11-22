@@ -1,11 +1,10 @@
 import { lastPathSegment, parentDirectoryPath } from '../shared/domain/paths';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useHorizontalDrag } from '../components/useHorizontalDrag';
+import { useExplorerPanels } from '../features/workstream-explorer/useExplorerPanels';
 import { useFileTabs } from '../features/file-editor/useFileTabs';
 import type { CSSProperties, ReactNode } from 'react';
 import { CaseSensitive, Clipboard, Code2, Eye, GitCompare, FilePlus2, FolderPlus, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, Search, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { readStringPreference, writePreference } from '../shared/preferences/store';
 import { ContentViewer } from '../features/content-viewer/ContentViewer';
 import { autoSaveLabel, useFileEditorSession } from '../features/file-editor/useFileEditorSession';
 import { treeKeyboardAction } from '../features/workstream-explorer/keyboard';
@@ -23,7 +22,7 @@ import type { ContentSearchSelection, WorkspaceContentSearchResult } from '../li
 import { ExplorerInspector } from '../features/workstream-explorer/ExplorerInspector';
 import { ExplorerTreeRow, ExplorerUnifiedSearchResults, ExplorerPathDialog, ExplorerEmpty, ExplorerDiff } from '../features/workstream-explorer/ExplorerParts';
 import { type EditorTab, type PathDialog, type ExplorerUnifiedResult, type OpenWorkspaceFileTab, type ExplorerRightPanelProps } from '../features/workstream-explorer/explorerPageTypes';
-import { boundedNumber, boundedLeftPanelWidth, boundedRightPanelWidth, tabKey, restrictRowsToRoot } from '../features/workstream-explorer/explorerLayout';
+import { tabKey, restrictRowsToRoot } from '../features/workstream-explorer/explorerLayout';
 
 const workspaceTabKey = (tab: OpenWorkspaceFileTab) => tabKey(tab.workspaceId, tab.path);
 
@@ -54,17 +53,13 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const [revertOpen, setRevertOpen] = useState(false);
   const [reverting, setReverting] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [leftWidth, setLeftWidth] = useState(() => boundedNumber(readStringPreference('workstreamExplorer.leftWidth'), 400, boundedLeftPanelWidth));
-  const [rightWidth, setRightWidth] = useState(() => boundedNumber(readStringPreference('workstreamExplorer.rightWidth'), 300, boundedRightPanelWidth));
+  const { gridRef, leftCollapsed, setLeftCollapsed, leftWidth, rightWidth, startResize } = useExplorerPanels();
   const fileTabs = useFileTabs(workspaceTabKey);
   const { openTabs, activeKey: activeTabKey, activeTab } = fileTabs;
   const [searchIndex, setSearchIndex] = useState(0);
   const [pathDialog, setPathDialog] = useState<PathDialog | null>(null);
 	const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const treeRef = useRef<HTMLDivElement | null>(null);
-  const gridRef = useRef<HTMLDivElement | null>(null);
-  const startDrag = useHorizontalDrag();
   const workspace = workspaces.find((item) => item.id === location?.workspaceId);
   const rightPanelOpen = rightPanel ? !rightPanel.collapsed : inspectorOpen;
   const rightPanelTitle = rightPanel?.title ?? 'Inspector';
@@ -319,20 +314,6 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
       onLocationChange({ workspaceId: tab.workspaceId, path: parentPath || undefined, mode: explorer.mode });
     }
   };
-
-  const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
-    const initial = side === 'left' ? leftWidth : rightWidth;
-    let latest = initial;
-    startDrag(event, {
-      move: (deltaX) => {
-        latest = side === 'left' ? boundedLeftPanelWidth(initial + deltaX) : boundedRightPanelWidth(initial - deltaX);
-        gridRef.current?.style.setProperty(side === 'left' ? '--explorer-left-width' : '--explorer-right-width', `${latest}px`);
-        if (side === 'left') setLeftWidth(latest); else setRightWidth(latest);
-      },
-      end: () => writePreference(side === 'left' ? 'workstreamExplorer.leftWidth' : 'workstreamExplorer.rightWidth', String(latest)),
-    });
-  };
-
 
   const gridStyle = {
     '--explorer-left-width': `${leftCollapsed ? 44 : leftWidth}px`,
