@@ -188,15 +188,33 @@ func TestSessionChangesUnsupportedForNonLocalContentProvider(t *testing.T) {
 	}
 }
 
-func TestSessionChangesUnavailableWhenWorkspacePathMissing(t *testing.T) {
-	workspace := models.WorkspaceConfig{ID: "ws-1", Name: "Missing", Path: filepath.Join(t.TempDir(), "does-not-exist")}
-	service, _ := changesTestService(t, workspace, baseSessionRecord(workspace.ID, "deadbeef"), &fakeChangeGit{})
-	result, err := service.SessionChanges(context.Background(), "session-1")
-	if err != nil {
-		t.Fatalf("err=%v", err)
-	}
-	if result.Availability != SessionChangesUnavailable || result.Reason != ReasonWorkspaceMissing {
-		t.Fatalf("availability=%q reason=%q", result.Availability, result.Reason)
+func TestSessionChangesUnavailableReasons(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		missingPath  bool
+		launchCommit string
+		git          *fakeChangeGit
+		want         string
+	}{
+		{"workspace path missing", true, "deadbeef", &fakeChangeGit{}, ReasonWorkspaceMissing},
+		{"launch commit unknown", false, "", &fakeChangeGit{}, ReasonLaunchCommitUnknown},
+		{"launch commit missing", false, "deadbeef", &fakeChangeGit{commitExistsErr: &gitadapter.ErrUnknownCommit{Ref: "deadbeef"}}, ReasonLaunchCommitMissing},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := t.TempDir()
+			if tc.missingPath {
+				path = filepath.Join(path, "does-not-exist")
+			}
+			workspace := models.WorkspaceConfig{ID: "ws-1", Name: "Local", Path: path}
+			service, _ := changesTestService(t, workspace, baseSessionRecord(workspace.ID, tc.launchCommit), tc.git)
+			result, err := service.SessionChanges(context.Background(), "session-1")
+			if err != nil {
+				t.Fatalf("err=%v", err)
+			}
+			if result.Availability != SessionChangesUnavailable || result.Reason != tc.want {
+				t.Fatalf("availability=%q reason=%q, want %q", result.Availability, result.Reason, tc.want)
+			}
+		})
 	}
 }
 
@@ -215,31 +233,6 @@ func TestSessionChangesUnavailableWhenWorkspaceRecordMissing(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 	if result.Availability != SessionChangesUnavailable || result.Reason != ReasonWorkspaceMissing {
-		t.Fatalf("availability=%q reason=%q", result.Availability, result.Reason)
-	}
-}
-
-func TestSessionChangesUnavailableWhenLaunchCommitUnknown(t *testing.T) {
-	workspace := models.WorkspaceConfig{ID: "ws-1", Name: "Local", Path: t.TempDir()}
-	service, _ := changesTestService(t, workspace, baseSessionRecord(workspace.ID, ""), &fakeChangeGit{})
-	result, err := service.SessionChanges(context.Background(), "session-1")
-	if err != nil {
-		t.Fatalf("err=%v", err)
-	}
-	if result.Availability != SessionChangesUnavailable || result.Reason != ReasonLaunchCommitUnknown {
-		t.Fatalf("availability=%q reason=%q", result.Availability, result.Reason)
-	}
-}
-
-func TestSessionChangesUnavailableWhenLaunchCommitMissing(t *testing.T) {
-	workspace := models.WorkspaceConfig{ID: "ws-1", Name: "Local", Path: t.TempDir()}
-	git := &fakeChangeGit{commitExistsErr: &gitadapter.ErrUnknownCommit{Ref: "deadbeef"}}
-	service, _ := changesTestService(t, workspace, baseSessionRecord(workspace.ID, "deadbeef"), git)
-	result, err := service.SessionChanges(context.Background(), "session-1")
-	if err != nil {
-		t.Fatalf("err=%v", err)
-	}
-	if result.Availability != SessionChangesUnavailable || result.Reason != ReasonLaunchCommitMissing {
 		t.Fatalf("availability=%q reason=%q", result.Availability, result.Reason)
 	}
 }

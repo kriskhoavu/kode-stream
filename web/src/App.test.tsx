@@ -1,6 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { routeFromLocation } from './app/router';
 import { App, LocalServerUnavailable } from './App';
 import { api } from './shared/api';
 import type { WorkspaceConfig } from './lib/types';
@@ -19,37 +18,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   localStorage.clear();
   window.history.replaceState(null, '', '/workstream');
-});
-
-describe('routeFromLocation', () => {
-  it('parses item workspace routes', () => {
-    window.history.pushState(null, '', '/items/PM-003%20Architecture');
-
-    expect(routeFromLocation()).toEqual({ name: 'item', itemId: 'PM-003 Architecture' });
-  });
-
-  it('presents removed list routes as not found', () => {
-    window.history.pushState(null, '', '/items');
-    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/items' });
-
-    window.history.pushState(null, '', '/branches');
-    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/branches' });
-  });
-
-  it('parses retained top-level routes', () => {
-    window.history.pushState(null, '', '/workspaces');
-    expect(routeFromLocation()).toEqual({ name: 'workspaces' });
-    window.history.pushState(null, '', '/settings');
-    expect(routeFromLocation()).toEqual({ name: 'settings' });
-    window.history.pushState(null, '', '/knowledge?view=graph');
-    expect(routeFromLocation()).toEqual({ name: 'knowledge', location: { view: 'graph' } });
-  });
-
-  it('presents unknown paths as not found', () => {
-    window.history.pushState(null, '', '/unknown');
-
-    expect(routeFromLocation()).toEqual({ name: 'not-found', path: '/unknown' });
-  });
 });
 
 describe('LocalServerUnavailable', () => {

@@ -4,8 +4,6 @@ import { LeftNav, WorkspaceMenu } from './app/AppNavigation';
 import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Search, Sun, FolderGit2, Settings, Bot } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
-export type { Route } from './app/router';
-export { routeFromLocation } from './app/router';
 import { routeFromPath } from './app/router';
 import { api, isExtensionSurface, localAPIOrigin } from './shared/api';
 import { ActivityPanel } from './components/ReliabilityPanels';

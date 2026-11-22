@@ -17,12 +17,7 @@ func TestCloudCommandIsUnavailableUntilDeliveryLifecycleExists(t *testing.T) {
 	apiHandler, workspaceID := cloudCommandTestAPI(t, true)
 	handler := apiHandler.Routes()
 
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspaceID+"/commands", strings.NewReader(`{"type":"git","payload":{"op":"status"},"log":"token=abc123 password=hunter2 ok"}`))
-	request.Header.Set("X-Kode-Stream-Subject", "editor")
-	request.Header.Set("X-Kode-Stream-Role", "editor")
-	request.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
-	handler.ServeHTTP(response, request)
+	response := postAsCloudEditor(handler, "/api/workspaces/"+workspaceID+"/commands", `{"type":"git","payload":{"op":"status"},"log":"token=abc123 password=hunter2 ok"}`, "editor")
 
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
@@ -41,12 +36,7 @@ func TestCloudCommandRejectsOfflineAgent(t *testing.T) {
 	apiHandler, workspaceID := cloudCommandTestAPI(t, false)
 	handler := apiHandler.Routes()
 
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspaceID+"/commands", strings.NewReader(`{"type":"git"}`))
-	request.Header.Set("X-Kode-Stream-Subject", "editor")
-	request.Header.Set("X-Kode-Stream-Role", "editor")
-	request.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
-	handler.ServeHTTP(response, request)
+	response := postAsCloudEditor(handler, "/api/workspaces/"+workspaceID+"/commands", `{"type":"git"}`, "editor")
 
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
@@ -61,12 +51,7 @@ func TestCloudCommandRejectsViewerWriteCapability(t *testing.T) {
 	apiHandler, workspaceID := cloudCommandTestAPI(t, true)
 	handler := apiHandler.Routes()
 
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspaceID+"/commands", strings.NewReader(`{"type":"file"}`))
-	request.Header.Set("X-Kode-Stream-Subject", "editor")
-	request.Header.Set("X-Kode-Stream-Role", "viewer")
-	request.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
-	handler.ServeHTTP(response, request)
+	response := postAsCloudEditor(handler, "/api/workspaces/"+workspaceID+"/commands", `{"type":"file"}`, "viewer")
 
 	if response.Code != http.StatusForbidden {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
@@ -92,12 +77,7 @@ func TestCloudCommandRejectsRemoteSnapshotExecutionWithoutProviderCall(t *testin
 	}
 	handler := apiHandler.Routes()
 
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/commands", strings.NewReader(`{"type":"git"}`))
-	request.Header.Set("X-Kode-Stream-Subject", "editor")
-	request.Header.Set("X-Kode-Stream-Role", "editor")
-	request.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
-	handler.ServeHTTP(response, request)
+	response := postAsCloudEditor(handler, "/api/workspaces/"+workspace.ID+"/commands", `{"type":"git"}`, "editor")
 
 	if response.Code != http.StatusConflict || !strings.Contains(response.Body.String(), "read-only snapshot") {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
@@ -108,12 +88,7 @@ func TestCloudDeniesHostedExecutionRoutes(t *testing.T) {
 	apiHandler, workspaceID := cloudCommandTestAPI(t, true)
 	handler := apiHandler.Routes()
 
-	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspaceID+"/git/pull", strings.NewReader(`{}`))
-	request.Header.Set("X-Kode-Stream-Subject", "editor")
-	request.Header.Set("X-Kode-Stream-Role", "editor")
-	request.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
-	handler.ServeHTTP(response, request)
+	response := postAsCloudEditor(handler, "/api/workspaces/"+workspaceID+"/git/pull", `{}`, "editor")
 
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
@@ -137,4 +112,16 @@ func cloudCommandTestAPI(t *testing.T, connected bool) (*API, string) {
 		t.Fatal(err)
 	}
 	return apiHandler, workspace.ID
+}
+
+// postAsCloudEditor posts body to path as the Cloud user "editor" with role,
+// carrying that user's CSRF token, and returns the recorded response.
+func postAsCloudEditor(handler http.Handler, path, body, role string) *httptest.ResponseRecorder {
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+	request.Header.Set("X-Kode-Stream-Subject", "editor")
+	request.Header.Set("X-Kode-Stream-Role", role)
+	request.Header.Set(csrfHeader, stableCloudUserID("editor:csrf"))
+	handler.ServeHTTP(response, request)
+	return response
 }

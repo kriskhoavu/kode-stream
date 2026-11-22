@@ -42,57 +42,39 @@ func TestResolveConfigDefaultsLocalModeToDataDir(t *testing.T) {
 	}
 }
 
-func TestResolveConfigUsesExplicitDatabaseOptionForLocalSQLite(t *testing.T) {
-	paths := system.Paths{SQLiteDatabaseFile: filepath.Join(t.TempDir(), "kode-stream.db")}
-	config, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeLocal}, paths, mapEnv(map[string]string{
-		EnvStorageOption: StorageOptionDatabase,
-	}))
-	if err != nil {
-		t.Fatalf("ResolveConfig returned error: %v", err)
-	}
-	if config.StorageOption != StorageOptionDatabase || config.Driver != StorageDriverSQLite {
-		t.Fatalf("config = %#v, want database/sqlite", config)
-	}
-}
-
-func TestResolveConfigRequiresPostgresInCloudMode(t *testing.T) {
-	_, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeCloud}, system.Paths{}, emptyEnv)
-	if err == nil {
-		t.Fatal("expected missing Postgres URL error")
-	}
-}
-
-func TestResolveConfigAcceptsCloudPostgresURL(t *testing.T) {
-	config, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeCloud}, system.Paths{}, mapEnv(map[string]string{
-		EnvDatabaseURL: "postgres://kode-stream@localhost/kode_stream",
-	}))
-	if err != nil {
-		t.Fatalf("ResolveConfig returned error: %v", err)
-	}
-	if config.Driver != StorageDriverPostgres {
-		t.Fatalf("driver = %q, want %q", config.Driver, StorageDriverPostgres)
-	}
-}
-
-func TestResolveConfigUsesStorageOption(t *testing.T) {
-	paths := system.Paths{SQLiteDatabaseFile: filepath.Join(t.TempDir(), "kode-stream.db")}
-	config, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeLocal}, paths, mapEnv(map[string]string{
-		EnvStorageOption: StorageOptionDataDir,
-	}))
-	if err != nil {
-		t.Fatalf("ResolveConfig returned error: %v", err)
-	}
-	if config.StorageOption != StorageOptionDataDir || config.Driver != StorageDriverFile {
-		t.Fatalf("config = %#v, want datadir/file", config)
-	}
-}
-
-func TestResolveConfigRejectsCloudDataDir(t *testing.T) {
-	_, err := ResolveConfig(system.RuntimeConfig{Mode: models.RuntimeModeCloud}, system.Paths{}, mapEnv(map[string]string{
-		EnvStorageOption: StorageOptionDataDir,
-	}))
-	if err == nil {
-		t.Fatal("expected cloud datadir validation error")
+func TestResolveConfigByModeAndOption(t *testing.T) {
+	local := system.RuntimeConfig{Mode: models.RuntimeModeLocal}
+	cloud := system.RuntimeConfig{Mode: models.RuntimeModeCloud}
+	for _, tc := range []struct {
+		name       string
+		runtime    system.RuntimeConfig
+		env        map[string]string
+		wantOption string
+		wantDriver string
+		wantErr    bool
+	}{
+		{"local database option uses SQLite", local, map[string]string{EnvStorageOption: StorageOptionDatabase}, StorageOptionDatabase, StorageDriverSQLite, false},
+		{"local data directory option uses files", local, map[string]string{EnvStorageOption: StorageOptionDataDir}, StorageOptionDataDir, StorageDriverFile, false},
+		{"cloud requires a Postgres URL", cloud, map[string]string{}, "", "", true},
+		{"cloud accepts a Postgres URL", cloud, map[string]string{EnvDatabaseURL: "postgres://kode-stream@localhost/kode_stream"}, "", StorageDriverPostgres, false},
+		{"cloud refuses the data directory", cloud, map[string]string{EnvStorageOption: StorageOptionDataDir}, "", "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			paths := system.Paths{SQLiteDatabaseFile: filepath.Join(t.TempDir(), "kode-stream.db")}
+			config, err := ResolveConfig(tc.runtime, paths, mapEnv(tc.env))
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("config = %#v, want an error", config)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ResolveConfig returned error: %v", err)
+			}
+			if config.Driver != tc.wantDriver || (tc.wantOption != "" && config.StorageOption != tc.wantOption) {
+				t.Fatalf("config = %#v, want option %q driver %q", config, tc.wantOption, tc.wantDriver)
+			}
+		})
 	}
 }
 

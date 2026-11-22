@@ -126,44 +126,27 @@ func TestFallbackDocumentsReturnsEmptySliceForEmptyPlan(t *testing.T) {
 }
 
 func TestDocumentCollectionDetection(t *testing.T) {
-	root := t.TempDir()
-	writeTestFile(t, root, "a12/guide.md", "# Guide\n")
-	reader := NewFilesystemSourceReader(root)
-	entries, err := reader.ReadDir("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !shouldScanAsDocumentCollection(reader, "", entries) {
-		t.Fatal("expected freestyle markdown root to scan as document collection")
-	}
-}
-
-func TestStructuredPlanDirectoryDoesNotScanAsDocumentCollection(t *testing.T) {
-	root := t.TempDir()
-	writeTestFile(t, root, "api/DI-1/README.md", "# Item\n")
-	reader := NewFilesystemSourceReader(root)
-	entries, err := reader.ReadDir("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if shouldScanAsDocumentCollection(reader, "", entries) {
-		t.Fatal("structured item root should not scan as one document collection")
-	}
-}
-
-func TestNestedFreestyleDocsStillScanAsDocumentCollection(t *testing.T) {
-	root := t.TempDir()
-	writeTestFile(t, root, "ai/revised/note.md", "# Note\n")
-	reader := NewFilesystemSourceReader(root)
-	entries, err := reader.ReadDir("")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !shouldScanAsDocumentCollection(reader, "", entries) {
-		t.Fatal("nested freestyle docs should not look like structured item folders")
+	for _, tc := range []struct {
+		name       string
+		file       string
+		collection bool
+	}{
+		{"freestyle markdown root", "a12/guide.md", true},
+		{"structured item root", "api/DI-1/README.md", false},
+		{"nested freestyle docs", "ai/revised/note.md", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeTestFile(t, root, tc.file, "# Page\n")
+			reader := NewFilesystemSourceReader(root)
+			entries, err := reader.ReadDir("")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := shouldScanAsDocumentCollection(reader, "", entries); got != tc.collection {
+				t.Fatalf("shouldScanAsDocumentCollection = %v, want %v", got, tc.collection)
+			}
+		})
 	}
 }
 

@@ -140,36 +140,30 @@ func TestSessionChangesReturns404ForUnknownSession(t *testing.T) {
 	}
 }
 
-func TestSessionChangesReturns404WhenCloudCallerMayNotReadWorkspace(t *testing.T) {
-	fixture := newSessionsTestFixture(t, models.RuntimeModeCloud)
-	// The workspace is registered under "owner", not "intruder": a Cloud caller
-	// who is not the owner must see the same 404 a missing session would give,
-	// never a 403 that would confirm the session exists.
-	if _, err := fixture.cloud.Upsert(context.Background(), models.WorkspaceConfig{ID: fixture.workspace.ID, OwnerUserID: "owner", Name: fixture.workspace.Name, Path: fixture.workspace.Path}); err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest(http.MethodGet, "/api/sessions/session-1/changes", nil)
-	req.SetPathValue("id", "session-1")
-	req = withCloudSession(req, "intruder")
-	recorder := httptest.NewRecorder()
-	fixture.controller.sessionChanges(recorder, req)
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
-	}
-}
-
-func TestSessionChangesAllowsCloudOwner(t *testing.T) {
-	fixture := newSessionsTestFixture(t, models.RuntimeModeCloud)
-	if _, err := fixture.cloud.Upsert(context.Background(), models.WorkspaceConfig{ID: fixture.workspace.ID, OwnerUserID: "owner", Name: fixture.workspace.Name, Path: fixture.workspace.Path}); err != nil {
-		t.Fatal(err)
-	}
-	req := httptest.NewRequest(http.MethodGet, "/api/sessions/session-1/changes", nil)
-	req.SetPathValue("id", "session-1")
-	req = withCloudSession(req, "owner")
-	recorder := httptest.NewRecorder()
-	fixture.controller.sessionChanges(recorder, req)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+// A Cloud caller who is not the workspace's owner must see the same 404 a
+// missing session would give, never a 403 that would confirm the session exists.
+func TestSessionChangesCloudOwnership(t *testing.T) {
+	for _, tc := range []struct {
+		caller string
+		want   int
+	}{
+		{"owner", http.StatusOK},
+		{"intruder", http.StatusNotFound},
+	} {
+		t.Run(tc.caller, func(t *testing.T) {
+			fixture := newSessionsTestFixture(t, models.RuntimeModeCloud)
+			if _, err := fixture.cloud.Upsert(context.Background(), models.WorkspaceConfig{ID: fixture.workspace.ID, OwnerUserID: "owner", Name: fixture.workspace.Name, Path: fixture.workspace.Path}); err != nil {
+				t.Fatal(err)
+			}
+			req := httptest.NewRequest(http.MethodGet, "/api/sessions/session-1/changes", nil)
+			req.SetPathValue("id", "session-1")
+			req = withCloudSession(req, tc.caller)
+			recorder := httptest.NewRecorder()
+			fixture.controller.sessionChanges(recorder, req)
+			if recorder.Code != tc.want {
+				t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+			}
+		})
 	}
 }
 
@@ -299,19 +293,7 @@ func TestGlobalSessionsRejectsInvalidScope(t *testing.T) {
 
 func TestGlobalSessionsDefaultsToActiveScope(t *testing.T) {
 	fixture := newSessionsTestFixture(t, models.RuntimeModeLocal)
-	req := httptest.NewRequest(http.MethodGet, "/api/sessions", nil)
-	recorder := httptest.NewRecorder()
-	fixture.controller.globalSessions(recorder, req)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
-	}
-	var payload struct {
-		Rows      []appaisession.GlobalSessionRow `json:"rows"`
-		Truncated bool                            `json:"truncated"`
-	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
+	payload := fetchGlobalSessions(t, fixture, "/api/sessions", "")
 	// The seeded record is exited (not live), so the default active scope
 	// excludes it.
 	if len(payload.Rows) != 0 {
@@ -321,19 +303,7 @@ func TestGlobalSessionsDefaultsToActiveScope(t *testing.T) {
 
 func TestGlobalSessionsScopeAllListsExitedSession(t *testing.T) {
 	fixture := newSessionsTestFixture(t, models.RuntimeModeLocal)
-	req := httptest.NewRequest(http.MethodGet, "/api/sessions?scope=all", nil)
-	recorder := httptest.NewRecorder()
-	fixture.controller.globalSessions(recorder, req)
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
-	}
-	var payload struct {
-		Rows      []appaisession.GlobalSessionRow `json:"rows"`
-		Truncated bool                            `json:"truncated"`
-	}
-	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
-		t.Fatal(err)
-	}
+	payload := fetchGlobalSessions(t, fixture, "/api/sessions?scope=all", "")
 	if len(payload.Rows) != 1 || payload.Rows[0].Record.ID != "session-1" || payload.Rows[0].WorkspaceName != "Test" {
 		t.Fatalf("rows=%#v", payload.Rows)
 	}
@@ -355,21 +325,33 @@ func TestDeleteSessionRemovesFinishedRecord(t *testing.T) {
 
 func TestGlobalSessionsHidesWorkspacesCloudCallerMayNotRead(t *testing.T) {
 	fixture := newSessionsTestFixture(t, models.RuntimeModeCloud)
-	req := httptest.NewRequest(http.MethodGet, "/api/sessions?scope=all", nil)
-	req = withCloudSession(req, "stranger")
+	payload := fetchGlobalSessions(t, fixture, "/api/sessions?scope=all", "stranger")
+	if len(payload.Rows) != 0 {
+		t.Fatalf("rows=%#v, want the workspace hidden rather than a 403", payload.Rows)
+	}
+}
+
+type globalSessionsPayload struct {
+	Rows      []appaisession.GlobalSessionRow `json:"rows"`
+	Truncated bool                            `json:"truncated"`
+}
+
+// fetchGlobalSessions asks the global sessions route, as a Cloud caller when
+// one is named, and decodes its 200 answer.
+func fetchGlobalSessions(t *testing.T, fixture sessionsTestFixture, path, caller string) globalSessionsPayload {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if caller != "" {
+		req = withCloudSession(req, caller)
+	}
 	recorder := httptest.NewRecorder()
 	fixture.controller.globalSessions(recorder, req)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
-	var payload struct {
-		Rows      []appaisession.GlobalSessionRow `json:"rows"`
-		Truncated bool                            `json:"truncated"`
-	}
+	var payload globalSessionsPayload
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if len(payload.Rows) != 0 {
-		t.Fatalf("rows=%#v, want the workspace hidden rather than a 403", payload.Rows)
-	}
+	return payload
 }
