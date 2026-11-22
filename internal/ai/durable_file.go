@@ -6,6 +6,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+
+	"kode-stream/internal/filesystem/atomicfile"
 )
 
 const maxAIYAMLBytes int64 = 2 << 20
@@ -68,40 +70,19 @@ func publishDurableFileWith(path string, data []byte, ops durableFileOps) error 
 			mode = info.Mode().Perm()
 		}
 	}
-	temporary, err := os.CreateTemp(directory, ".ai-generation-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
 	if err := ops.check("write"); err != nil {
-		_ = temporary.Close()
 		return err
 	}
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
+	hooks := atomicfile.Hooks{
+		AfterWrite: func() error { return ops.check("sync") },
+		AfterSync:  func() error { return ops.check("close") },
+		AfterClose: func() error { return ops.check("rename") },
 	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
+	temporaryPath, err := atomicfile.WriteTemp(directory, ".ai-generation-*", mode, data, hooks)
+	if temporaryPath != "" {
+		defer os.Remove(temporaryPath)
 	}
-	if err := ops.check("sync"); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := ops.check("close"); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := ops.check("rename"); err != nil {
+	if err != nil {
 		return err
 	}
 	if err := os.Rename(temporaryPath, path); err != nil {
@@ -129,47 +110,9 @@ func publishDurableFileWith(path string, data []byte, ops durableFileOps) error 
 }
 
 func syncAIDirectory(directory string) error {
-	dir, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	err = dir.Sync()
-	closeErr := dir.Close()
-	if err == nil {
-		err = closeErr
-	}
-	return err
+	return atomicfile.SyncDir(directory)
 }
 
 func restoreDurableFile(path string, data []byte, mode os.FileMode) error {
-	temporary, err := os.CreateTemp(filepath.Dir(path), ".ai-rollback-*")
-	if err != nil {
-		return err
-	}
-	name := temporary.Name()
-	defer os.Remove(name)
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	if err := os.Rename(name, path); err != nil {
-		return err
-	}
-	dir, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-	return dir.Sync()
+	return atomicfile.Replace(path, ".ai-rollback-*", data, mode)
 }

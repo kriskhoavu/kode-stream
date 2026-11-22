@@ -134,7 +134,7 @@ func (s *Store) save(index persistedIndex) error {
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return statErr
 	}
-	temporaryPath, err := atomicfile.WriteTemp(directory, ".knowledge-index-*.tmp", mode, data, atomicfile.Hooks{AfterWrite: s.hooks.afterWrite, AfterSync: s.hooks.afterSync, AfterClose: s.hooks.afterClose})
+	temporaryPath, err := atomicfile.WriteTemp(directory, ".knowledge-index-*.tmp", mode, data, s.atomicHooks())
 	if temporaryPath != "" {
 		defer os.Remove(temporaryPath)
 	}
@@ -144,37 +144,30 @@ func (s *Store) save(index persistedIndex) error {
 	if err := os.Rename(temporaryPath, s.path); err != nil {
 		return err
 	}
-	rollback := func(cause error) error {
-		if !hadPrevious {
-			if restoreErr := removeIndex(s.path); restoreErr != nil {
-				return fmt.Errorf("knowledge index publication failed: %v; absent-state restoration failed: %w", cause, restoreErr)
-			}
-			return cause
-		}
-		if restoreErr := restoreIndex(s.path, previous, mode); restoreErr != nil {
-			return fmt.Errorf("knowledge index publication failed: %v; original restoration failed: %w", cause, restoreErr)
+	if err := atomicfile.SyncRename(directory, s.atomicHooks()); err != nil {
+		return s.rollback(err, hadPrevious, previous, mode)
+	}
+	return nil
+}
+
+func (s *Store) atomicHooks() atomicfile.Hooks {
+	h := s.hooks
+	return atomicfile.Hooks{AfterWrite: h.afterWrite, AfterSync: h.afterSync, AfterClose: h.afterClose, AfterRename: h.afterRename, AfterDirectorySync: h.afterDirectorySync}
+}
+
+// rollback restores the index that a failed publication replaced: the
+// previous content, or no file when there was none.
+func (s *Store) rollback(cause error, hadPrevious bool, previous []byte, mode os.FileMode) error {
+	if !hadPrevious {
+		if restoreErr := removeIndex(s.path); restoreErr != nil {
+			return fmt.Errorf("knowledge index publication failed: %v; absent-state restoration failed: %w", cause, restoreErr)
 		}
 		return cause
 	}
-	if s.hooks.afterRename != nil {
-		if err := s.hooks.afterRename(); err != nil {
-			return rollback(err)
-		}
+	if restoreErr := restoreIndex(s.path, previous, mode); restoreErr != nil {
+		return fmt.Errorf("knowledge index publication failed: %v; original restoration failed: %w", cause, restoreErr)
 	}
-	parent, err := os.Open(directory)
-	if err != nil {
-		return rollback(err)
-	}
-	defer parent.Close()
-	if err := parent.Sync(); err != nil {
-		return rollback(err)
-	}
-	if s.hooks.afterDirectorySync != nil {
-		if err := s.hooks.afterDirectorySync(); err != nil {
-			return rollback(err)
-		}
-	}
-	return nil
+	return cause
 }
 
 func removeIndex(path string) error {

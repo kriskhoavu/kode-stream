@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"kode-stream/internal/filesystem/atomicfile"
 )
 
 const maxCanvasFileBytes int64 = 4 << 20
@@ -387,25 +389,11 @@ func (r *FileRepository) save(state Snapshot) error {
 	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return statErr
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(r.path), ".canvases-*")
+	temporaryPath, err := atomicfile.WriteTemp(filepath.Dir(r.path), ".canvases-*", mode, data, atomicfile.Hooks{})
+	if temporaryPath != "" {
+		defer os.Remove(temporaryPath)
+	}
 	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer os.Remove(temporaryPath)
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
 		return err
 	}
 	backupPath := ""

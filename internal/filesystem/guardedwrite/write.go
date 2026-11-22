@@ -69,6 +69,10 @@ type failureHooks struct {
 	afterDirectory func() error
 }
 
+func (h failureHooks) atomic() atomicfile.Hooks {
+	return atomicfile.Hooks{AfterWrite: h.afterWrite, AfterSync: h.afterSync, AfterClose: h.afterClose, AfterRename: h.afterRename, AfterDirectorySync: h.afterDirectory}
+}
+
 // ReplaceExisting atomically replaces a regular file. It bounds the existing
 // read before allocation, preserves permissions, fsyncs the file and parent,
 // and revalidates the target immediately before publication.
@@ -101,7 +105,7 @@ func replaceExisting(root, relative string, content []byte, expectedHash string,
 	if err != nil {
 		return Result{}, err
 	}
-	temporaryPath, err := atomicfile.WriteTemp(directory, ".kode-stream-write-*", initial.Mode().Perm(), content, atomicfile.Hooks{AfterWrite: hooks.afterWrite, AfterSync: hooks.afterSync, AfterClose: hooks.afterClose})
+	temporaryPath, err := atomicfile.WriteTemp(directory, ".kode-stream-write-*", initial.Mode().Perm(), content, hooks.atomic())
 	if temporaryPath != "" {
 		defer os.Remove(temporaryPath)
 	}
@@ -114,7 +118,7 @@ func replaceExisting(root, relative string, content []byte, expectedHash string,
 	if err := os.Rename(temporaryPath, full); err != nil {
 		return Result{}, err
 	}
-	if err := publishRename(directory, hooks); err != nil {
+	if err := atomicfile.SyncRename(directory, hooks.atomic()); err != nil {
 		if restoreErr := restore(full, current, initial.Mode().Perm()); restoreErr != nil {
 			return Result{}, fmt.Errorf("write failed: %v; original restoration failed: %w", err, restoreErr)
 		}
@@ -154,14 +158,6 @@ func readExisting(full string, maxBytes int64) (os.FileInfo, []byte, error) {
 	return initial, current, nil
 }
 
-// runHook calls a failure hook when one is set.
-func runHook(hook func() error) error {
-	if hook == nil {
-		return nil
-	}
-	return hook()
-}
-
 // requireUnchanged refuses publication when the target or its parent changed
 // since the target was read.
 func requireUnchanged(full string, initial os.FileInfo, directory, realDirectory string) error {
@@ -174,27 +170,6 @@ func requireUnchanged(full string, initial os.FileInfo, directory, realDirectory
 		return fmt.Errorf("%w: parent changed during write", ErrUnsafePath)
 	}
 	return nil
-}
-
-// publishRename makes a completed rename durable by syncing the parent
-// directory. An error means the caller restores the original content.
-func publishRename(directory string, hooks failureHooks) error {
-	if err := runHook(hooks.afterRename); err != nil {
-		return err
-	}
-	dir, err := os.Open(directory)
-	if err != nil {
-		return err
-	}
-	if err := dir.Sync(); err != nil {
-		_ = dir.Close()
-		return err
-	}
-	if err := runHook(hooks.afterDirectory); err != nil {
-		_ = dir.Close()
-		return err
-	}
-	return dir.Close()
 }
 
 func restore(target string, data []byte, mode os.FileMode) error {

@@ -7,11 +7,14 @@ import (
 	"path/filepath"
 )
 
-// Hooks inject failures between the steps of WriteTemp, for tests.
+// Hooks inject failures between the steps of WriteTemp and SyncRename, for
+// tests.
 type Hooks struct {
-	AfterWrite func() error
-	AfterSync  func() error
-	AfterClose func() error
+	AfterWrite         func() error
+	AfterSync          func() error
+	AfterClose         func() error
+	AfterRename        func() error
+	AfterDirectorySync func() error
 }
 
 func run(hook func() error) error {
@@ -51,11 +54,24 @@ func WriteTemp(dir, pattern string, mode os.FileMode, data []byte, hooks Hooks) 
 
 // SyncDir makes a rename inside dir durable.
 func SyncDir(dir string) error {
+	return SyncRename(dir, Hooks{})
+}
+
+// SyncRename makes a completed rename inside dir durable, running the rename
+// and directory hooks. An error means the caller restores what it replaced.
+func SyncRename(dir string, hooks Hooks) error {
+	if err := run(hooks.AfterRename); err != nil {
+		return err
+	}
 	directory, err := os.Open(dir)
 	if err != nil {
 		return err
 	}
 	if err := directory.Sync(); err != nil {
+		_ = directory.Close()
+		return err
+	}
+	if err := run(hooks.AfterDirectorySync); err != nil {
 		_ = directory.Close()
 		return err
 	}
