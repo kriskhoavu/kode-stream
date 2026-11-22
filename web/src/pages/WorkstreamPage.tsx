@@ -1,20 +1,16 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, DragEvent, RefObject } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import { BookmarkPlus, Bot, RotateCw, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { FacetMenu, SelectedFilters } from '../components/FacetMenu';
 import { useModalDialog } from '../components/overlay';
 import { writePreference } from '../shared/preferences/store';
-import { StatusMenu } from '../components/StatusMenu';
 import { api, statusLabels, statusOrder } from '../shared/api';
-import type { WorkstreamBranchLoadResult, GitStatus, ItemStatus, ItemSummary, JiraIssueState, SavedFilter, SourceStructureSettings, WorkspaceConfig } from '../lib/types';
-import { labels } from '../lib/vocabulary';
+import type { WorkstreamBranchLoadResult, GitStatus, ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
 import { sourcesShownIn } from '../lib/sources';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
 import { applyItemStatus, isDropStatus, isItemDraggable } from '../features/workstream/dragAndDrop';
 import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicker';
-import { MarkdownPreview } from '../features/content-viewer/renderers/MarkdownPreview';
-import { canonicalSourceSettingsCard } from '../features/workspaces/sourceSettingsEditor';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { type AgentFocus } from '../features/workstream/AgentsPanel';
 import { plainError } from '../features/harness/useHarness';
@@ -32,18 +28,21 @@ import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSetting
 import { canStartTask, startPending } from '../features/harness/harnessState';
 import type { HarnessRunTab as HarnessRunTabId } from '../app/router';
 import type { HarnessTask } from '../lib/types';
+import { NewWorkItemDialog } from '../features/workstream/NewWorkItemDialog';
+import { SourceItemsDialog } from '../features/workstream/SourceItemsDialog';
+import { useSavedFilters } from '../features/workstream/useSavedFilters';
+import { useBoardDrag } from '../features/workstream/useBoardDrag';
+import { useWorkspaceGuard } from '../features/workstream/useWorkspaceGuard';
 import '../features/harness/harness.css';
 import '../features/workstream/harnessCards.css';
 import { ModalLayer } from '../components/ModalLayer';
-import { SourceStructureProposalList, SourceStructurePreviewTable, sourceItemsEditorFromResult, applySourceItemsProposal, clearSourceItemsProposal, updateSourceItemsPreviewField, type SourceItemsEditorState, UNSORTED_SELECTION_ID } from '../features/workstream/sourceItemsEditor';
-import { type NewWorkItemDraft, emptyNewWorkItemDraft, parseTags, jiraTags, jiraReadme } from '../features/workstream/newWorkItem';
+import { type NewWorkItemDraft } from '../features/workstream/newWorkItem';
 import { type BoardKind, type BoardLayout, boardKinds, boardLayouts, boardKindPreference, layoutPreferences, taskColumnLabels, taskStartColumn, readBoardKind, readBoardLayout } from '../features/workstream/boardPreferences';
 import { unique } from '../features/workstream/workstreamUtils';
 import { WorkstreamColumn } from '../features/workstream/WorkstreamColumn';
 import { PlanCard } from '../features/workstream/PlanCard';
 import { PlanPreviewDrawer } from '../features/workstream/plan-drawer/PlanPreviewDrawer';
 
-const DRAG_CLICK_SUPPRESSION_MS = 350;
 export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = statusOrder, focusedItemId, focusedSessionId, onOpenPlan, onOpenHarnessRun, onWorkspacesChanged, onOpenWorkspaces, onOpenReview }: {
   workspace?: WorkspaceConfig;
   refreshKey: number;
@@ -67,24 +66,16 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [error, setError] = useState('');
   const [scanState, setScanState] = useState('');
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
+  const { savedFilters, saveFilterOpen, setSaveFilterOpen, saveFilterName, setSaveFilterName, saveCurrentFilter, applySavedFilter, deleteSavedFilter } = useSavedFilters({ workspaceId: workspace?.id, filters, query, setFilters, setQuery });
   const [drawerPlanId, setDrawerPlanId] = useState('');
   const [drawerAgent, setDrawerAgent] = useState<AgentFocus>();
-  const [newPlanOpen, setNewPlanOpen] = useState(false);
-  const [newPlanDraft, setNewPlanDraft] = useState<NewWorkItemDraft>(() => emptyNewWorkItemDraft());
-  const [newPlanError, setNewPlanError] = useState('');
-  const [creatingPlan, setCreatingPlan] = useState(false);
-  const [jiraLookup, setJiraLookup] = useState<JiraIssueState | null>(null);
-  const [jiraLookupLoading, setJiraLookupLoading] = useState(false);
-  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
-  const [saveFilterOpen, setSaveFilterOpen] = useState(false);
-  const [saveFilterName, setSaveFilterName] = useState('');
+  /** Open while set: the New Work Item dialog, starting from these values. */
+  const [newItemSeed, setNewItemSeed] = useState<Partial<NewWorkItemDraft>>();
   const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(() => new Set());
-  const [activeItemId, setActiveItemId] = useState('');
   const [createdItemId, setCreatedItemId] = useState('');
   // Holds a just-created item until a reload reports it, so a rescan that has
   // not caught up yet cannot make the new card flash and vanish.
   const pendingCreatedItemRef = useRef<ItemSummary | null>(null);
-  const [dragTargetStatus, setDragTargetStatus] = useState<ItemStatus | ''>('');
   const [workspaceGitStatus, setWorkspaceGitStatus] = useState<GitStatus | null>(null);
   const [workspaceBranchCurrent, setWorkspaceBranchCurrent] = useState('');
   const [workspaceBranchList, setWorkspaceBranchList] = useState<string[]>([]);
@@ -135,36 +126,14 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
   // The workspace's AI and harness settings, opened from the Tasks board.
   const [harnessSettingsOpen, setHarnessSettingsOpen] = useState(false);
-  const [sourceItemsLoading, setSourceItemsLoading] = useState(false);
-  const [sourceItemsSaving, setSourceItemsSaving] = useState(false);
-  const [sourceItemsDirectory, setSourceItemsDirectory] = useState('');
-  const [sourceItemsError, setSourceItemsError] = useState('');
-  const [sourceItemsEditor, setSourceItemsEditor] = useState<SourceItemsEditorState | null>(null);
-	const sourceItemsDialog = useModalDialog(() => setSourceItemsOpen(false), !sourceItemsSaving, sourceItemsOpen);
 	const harnessSettingsDialog = useModalDialog(() => { setHarnessSettingsOpen(false); void harness.refresh(); }, true, harnessSettingsOpen);
-	const newItemDialog = useModalDialog(() => closeNewPlan(), !creatingPlan, newPlanOpen);
-  const suppressPreviewRef = useRef<{ itemId: string; until: number } | null>(null);
   const appliedFocusRef = useRef('');
 	// Every asynchronous board workflow is scoped to this generation. A route
 	// change/unmount invalidates outstanding responses before they can paint a
 	// different workspace.
-	const workspaceGenerationRef = useRef(0);
-	const activeWorkspaceRef = useRef<string | undefined>(workspace?.id);
-	const jiraLookupAbortRef = useRef<AbortController | null>(null);
+	const track = useWorkspaceGuard(workspace?.id);
 	const checkoutAbortRef = useRef<AbortController | undefined>(undefined);
-	const closeNewPlan = () => {
-		jiraLookupAbortRef.current?.abort();
-		jiraLookupAbortRef.current = null;
-		setJiraLookupLoading(false);
-		setNewPlanOpen(false);
-		setJiraLookup(null);
-		setNewPlanError('');
-	};
-	useEffect(() => {
-		activeWorkspaceRef.current = workspace?.id;
-		workspaceGenerationRef.current += 1;
-		return () => { workspaceGenerationRef.current += 1; jiraLookupAbortRef.current?.abort(); checkoutAbortRef.current?.abort(); };
-	}, [workspace?.id]);
+	useEffect(() => () => checkoutAbortRef.current?.abort(), [workspace?.id]);
   const text = query;
 
   const withPendingCreated = (loaded: ItemSummary[]) => {
@@ -185,8 +154,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 		const controller = new AbortController();
 		checkoutAbortRef.current = controller;
 		const workspaceID = workspace.id;
-		const generation = workspaceGenerationRef.current;
-		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
+		const active = track(workspaceID);
     if (!silent) setLoading(true);
     setError('');
     try {
@@ -251,43 +219,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     const timer = window.setTimeout(() => setCreatedItemId(''), 2600);
     return () => window.clearTimeout(timer);
   }, [createdItemId]);
-
-  useEffect(() => {
-    if (!newPlanOpen && !sourceItemsOpen) return;
-    const previousBodyOverflow = document.body.style.overflow;
-    const mainContent = document.querySelector<HTMLElement>('.main-content');
-    const previousMainContentOverflow = mainContent?.style.overflow ?? '';
-    document.body.style.overflow = 'hidden';
-    if (mainContent) mainContent.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      if (mainContent) mainContent.style.overflow = previousMainContentOverflow;
-    };
-  }, [newPlanOpen, sourceItemsOpen]);
-
-  useEffect(() => {
-    if (!newPlanOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-			closeNewPlan();
-    };
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [newPlanOpen]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    api.savedFilters(controller.signal)
-      .then((saved) => {
-        if (!controller.signal.aborted) setSavedFilters(saved.filter((filter) => !filter.workspaceId || filter.workspaceId === workspace?.id));
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setSavedFilters([]);
-      });
-    return () => controller.abort();
-  }, [workspace?.id]);
 
   useEffect(() => {
     if (!workspace) {
@@ -373,6 +304,14 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     if (firstWorkspaceUnsortedSource) return firstWorkspaceUnsortedSource;
     return Array.from(unsortedSources)[0] ?? sourcesShownIn(workspace, 'workstream')[0] ?? '';
   }, [items, workspace]);
+  const drag = useBoardDrag({
+    tasksShown,
+    canDragPlan: (itemId) => { const item = items.find((candidate) => candidate.id === itemId); return Boolean(item && isItemDraggable(item) && !pendingItemIds.has(itemId)); },
+    startableTask,
+    onStartTask: (task) => taskActions.start(task),
+    onMovePlan: (itemId, status) => void moveItem(itemId, status)
+  });
+  const activeItemId = drag.activeItemId;
   const activeItem = activeItemId ? boardItems.find((item) => item.id === activeItemId) : undefined;
 
   const scan = async () => {
@@ -381,8 +320,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 		const controller = new AbortController();
 		checkoutAbortRef.current = controller;
 		const workspaceID = workspace.id;
-		const generation = workspaceGenerationRef.current;
-		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
+		const active = track(workspaceID);
     // On the Tasks board, Refresh also asks the workspace's sources (Jira) at once, rather than at the next poll.
     const pollScouts = tasksShown && harnessOn ? harness.client.pollScouts : undefined;
     setScanState(pollScouts ? 'Checking Jira' : 'Refreshing');
@@ -410,14 +348,27 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     await loadCheckout(false, options);
   };
 
+  // Show the new card on the board rather than jumping to the detail page.
+  // The refresh is silent so the columns never blank out.
+  const showCreatedItem = (item: ItemSummary) => {
+    pendingCreatedItemRef.current = item;
+    setPlans((current) => current.some((candidate) => candidate.id === item.id)
+      ? current.map((candidate) => (candidate.id === item.id ? { ...candidate, ...item } : candidate))
+      : [item, ...current]);
+    setCreatedItemId(item.id);
+    // A new work item is a plan: show the board that holds it.
+    if (tasksShown) setBoardKind('plans');
+    setNewItemSeed(undefined);
+    void Promise.resolve(onWorkspacesChanged()).then(() => reloadPlans({ silent: true }));
+  };
+
   const moveItem = async (itemId: string, status: ItemStatus) => {
     const item = items.find((candidate) => candidate.id === itemId);
     if (!item || !isItemDraggable(item) || !isDropStatus(status) || item.status === status || pendingItemIds.has(itemId)) return;
 
     const previousStatus = item.status;
 		const workspaceID = workspace?.id;
-		const generation = workspaceGenerationRef.current;
-		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
+		const active = track(workspaceID);
     setError('');
     setPlans((current) => applyItemStatus(current, itemId, status));
     setPendingItemIds((current) => new Set(current).add(itemId));
@@ -443,225 +394,12 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     }
   };
 
-  const handleCardDragStart = (event: DragEvent<HTMLElement>, itemId: string) => {
-    if (tasksShown) {
-      if (!startableTask(itemId)) { event.preventDefault(); return; }
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', itemId);
-      setActiveItemId(itemId);
-      suppressPreviewRef.current = { itemId, until: Number.POSITIVE_INFINITY };
-      return;
-    }
-    const item = items.find((candidate) => candidate.id === itemId);
-    if (!item || !isItemDraggable(item) || pendingItemIds.has(itemId)) {
-      event.preventDefault();
-      return;
-    }
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', itemId);
-    setActiveItemId(itemId);
-    suppressPreviewRef.current = { itemId, until: Number.POSITIVE_INFINITY };
-  };
-
-  const finishDrag = (itemId: string) => {
-    suppressPreviewRef.current = { itemId, until: window.performance.now() + DRAG_CLICK_SUPPRESSION_MS };
-    setActiveItemId('');
-    setDragTargetStatus('');
-  };
-
-  const handleCardDragEnd = (itemId: string) => {
-    finishDrag(itemId);
-  };
-
-  const handleColumnDragOver = (event: DragEvent<HTMLElement>, status: ItemStatus) => {
-    if (!activeItemId || !isDropStatus(status) || (tasksShown && status !== taskStartColumn)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
-    if (dragTargetStatus !== status) setDragTargetStatus(status);
-  };
-
-  const handleColumnDragLeave = (event: DragEvent<HTMLElement>, status: ItemStatus) => {
-    if (dragTargetStatus === status && !event.currentTarget.contains(event.relatedTarget as Node | null)) {
-      setDragTargetStatus('');
-    }
-  };
-
-  const handleColumnDrop = (event: DragEvent<HTMLElement>, status: ItemStatus) => {
-    const itemId = event.dataTransfer.getData('text/plain') || activeItemId;
-    if (!itemId || !isDropStatus(status)) return;
-    if (tasksShown) {
-      const task = status === taskStartColumn ? startableTask(itemId) : undefined;
-      if (!task) return;
-      event.preventDefault();
-      setDragTargetStatus('');
-      taskActions.start(task);
-      return;
-    }
-    event.preventDefault();
-    setDragTargetStatus('');
-    void moveItem(itemId, status);
-  };
-
-  const fetchJiraIssue = async () => {
-    if (!workspace || !newPlanDraft.jiraKey.trim()) return;
-		jiraLookupAbortRef.current?.abort();
-		const controller = new AbortController();
-		jiraLookupAbortRef.current = controller;
-		const workspaceID = workspace.id;
-		const generation = workspaceGenerationRef.current;
-		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
-    setJiraLookupLoading(true);
-    setNewPlanError('');
-    try {
-			const result = await api.workspaceJiraIssue(workspace.id, newPlanDraft.jiraKey.trim(), controller.signal);
-			if (!active()) return;
-      setJiraLookup(result);
-      if (result.state === 'available' && result.issue) {
-        const issue = result.issue;
-        const nextTags = jiraTags(issue).join(', ');
-        // Fetching is an explicit request for this ticket's values, so they
-        // replace whatever a previous fetch imported. Keeping the old values
-        // left the details panel describing a different ticket than the preview.
-        setNewPlanDraft((draft) => ({
-          ...draft,
-          identifier: issue.key,
-          title: issue.summary,
-          owner: issue.assignee?.displayName || '',
-          tags: nextTags
-        }));
-      }
-		} catch (err) {
-			if (controller.signal.aborted) return;
-			if (!active()) return;
-      setJiraLookup(null);
-      setNewPlanError(err instanceof Error ? err.message : 'Jira lookup failed');
-    } finally {
-		if (active()) setJiraLookupLoading(false);
-    }
-  };
-
-  const createPlan = async () => {
-    if (!workspace) return;
-    setCreatingPlan(true);
-    setNewPlanError('');
-    try {
-      const source = newPlanDraft.source || sourcesShownIn(workspace, 'workstream')[0] || 'plans';
-      const jiraIssue = newPlanDraft.origin === 'jira' && jiraLookup?.state === 'available' ? jiraLookup.issue : undefined;
-      const result = await api.createItem({
-        workspaceId: workspace.id,
-        source,
-        scope: newPlanDraft.scope.trim() || source,
-        identifier: newPlanDraft.identifier.trim(),
-        title: newPlanDraft.title.trim() || undefined,
-        status: newPlanDraft.status,
-        owner: newPlanDraft.owner.trim() || undefined,
-        tags: parseTags(newPlanDraft.tags),
-        jiraKey: jiraIssue?.key,
-        initialReadme: jiraIssue ? jiraReadme(jiraIssue) : undefined
-      });
-      notifyReliabilityChanged();
-      // Show the new card on the board rather than jumping to the detail page.
-      // The refresh is silent so the columns never blank out, and the dialog
-      // stays up until the board behind it already holds the item.
-      pendingCreatedItemRef.current = result.item;
-      setPlans((current) => current.some((candidate) => candidate.id === result.item.id)
-        ? current.map((candidate) => (candidate.id === result.item.id ? { ...candidate, ...result.item } : candidate))
-        : [result.item, ...current]);
-      setCreatedItemId(result.item.id);
-      // A new work item is a plan: show the board that holds it.
-      if (tasksShown) setBoardKind('plans');
-      setNewPlanOpen(false);
-      setNewPlanDraft(emptyNewWorkItemDraft());
-      setJiraLookup(null);
-      void Promise.resolve(onWorkspacesChanged()).then(() => reloadPlans({ silent: true }));
-    } catch (err) {
-      setNewPlanError(err instanceof Error ? err.message : 'Item creation failed');
-    } finally {
-      setCreatingPlan(false);
-    }
-  };
-
-  const loadSourceItemsSettings = async (directory: string) => {
-    if (!workspace) return;
-		const workspaceID = workspace.id;
-		const generation = workspaceGenerationRef.current;
-		const active = () => activeWorkspaceRef.current === workspaceID && workspaceGenerationRef.current === generation;
-    setSourceItemsLoading(true);
-    setSourceItemsError('');
-    setSourceItemsDirectory(directory);
-    try {
-      const result = await api.sourceStructure(workspace.id, directory);
-			if (!active()) return;
-      setSourceItemsEditor(sourceItemsEditorFromResult(workspace, directory, result));
-    } catch (err) {
-			if (!active()) return;
-      setSourceItemsEditor(null);
-      setSourceItemsError(err instanceof Error ? err.message : 'Source settings failed to load');
-    } finally {
-		if (active()) setSourceItemsLoading(false);
-    }
-  };
-
-  const openSourceItemsDialog = async () => {
+  const openSourceItemsDialog = () => {
     if (!workspace || sourcesShownIn(workspace, 'workstream').length === 0) {
       onOpenWorkspaces?.();
       return;
     }
-    const initialDirectory = preferredSourceForConfiguration;
     setSourceItemsOpen(true);
-    void loadSourceItemsSettings(initialDirectory);
-  };
-
-  const saveSourceItemsSettings = async () => {
-    if (!sourceItemsEditor) return;
-    setSourceItemsSaving(true);
-    setSourceItemsError('');
-    try {
-      if (sourceItemsEditor.selectedProposalId === UNSORTED_SELECTION_ID) {
-        if (sourceItemsEditor.exists) {
-          await api.resetSourceStructure(sourceItemsEditor.workspace.id, sourceItemsEditor.directory);
-          setScanState('Source structure reset');
-        } else {
-          const result = await api.scan(sourceItemsEditor.workspace.id);
-          setScanState(`${result.itemCount} items indexed`);
-        }
-      } else {
-        const settings: SourceStructureSettings = {
-          version: 1,
-          cards: [canonicalSourceSettingsCard(sourceItemsEditor.card), ...sourceItemsEditor.cards.slice(1).map(canonicalSourceSettingsCard)]
-        };
-        await api.saveSourceStructure(sourceItemsEditor.workspace.id, sourceItemsEditor.directory, settings);
-        setScanState('Source structure saved');
-      }
-      notifyReliabilityChanged();
-      setSourceItemsOpen(false);
-      await onWorkspacesChanged();
-      await reloadPlans();
-    } catch (err) {
-      setSourceItemsError(err instanceof Error ? err.message : 'Source settings failed to save');
-    } finally {
-      setSourceItemsSaving(false);
-    }
-  };
-
-  const resetSourceItemsSettings = async () => {
-    if (!sourceItemsEditor) return;
-    const confirmed = window.confirm(`Reset Source Items for ${sourceItemsEditor.directory}? This removes the source's rules and scans the source again.`);
-    if (!confirmed) return;
-    setSourceItemsSaving(true);
-    setSourceItemsError('');
-    try {
-      const result = await api.resetSourceStructure(sourceItemsEditor.workspace.id, sourceItemsEditor.directory);
-      notifyReliabilityChanged();
-      setSourceItemsEditor(sourceItemsEditorFromResult(sourceItemsEditor.workspace, sourceItemsEditor.directory, result));
-      setScanState('Source structure reset');
-      await onWorkspacesChanged();
-      await reloadPlans();
-    } catch (err) {
-      setSourceItemsError(err instanceof Error ? err.message : 'Source settings failed to reset');
-    } finally {
-      setSourceItemsSaving(false);
-    }
   };
 
   const toggleFilter = (key: FilterKey, value: string) => {
@@ -672,32 +410,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         [key]: values.includes(value) ? values.filter((item) => item !== value) : [...values, value]
       };
     });
-  };
-
-  const saveCurrentFilter = async () => {
-    if (!saveFilterName.trim()) return;
-    const saved = await api.saveFilter({
-      name: saveFilterName.trim(),
-      route: '/workstream',
-      workspaceId: workspace?.id,
-      filters: { filters: { ...filters, branches: [] }, query }
-    });
-    setSavedFilters((current) => [saved, ...current]);
-    setSaveFilterName('');
-    setSaveFilterOpen(false);
-  };
-
-  const applySavedFilter = (saved: SavedFilter) => {
-    const value = saved.filters as { filters?: Partial<Filters>; query?: string };
-    const nextFilters = { ...emptyFilters, ...(value.filters ?? {}) };
-    nextFilters.branches = [];
-    setFilters(nextFilters);
-    setQuery(value.query ?? '');
-  };
-
-  const deleteSavedFilter = async (id: string) => {
-    await api.deleteFilter(id);
-    setSavedFilters((current) => current.filter((filter) => filter.id !== id));
   };
 
   if (!workspace && !loading) {
@@ -733,7 +445,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
           <button className="secondary" onClick={scan}>
             <RotateCw size={16} /> Refresh
           </button>
-          <button className="primary" onClick={() => setNewPlanOpen(true)}>
+          <button className="primary" onClick={() => setNewItemSeed({})}>
             + New Work Item
           </button>
           <span className="scan-state">{scanState}</span>
@@ -809,13 +521,12 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
               loading={loading}
               label={tasksShown ? taskColumnLabels[column] : undefined}
               dragActive={Boolean(activeItem) && (!tasksShown || column === taskStartColumn)}
-              dragTargetStatus={dragTargetStatus}
-              onDragOver={handleColumnDragOver}
-              onDragLeave={handleColumnDragLeave}
-              onDrop={handleColumnDrop}
+              dragTargetStatus={drag.dragTargetStatus}
+              onDragOver={drag.onColumnDragOver}
+              onDragLeave={drag.onColumnDragLeave}
+              onDrop={drag.onColumnDrop}
               onCreate={column === 'unsorted' || tasksShown ? undefined : () => {
-                setNewPlanDraft((draft) => ({ ...draft, status: column, source: sourcesShownIn(workspace, 'workstream')[0] ?? '' }));
-                setNewPlanOpen(true);
+                setNewItemSeed({ status: column, source: sourcesShownIn(workspace, 'workstream')[0] ?? '' });
               }}
             >
               {!loading && grouped.get(column)?.map((plan) => (
@@ -826,14 +537,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
                   pending={pendingItemIds.has(plan.id)}
                   active={activeItemId === plan.id}
                   created={createdItemId === plan.id}
-                  onDragStart={(event) => handleCardDragStart(event, plan.id)}
-                  onDragEnd={() => handleCardDragEnd(plan.id)}
+                  onDragStart={(event) => drag.onCardDragStart(event, plan.id)}
+                  onDragEnd={() => drag.onCardDragEnd(plan.id)}
                   onPreview={() => {
-                    const suppressed = suppressPreviewRef.current;
-                    if (suppressed?.itemId === plan.id && window.performance.now() <= suppressed.until) {
-                      return;
-                    }
-                    suppressPreviewRef.current = null;
+                    if (!drag.previewAllowed(plan.id)) return;
                     setDrawerPlanId(plan.id);
                     setDrawerAgent(undefined);
                   }}
@@ -910,209 +617,15 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         </div></ModalLayer>
       )}
       {sourceItemsOpen && workspace && (
-        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !sourceItemsSaving) setSourceItemsOpen(false); }}>
-          <div ref={sourceItemsDialog.ref as RefObject<HTMLDivElement>} className="modal-panel source-structure-modal" role="dialog" aria-modal="true" aria-label={labels.sourceStructure}>
-            <header>
-              <div>
-                <h2>{labels.sourceStructure}</h2>
-                <span>{workspace.name} / {sourceItemsDirectory || sourcesShownIn(workspace, 'workstream')[0]}</span>
-              </div>
-              <button data-autofocus className="icon-button" type="button" onClick={() => setSourceItemsOpen(false)} disabled={sourceItemsSaving} aria-label="Close source items">
-                <X size={16} />
-              </button>
-            </header>
-            {sourcesShownIn(workspace, 'workstream').length > 1 && (
-              <label className="repo-field">
-                Source
-                <select value={sourceItemsDirectory} onChange={(event) => void loadSourceItemsSettings(event.target.value)} disabled={sourceItemsLoading || sourceItemsSaving}>
-                  {sourcesShownIn(workspace, 'workstream').map((directory) => <option key={directory} value={directory}>{directory}</option>)}
-                </select>
-              </label>
-            )}
-            <p className="modal-help">Define how this source should be split into board items.</p>
-            {sourceItemsLoading && <span className="reliability-muted">Loading source settings...</span>}
-            {!sourceItemsLoading && sourceItemsError && <span className="error">{sourceItemsError}</span>}
-            {!sourceItemsLoading && sourceItemsEditor && (
-              <>
-                {!sourceItemsEditor.exists && sourceItemsEditor.mode === 'structured' && (
-                  <div className="metadata-callout source-structure-supported">
-                    <strong>Built-in structure detected</strong>
-                    <span>This source already follows a supported item layout. Saving here creates an optional override.</span>
-                  </div>
-                )}
-                {!sourceItemsEditor.exists && sourceItemsEditor.mode !== 'structured' && (
-                  <div className="metadata-callout">
-                    <strong>No settings file yet</strong>
-                    <span>Saving adds this source's rules to <code>.kode-stream/workspace-settings.yaml</code>.</span>
-                  </div>
-                )}
-                {sourceItemsEditor.warnings.length > 0 && (
-                  <div className="plan-warnings">
-                    <h3>Warnings</h3>
-                    {sourceItemsEditor.warnings.map((warning) => <p key={warning}>{warning}</p>)}
-                  </div>
-                )}
-                <SourceStructureProposalList
-                  proposals={sourceItemsEditor.proposals}
-                  selectedProposalId={sourceItemsEditor.selectedProposalId}
-                  onSelect={(proposal) => applySourceItemsProposal(setSourceItemsEditor, proposal)}
-                  onClear={() => clearSourceItemsProposal(setSourceItemsEditor)}
-                />
-                <SourceStructurePreviewTable
-                  preview={sourceItemsEditor.preview}
-                  onChangeField={(path, field, value) => updateSourceItemsPreviewField(setSourceItemsEditor, path, field, value)}
-                />
-              </>
-            )}
-            <footer className="modal-actions">
-              {sourceItemsEditor?.exists && (
-                <button className="secondary danger" type="button" onClick={() => void resetSourceItemsSettings()} disabled={sourceItemsSaving || sourceItemsLoading}>
-                  Reset config
-                </button>
-              )}
-              <button className="secondary" type="button" onClick={() => setSourceItemsOpen(false)} disabled={sourceItemsSaving}>Cancel</button>
-              <button className="primary" type="button" onClick={() => void saveSourceItemsSettings()} disabled={sourceItemsSaving || sourceItemsLoading || !sourceItemsEditor}>
-                <SlidersHorizontal size={15} />
-                {sourceItemsSaving ? 'Saving...' : sourceItemsEditor?.selectedProposalId === UNSORTED_SELECTION_ID ? 'Scan Unsorted' : 'Save and Scan'}
-              </button>
-            </footer>
-          </div>
-        </div></ModalLayer>
+        <SourceItemsDialog workspace={workspace} initialDirectory={preferredSourceForConfiguration} onClose={() => setSourceItemsOpen(false)} onSaved={async (message, done) => {
+          setScanState(message);
+          if (done) setSourceItemsOpen(false);
+          await onWorkspacesChanged();
+          await reloadPlans();
+        }} />
       )}
-      {newPlanOpen && workspace && (
-        <ModalLayer><div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !creatingPlan) closeNewPlan(); }}>
-          <section ref={newItemDialog.ref} className={newPlanDraft.origin === 'jira' ? 'modal-panel new-work-item-modal jira-mode' : 'modal-panel new-work-item-modal'} role="dialog" aria-modal="true" aria-label="Create new work item">
-            <header>
-              <h2>New Work Item</h2>
-				<button data-autofocus type="button" className="icon-button" onClick={() => {
-				closeNewPlan();
-              }}><X size={16} /></button>
-            </header>
-            <div className={newPlanDraft.origin === 'jira' ? 'metadata-form jira-work-item-form' : 'metadata-form'}>
-              <div className="segmented-control" role="group" aria-label="Item origin">
-                <button
-                  type="button"
-                  className={newPlanDraft.origin === 'blank' ? 'active' : ''}
-                  onClick={() => {
-					jiraLookupAbortRef.current?.abort();
-					jiraLookupAbortRef.current = null;
-					setJiraLookupLoading(false);
-					setNewPlanDraft((draft) => ({ ...emptyNewWorkItemDraft(), source: draft.source, origin: 'blank' }));
-                    setJiraLookup(null);
-                    setNewPlanError('');
-                  }}
-                >
-                  Blank
-                </button>
-                <button
-                  type="button"
-                  className={newPlanDraft.origin === 'jira' ? 'active' : ''}
-                  onClick={() => {
-                    setNewPlanDraft((draft) => ({ ...draft, origin: 'jira' }));
-                    setNewPlanError('');
-                  }}
-                >
-                  From Jira
-                </button>
-              </div>
-              {newPlanDraft.origin === 'blank' ? (
-                <>
-                  <label>Source<select value={newPlanDraft.source || sourcesShownIn(workspace, 'workstream')[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
-                    {sourcesShownIn(workspace, 'workstream').map((directory) => <option value={directory} key={directory}>{directory}</option>)}
-                  </select></label>
-                  <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Any item name" /></label>
-                  <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
-                </>
-              ) : (
-                <div className="jira-create-layout">
-                  <section className="jira-ticket-column">
-                    <div className="jira-column-heading">
-                      <strong>Jira ticket</strong>
-                      <span>Fetch the source issue and review its context.</span>
-                    </div>
-                    <label>Source<select value={newPlanDraft.source || sourcesShownIn(workspace, 'workstream')[0] || ''} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, source: event.target.value }))}>
-                      {sourcesShownIn(workspace, 'workstream').map((directory) => <option value={directory} key={directory}>{directory}</option>)}
-                    </select></label>
-                    <div className="jira-intake">
-                      <label>Jira key<input
-                        value={newPlanDraft.jiraKey}
-                        onChange={(event) => {
-                          setNewPlanDraft((draft) => ({ ...draft, jiraKey: event.target.value.toUpperCase() }));
-                          setJiraLookup(null);
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key !== 'Enter' || jiraLookupLoading || !newPlanDraft.jiraKey.trim()) return;
-                          event.preventDefault();
-                          void fetchJiraIssue();
-                        }}
-                        placeholder="PM-025"
-                      /></label>
-                      <button type="button" className="secondary" disabled={jiraLookupLoading || !newPlanDraft.jiraKey.trim()} onClick={() => void fetchJiraIssue()}>
-                        <Search size={15} />
-                        {jiraLookupLoading ? 'Fetching...' : 'Fetch Jira'}
-                      </button>
-                    </div>
-                    {jiraLookup && (
-                      <section className={jiraLookup.state === 'available' ? 'jira-issue-preview' : 'jira-issue-preview warning'} aria-label="Jira issue preview">
-                        {jiraLookup.issue ? (
-                          <>
-                            <header className="jira-issue-preview-header">
-                              <strong>{jiraLookup.issue.key}: {jiraLookup.issue.summary}</strong>
-                              {jiraLookup.issue.browserUrl && <a href={jiraLookup.issue.browserUrl} target="_blank" rel="noreferrer">Open Jira</a>}
-                            </header>
-                            <div className="jira-issue-preview-body">
-                              <strong className="jira-issue-preview-label">Description</strong>
-                              {jiraLookup.issue.description
-                                ? <div className="jira-issue-preview-description"><MarkdownPreview content={jiraLookup.issue.description} /></div>
-                                : <p className="jira-issue-preview-description empty">This Jira ticket has no description.</p>}
-                            </div>
-                            <dl className="jira-issue-preview-meta">
-                              <div><dt>Type</dt><dd>{jiraLookup.issue.issueType || 'Issue'}</dd></div>
-                              <div><dt>Status</dt><dd>{jiraLookup.issue.status || 'Unknown'}</dd></div>
-                              <div><dt>Assignee</dt><dd>{jiraLookup.issue.assignee?.displayName || 'Unassigned'}</dd></div>
-                              {jiraLookup.issue.priority && <div><dt>Priority</dt><dd>{jiraLookup.issue.priority}</dd></div>}
-                            </dl>
-                            {jiraLookup.issue.attachments.length > 0 && <small>{jiraLookup.issue.attachments.length} attachment{jiraLookup.issue.attachments.length === 1 ? '' : 's'} referenced</small>}
-                          </>
-                        ) : (
-                          <>
-                            <strong>{jiraLookup.message || jiraLookup.state}</strong>
-                            {jiraLookup.recoveryHint && <span>{jiraLookup.recoveryHint}</span>}
-                          </>
-                        )}
-                      </section>
-                    )}
-                  </section>
-                  <section className="jira-details-column">
-                    <div className="jira-column-heading">
-                      <strong>Work item details</strong>
-                      <span>Review the values imported from Jira before creation.</span>
-                    </div>
-                    <div className="jira-field-row">
-                      <label>Item name<input value={newPlanDraft.identifier} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, identifier: event.target.value }))} placeholder="Jira key or local item name" /></label>
-                      <label>Status<StatusMenu value={newPlanDraft.status} onChange={(status) => setNewPlanDraft((draft) => ({ ...draft, status }))} /></label>
-                    </div>
-                    <label>Title<input value={newPlanDraft.title} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Jira summary" /></label>
-                    <label>Owner<input value={newPlanDraft.owner} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, owner: event.target.value }))} placeholder="Assignee" /></label>
-                    <label>Tags<input value={newPlanDraft.tags} onChange={(event) => setNewPlanDraft((draft) => ({ ...draft, tags: event.target.value }))} placeholder="story, priority-high" /></label>
-                  </section>
-                </div>
-              )}
-            </div>
-            {newPlanError && <p className="error">{newPlanError}</p>}
-            <footer className="modal-actions">
-				<button type="button" className="ghost" onClick={closeNewPlan}>Cancel</button>
-              <button
-                type="button"
-                className="primary"
-                disabled={creatingPlan || !newPlanDraft.identifier.trim() || (newPlanDraft.origin === 'jira' && jiraLookup?.state !== 'available')}
-                onClick={createPlan}
-              >
-                {creatingPlan ? 'Creating...' : 'Create Item'}
-              </button>
-            </footer>
-          </section>
-        </div></ModalLayer>
+      {newItemSeed && workspace && (
+        <NewWorkItemDialog workspace={workspace} seed={newItemSeed} onClose={() => setNewItemSeed(undefined)} onCreated={showCreatedItem} />
       )}
     </section>
   );
