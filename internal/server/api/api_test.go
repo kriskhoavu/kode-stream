@@ -30,6 +30,7 @@ import (
 	appsearch "kode-stream/internal/search"
 	"kode-stream/internal/storage"
 	"kode-stream/internal/system"
+	appverification "kode-stream/internal/verification"
 	workspacehealth "kode-stream/internal/workspace"
 	"kode-stream/internal/workspace/registry"
 	"kode-stream/internal/workspace/scanner"
@@ -910,15 +911,28 @@ func TestWorkspaceRuntimeRouteClearsRuntimeOnNull(t *testing.T) {
 
 func TestVerificationCreateReturnsQueueFullWithoutPartialJob(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
-	if _, err := apiHandler.verification.workspaces.SaveRuntime(workspace.ID, &models.WorkspaceRuntimeConfig{Type: models.RuntimeTypeCustom, Commands: models.RuntimeCommandSet{Up: "true", Down: "true", Verify: models.RuntimeVerifyCommands{Smoke: "sleep 0.5"}}}); err != nil {
+	// Each job holds its slot until the test releases it, so the queue is full
+	// however slowly the machine runs the jobs.
+	release := filepath.Join(t.TempDir(), "release")
+	hold := fmt.Sprintf("while [ ! -f %q ]; do sleep 0.05; done", release)
+	if _, err := apiHandler.verification.workspaces.SaveRuntime(workspace.ID, &models.WorkspaceRuntimeConfig{Type: models.RuntimeTypeCustom, Commands: models.RuntimeCommandSet{Up: "true", Down: "true", Verify: models.RuntimeVerifyCommands{Smoke: hold}}}); err != nil {
 		t.Fatal(err)
 	}
+	var jobIDs []string
+	t.Cleanup(func() { releaseVerificationJobs(t, apiHandler, workspace.ID, release, jobIDs) })
 	for range 2 {
 		response := httptest.NewRecorder()
 		apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/verification-jobs", strings.NewReader(`{}`)))
 		if response.Code != http.StatusAccepted {
 			t.Fatalf("accepted job status=%d body=%s", response.Code, response.Body.String())
 		}
+		var job struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &job); err != nil {
+			t.Fatal(err)
+		}
+		jobIDs = append(jobIDs, job.ID)
 	}
 	response := httptest.NewRecorder()
 	apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspace.ID+"/verification-jobs", strings.NewReader(`{}`)))
@@ -928,6 +942,28 @@ func TestVerificationCreateReturnsQueueFullWithoutPartialJob(t *testing.T) {
 	count := apiHandler.verification.verification.JobCount()
 	if count != 2 {
 		t.Fatalf("queue-full request created partial job; jobs=%d", count)
+	}
+}
+
+// releaseVerificationJobs lets held jobs finish and waits until they have, so
+// none still writes artifacts when the workspace's temporary directory goes.
+func releaseVerificationJobs(t *testing.T, apiHandler *API, workspaceID, release string, jobIDs []string) {
+	t.Helper()
+	if err := os.WriteFile(release, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for _, id := range jobIDs {
+		for {
+			job, ok := apiHandler.verification.verification.Get(workspaceID, id)
+			if !ok || (job.Status != appverification.JobStatusQueued && job.Status != appverification.JobStatusRunning) {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("verification job %s still %s after release", id, job.Status)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
 	}
 }
 
