@@ -7785,7 +7785,7 @@ body.is-resizing-panel {
 }
 
 .workspace-settings-modal {
-  width: min(1080px, calc(100vw - 40px));
+  width: min(880px, calc(100vw - 40px));
 }
 
 .workspace-settings-modal > header {
