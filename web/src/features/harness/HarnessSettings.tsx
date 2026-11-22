@@ -399,7 +399,6 @@ function ModelInput({ label, value, placeholder, hideLabel = false, onChange }: 
 			<span className={hideLabel ? 'sr-only' : undefined}>{label}</span>
 			<input value={value} list={listId} title={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value.trim())} />
 			<datalist id={listId}>{modelSuggestions.map((model) => <option key={model} value={model}>{modelLabel(model)}</option>)}</datalist>
-			{modelLabel(value) !== value && <small className="hx-muted">{modelLabel(value)}</small>}
 		</label>
 	);
 }
