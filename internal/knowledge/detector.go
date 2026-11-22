@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -89,153 +88,12 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 	}
 	ctx, cancel := context.WithTimeout(parent, limits.Timeout)
 	defer cancel()
-	cleanSource := filepath.Clean(strings.TrimSpace(source))
-	if cleanSource == "." || cleanSource == "" || filepath.IsAbs(cleanSource) || strings.HasPrefix(cleanSource, "..") {
-		return KnowledgeWiki{}, false, fmt.Errorf("unsafe source path %q", source)
-	}
-	root := filepath.Join(workspaceRoot, cleanSource)
-	resolved, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return KnowledgeWiki{}, false, nil
-		}
+	cleanSource, resolved, found, err := resolveSourceRoot(workspaceRoot, source)
+	if err != nil || !found {
 		return KnowledgeWiki{}, false, err
 	}
-	if !withinPath(workspaceRoot, resolved) {
-		return KnowledgeWiki{}, false, fmt.Errorf("source escapes workspace")
-	}
-	indexInfo, err := os.Lstat(filepath.Join(resolved, "index.md"))
-	if err != nil || !indexInfo.Mode().IsRegular() {
-		return KnowledgeWiki{}, false, nil
-	}
-
-	type candidate struct {
-		path string
-		rel  string
-	}
-	candidates := make([]candidate, 0)
-	workspacePaths := make([]string, 0)
-	err = filepath.WalkDir(resolved, func(current string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		if entry.IsDir() {
-			if current != resolved && (entry.Name() == ".git" || strings.HasPrefix(entry.Name(), ".")) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.Type()&os.ModeSymlink != 0 || !entry.Type().IsRegular() || !strings.EqualFold(filepath.Ext(entry.Name()), ".md") {
-			return nil
-		}
-		_, infoErr := entry.Info()
-		if infoErr != nil {
-			return infoErr
-		}
-		rel, relErr := filepath.Rel(resolved, current)
-		if relErr != nil {
-			return relErr
-		}
-		relWorkspace, relErr := filepath.Rel(workspaceRoot, current)
-		if relErr != nil {
-			return relErr
-		}
-		candidates = append(candidates, candidate{path: current, rel: filepath.ToSlash(rel)})
-		workspacePaths = append(workspacePaths, filepath.ToSlash(relWorkspace))
-		if len(candidates) > limits.MaxFiles {
-			return fmt.Errorf("file budget exceeded")
-		}
-		return nil
-	})
-	if err != nil {
-		return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", cleanSource, err)
-	}
-	ignored := map[string]bool{}
-	if d.ignore != nil {
-		ignored, err = d.ignore.Ignored(workspaceRoot, workspacePaths)
-		if err != nil {
-			return KnowledgeWiki{}, false, fmt.Errorf("scan ignores: %w", err)
-		}
-	}
-
-	pages := make([]KnowledgePage, 0)
-	warnings := make([]KnowledgeWarning, 0)
-	files, totalBytes, links := 0, int64(0), 0
-	for index, file := range candidates {
-		select {
-		case <-ctx.Done():
-			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", cleanSource, ctx.Err())
-		default:
-		}
-		if ignored[workspacePaths[index]] {
-			continue
-		}
-		files++
-		if files > limits.MaxFiles {
-			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: file budget exceeded", cleanSource)
-		}
-		remaining := limits.MaxTotalBytes - totalBytes
-		data, warning, err := readStableBounded(ctx, file.path, min(limits.MaxFileBytes, remaining))
-		if warning != "" {
-			warnings = append(warnings, KnowledgeWarning{WorkspaceID: workspace.ID, WikiRoot: filepath.ToSlash(cleanSource), Path: file.rel, Code: "file_too_large", Message: "file exceeds scan size limit"})
-			continue
-		}
-		if err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", cleanSource, err)
-			}
-			warnings = append(warnings, KnowledgeWarning{WorkspaceID: workspace.ID, WikiRoot: filepath.ToSlash(cleanSource), Path: file.rel, Code: "invalid_metadata", Message: "file changed or could not be read during scan"})
-			continue
-		}
-		totalBytes += int64(len(data))
-		if totalBytes > limits.MaxTotalBytes { // defensive: bounded reader must make this unreachable.
-			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: byte budget exceeded", cleanSource)
-		}
-		page, pageWarnings, err := ParsePage(file.rel, data)
-		for index := range pageWarnings {
-			pageWarnings[index].WorkspaceID = workspace.ID
-			pageWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
-		}
-		warnings = append(warnings, pageWarnings...)
-		if err != nil {
-			continue
-		}
-		pages = append(pages, page)
-		if len(pages) > limits.MaxPages {
-			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: page budget exceeded", cleanSource)
-		}
-		links += len(page.Links)
-		if links > limits.MaxLinks {
-			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: link budget exceeded", cleanSource)
-		}
-	}
-	if len(pages) == 0 {
-		return KnowledgeWiki{}, false, nil
-	}
-	pages, relationshipWarnings, _ := ResolveRelationships(pages)
-	for index := range relationshipWarnings {
-		relationshipWarnings[index].WorkspaceID = workspace.ID
-		relationshipWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
-	}
-	warnings = append(warnings, relationshipWarnings...)
-	pages, journeysBucket, taxonomyWarnings := applyTaxonomy(resolved, pages)
-	for index := range taxonomyWarnings {
-		taxonomyWarnings[index].WorkspaceID = workspace.ID
-		taxonomyWarnings[index].WikiRoot = filepath.ToSlash(cleanSource)
-	}
-	warnings = append(warnings, taxonomyWarnings...)
-	sort.Slice(warnings, func(i, j int) bool {
-		if warnings[i].Path == warnings[j].Path {
-			return warnings[i].Code < warnings[j].Code
-		}
-		return warnings[i].Path < warnings[j].Path
-	})
-	return KnowledgeWiki{WorkspaceID: workspace.ID, Root: filepath.ToSlash(cleanSource), DisplayName: displayName(cleanSource), JourneysBucket: journeysBucket, Pages: pages, Warnings: warnings, IndexedAt: time.Now().UTC()}, true, nil
+	scan := &sourceScan{ctx: ctx, detector: d, workspace: workspace, workspaceRoot: workspaceRoot, source: cleanSource, root: resolved, limits: limits}
+	return scan.run()
 }
 
 // readStableBounded never allocates more than limit bytes.  The path is
