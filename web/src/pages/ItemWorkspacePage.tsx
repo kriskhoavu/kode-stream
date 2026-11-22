@@ -37,7 +37,8 @@ import { BranchCheckoutPicker } from '../features/workstream/BranchCheckoutPicke
 import { useWorkspaceBranches } from '../features/workstream-explorer/useWorkspaceBranches';
 import { ModalLayer } from '../components/ModalLayer';
 import { type Tab, type RightPanelTab, type DiffMode, type PendingConfirm, type DetailViewMode, type OpenItemFileTab } from '../features/item-workspace/itemWorkspaceTypes';
-import { fileDirectoryPaths, hasFile, currentGitPath, workspacePathForSelection, buildFileStateMap, normalizePath, lastPathSegment, parentDirectoryPath } from '../features/item-workspace/itemPaths';
+import { fileDirectoryPaths, hasFile, currentGitPath, workspacePathForSelection, buildFileStateMap, normalizePath } from '../features/item-workspace/itemPaths';
+import { lastPathSegment, parentDirectoryPath } from '../shared/domain/paths';
 import { visibleItemWarnings } from '../features/item-workspace/itemFormat';
 import { DiffPanel } from '../features/item-workspace/DiffPanel';
 import { TreeNode } from '../features/item-workspace/FileTreeNode';
