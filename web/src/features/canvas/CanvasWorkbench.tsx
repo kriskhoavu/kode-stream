@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useHorizontalDrag } from '../../components/useHorizontalDrag';
 import { GitCompare, GripVertical, Info, PanelRightClose, PanelRightOpen, Play, RefreshCw, TerminalSquare, Ticket } from 'lucide-react';
 import { api } from '../../shared/api';
 import type { AISessionLaunchResult, AutomationDisplayMode, CanvasNode, CanvasProjection, E2ERunbook, EmbeddedAISessionResult, ItemDetail, ItemMetadataUpdateInput, ItemStatus, ItemVerificationTests, SafeSessionRecord, VerificationJob, VerificationTestSelection, VerifyProfile } from '../../lib/types';
@@ -24,7 +25,7 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 	const verificationAbortRef = useRef<AbortController | undefined>(undefined);
 	const runbooksAbortRef = useRef<AbortController | undefined>(undefined);
 	const workbenchRef = useRef<HTMLElement>(null);
-	const resizeCleanupRef = useRef<(() => void) | null>(null);
+	const startDrag = useHorizontalDrag();
 	const mountedRef = useRef(false);
 	const workspaceNode = projection.nodes.find((node) => node.kind === 'workspace')?.workspace;
 
@@ -57,7 +58,6 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		void refreshE2ERunbooks();
 		return () => { verificationAbortRef.current?.abort(); verificationPollRef.current += 1; runbooksAbortRef.current?.abort(); };
 	}, [selectedNode?.id, itemId, refreshE2ERunbooks]);
-	useEffect(() => () => resizeCleanupRef.current?.(), []);
 	useEffect(() => {
 		mountedRef.current = true;
 		return () => { mountedRef.current = false; };
@@ -163,31 +163,15 @@ export function CanvasWorkbench({ projection, selectedNode, aiSessionDialogOpen 
 		}
 	};
 	const startResize = (event: React.PointerEvent<HTMLButtonElement>) => {
-		event.preventDefault();
-		resizeCleanupRef.current?.();
-		const startX = event.clientX;
 		const startingWidth = panelWidth;
-		const maxWidth = 520;
-		const minWidth = 220;
 		let latestWidth = startingWidth;
-		const onPointerMove = (moveEvent: PointerEvent) => {
-			const nextWidth = Math.min(maxWidth, Math.max(minWidth, startingWidth - (moveEvent.clientX - startX)));
-			latestWidth = nextWidth;
-			workbenchRef.current?.style.setProperty('--canvas-workbench-width', `${nextWidth}px`);
-		};
-		const cleanup = (commit: boolean) => {
-			document.body.classList.remove('is-resizing-panel');
-			window.removeEventListener('pointermove', onPointerMove);
-			window.removeEventListener('pointerup', onPointerUp);
-			if (commit) setPanelWidth(latestWidth);
-			if (resizeCleanupRef.current === cancel) resizeCleanupRef.current = null;
-		};
-		const cancel = () => cleanup(false);
-		function onPointerUp() { cleanup(true); }
-		document.body.classList.add('is-resizing-panel');
-		window.addEventListener('pointermove', onPointerMove);
-		window.addEventListener('pointerup', onPointerUp, { once: true });
-		resizeCleanupRef.current = cancel;
+		startDrag(event, {
+			move: (deltaX) => {
+				latestWidth = Math.min(520, Math.max(220, startingWidth - deltaX));
+				workbenchRef.current?.style.setProperty('--canvas-workbench-width', `${latestWidth}px`);
+			},
+			end: () => setPanelWidth(latestWidth),
+		});
 	};
 	if (!selectedNode) return aiSessionDialogOpen && workspaceNode ? <AISessionLaunchDialog workspaceTarget={{ workspaceId: workspaceNode.id }} embeddedLaunchGuards={{ expectedWorkspaceId: projection.layout.workspaceId, expectedBranch: workspaceNode.branch || projection.layout.branchKey, observedCommit: workspaceNode.commit, idempotencyKey: newIdempotencyKey() }} onClose={() => onAISessionDialogOpenChange?.(false)} onLaunched={sessionLaunched} /> : null;
 

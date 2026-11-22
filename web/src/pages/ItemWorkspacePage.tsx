@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useHorizontalDrag } from '../components/useHorizontalDrag';
 import type { CSSProperties, MutableRefObject } from 'react';
 import { ArrowLeft, Bot, Code2, FilePlus2, FileText, FolderOpen, FolderPlus, GitCompare, GripVertical, Info, Ticket, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Pencil, RefreshCw, X } from 'lucide-react';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -81,7 +82,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const [renameOpen, setRenameOpen] = useState(false);
   const workspaceGridRef = useRef<HTMLDivElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
-  const resizeCleanupRef = useRef<(() => void) | null>(null);
+  const startDrag = useHorizontalDrag();
   const [contentSearchIndex, setContentSearchIndex] = useState(0);
   const [matchContext, setMatchContext] = useState<ContentSearchSelection | null>(null);
   const fileTreeRef = useRef<HTMLDivElement | null>(null);
@@ -413,46 +414,18 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const currentWorkspacePath = workspacePathForSelection(plan, file);
   const itemRootPath = normalizePath(plan?.itemPath ?? '') || undefined;
 
-  useEffect(() => () => {
-    clearTimer(autoSaveRefreshTimerRef);
-    resizeCleanupRef.current?.();
-  }, []);
+  useEffect(() => () => clearTimer(autoSaveRefreshTimerRef), []);
 
   const startResize = (side: 'left' | 'right', event: React.PointerEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    resizeCleanupRef.current?.();
-    const startX = event.clientX;
     const startingWidth = side === 'left' ? leftWidth : rightWidth;
     let latestWidth = startingWidth;
-
-    const onPointerMove = (moveEvent: PointerEvent) => {
-      const delta = moveEvent.clientX - startX;
-      const nextWidth = side === 'left' ? startingWidth + delta : startingWidth - delta;
-      const boundedWidth = Math.min(520, Math.max(220, nextWidth));
-      latestWidth = boundedWidth;
-      workspaceGridRef.current?.style.setProperty(side === 'left' ? '--left-panel-width' : '--right-panel-width', `${boundedWidth}px`);
-    };
-
-    const cleanup = (commit: boolean) => {
-      document.body.classList.remove('is-resizing-panel');
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      if (commit) {
-        if (side === 'left') {
-          setLeftWidth(latestWidth);
-        } else {
-          setRightWidth(latestWidth);
-        }
-      }
-      if (resizeCleanupRef.current === cancel) resizeCleanupRef.current = null;
-    };
-    const cancel = () => cleanup(false);
-    function onPointerUp() { cleanup(true); }
-
-    document.body.classList.add('is-resizing-panel');
-    window.addEventListener('pointermove', onPointerMove);
-    window.addEventListener('pointerup', onPointerUp, { once: true });
-    resizeCleanupRef.current = cancel;
+    startDrag(event, {
+      move: (deltaX) => {
+        latestWidth = Math.min(520, Math.max(220, side === 'left' ? startingWidth + deltaX : startingWidth - deltaX));
+        workspaceGridRef.current?.style.setProperty(side === 'left' ? '--left-panel-width' : '--right-panel-width', `${latestWidth}px`);
+      },
+      end: () => (side === 'left' ? setLeftWidth : setRightWidth)(latestWidth),
+    });
   };
 
   const loadDiff = async () => {

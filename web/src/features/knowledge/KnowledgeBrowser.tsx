@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useHorizontalDrag } from '../../components/useHorizontalDrag';
 import { BookOpen, ChevronRight, FileText, Folder, GripVertical, PanelRightClose, PanelRightOpen, Search } from 'lucide-react';
 import type { KnowledgePage, KnowledgeWarning } from '../../lib/types';
 import { KnowledgeWarnings } from './KnowledgeWarnings';
@@ -9,7 +10,7 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 	const [sidePanelWidth, setSidePanelWidth] = useState(300);
 	const [expandedDomains, setExpandedDomains] = useState<Set<string>>(() => new Set([rootFolderPath]));
 	const navigationRef = useRef<HTMLElement | null>(null);
-	const resizeCleanupRef = useRef<(() => void) | null>(null);
+	const startDrag = useHorizontalDrag();
 	const filtered = useMemo(() => {
 		const needle = query.trim().toLowerCase();
 		return needle ? pages.filter((page) => [page.title, page.slug, page.summary ?? '', ...page.roles, ...page.topics].some((value) => value.toLowerCase().includes(needle))) : pages;
@@ -34,7 +35,6 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		entry.scrollIntoView?.({ block: 'nearest' });
 		entry.focus({ preventScroll: true });
 	}, [expandedDomains, query, selectedSlug]);
-	useEffect(() => () => resizeCleanupRef.current?.(), []);
 	const moveFocus = (event: React.KeyboardEvent<HTMLButtonElement>, slug: string) => {
 		if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
 			event.preventDefault();
@@ -45,22 +45,8 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		if (event.key === 'Enter') { event.preventDefault(); onSelect(slug); }
 	};
 	const startSidePanelResize = (event: React.PointerEvent<HTMLButtonElement>) => {
-		event.preventDefault();
-		resizeCleanupRef.current?.();
-		const startX = event.clientX;
 		const startingWidth = sidePanelWidth;
-		const resize = (moveEvent: PointerEvent) => setSidePanelWidth(Math.max(260, Math.min(640, startingWidth - (moveEvent.clientX - startX))));
-		const cleanup = () => {
-			document.body.classList.remove('is-resizing-panel');
-			window.removeEventListener('pointermove', resize);
-			window.removeEventListener('pointerup', finish);
-			if (resizeCleanupRef.current === cleanup) resizeCleanupRef.current = null;
-		};
-		function finish() { cleanup(); }
-		document.body.classList.add('is-resizing-panel');
-		window.addEventListener('pointermove', resize);
-		window.addEventListener('pointerup', finish, { once: true });
-		resizeCleanupRef.current = cleanup;
+		startDrag(event, { move: (deltaX) => setSidePanelWidth(Math.max(260, Math.min(640, startingWidth - deltaX))) });
 	};
 	// The index is the wiki's folder tree, drawn like the Workstream explorer:
 	// the wiki root, its folders, then the pages in each, indented by depth. A
