@@ -183,6 +183,36 @@ describe('WorkstreamExplorer', () => {
     expect(container.querySelector('.file-tab-button')).toHaveTextContent('guide.md');
   });
 
+  it('closes the active tab without reopening it, and switches tabs without reloading the old file', async () => {
+    const entry = (name: string) => ({ id: name, name, path: name, type: 'file', hasChildren: false, ignored: false, hidden: false, editable: true, kind: 'markdown' });
+    apiMock.workspaceTree.mockResolvedValue({ workspaceId: 'ws', path: '', hiddenCount: 0, entries: [entry('a.md'), entry('b.md')] });
+    apiMock.workspaceFile.mockImplementation((_workspaceId: string, path: string) => Promise.resolve({ id: path, path, content: `# ${path}`, language: 'markdown', hash: path, kind: 'markdown', sizeBytes: 6, editable: true, truncated: false }));
+    apiMock.workspaceFileDiff.mockResolvedValue({ diff: '' });
+
+    function Harness() {
+      const [location, setLocation] = useState<{ workspaceId?: string; path?: string; mode?: 'all' | 'sources' }>({ workspaceId: 'ws', path: 'a.md', mode: 'all' });
+      return <WorkstreamExplorer workspaces={[workspace]} location={location} onLocationChange={(next) => setLocation(next ?? { workspaceId: 'ws', mode: 'all' })} />;
+    }
+    const tabs = () => Array.from(container.querySelectorAll('.file-tab')).map((tab) => `${tab.textContent}${tab.classList.contains('active') ? '*' : ''}`);
+
+    const { container } = render(<Harness />);
+    await waitFor(() => expect(tabs()).toEqual(['a.md*']));
+    fireEvent.click(screen.getByRole('button', { name: 'b.md' }));
+    await waitFor(() => expect(tabs()).toEqual(['a.md', 'b.md*']));
+
+    apiMock.workspaceFile.mockClear();
+    fireEvent.click(container.querySelectorAll('.file-tab-button')[0]);
+    await waitFor(() => expect(tabs()).toEqual(['a.md*', 'b.md']));
+    expect(apiMock.workspaceFile.mock.calls.map((call) => call[1])).toEqual(['a.md']);
+
+    apiMock.workspaceFile.mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Close a.md' }));
+    await waitFor(() => expect(tabs()).toEqual(['b.md*']));
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 50)); });
+    expect(tabs()).toEqual(['b.md*']);
+    expect(apiMock.workspaceFile.mock.calls.map((call) => call[1])).toEqual(['b.md']);
+  });
+
   it('does not request file content for a directory path during initial resolution', async () => {
     apiMock.workspaceTree.mockResolvedValue({ workspaceId: 'ws', path: '', hiddenCount: 0, entries: [
       { id: 'docs', name: 'docs', path: 'docs', type: 'directory', hasChildren: true, ignored: false, hidden: false, editable: false }

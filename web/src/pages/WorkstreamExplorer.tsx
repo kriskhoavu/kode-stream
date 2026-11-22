@@ -319,7 +319,8 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const activateTab = async (tab: OpenWorkspaceFileTab) => {
     if (editor.dirty && !(await editor.saveNow())) return;
     setMatchContext(null);
-    setActiveTabKey(tabKey(tab.workspaceId, tab.path));
+    // The location effect loads the tab and makes it active. Setting the active tab here first
+    // would make that effect reload the file still at the location.
     await explorer.expandToPath(tab.workspaceId, tab.path, 'file');
   };
 
@@ -332,7 +333,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     const nextTab = key === activeTabKey ? remaining[index] ?? remaining[index - 1] ?? null : activeTab;
     setOpenTabs(remaining);
     if (nextTab) {
-      setActiveTabKey(tabKey(nextTab.workspaceId, nextTab.path));
+      // As in activateTab: the location effect loads the next tab and makes it active.
       await explorer.expandToPath(nextTab.workspaceId, nextTab.path, 'file');
       return;
     }
