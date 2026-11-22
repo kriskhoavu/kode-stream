@@ -3,9 +3,9 @@ import { ArrowLeft, CheckCircle2, Download, ExternalLink, FolderGit2, FolderOpen
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { WorkspaceHealthPanel } from '../components/ReliabilityPanels';
 import { api } from '../shared/api';
-import type { JiraConnection, KnowledgeSettings, RuntimeContext, WorkspaceConfig, WorkspaceRuntimeConfig, SourceSurface, SystemConfigPaths } from '../lib/types';
+import type { RuntimeContext, WorkspaceConfig, SourceSurface, SystemConfigPaths } from '../lib/types';
 import { sourcePaths, sourceSurfaces, workspaceSources } from '../lib/sources';
-import { lastPathSegment, parseSources } from '../features/workspaces/sourceSettings';
+import { lastPathSegment } from '../features/workspaces/sourceSettings';
 import { notifyReliabilityChanged } from '../features/reliability/hooks';
 import { WorkspaceList } from '../features/workspaces/WorkspaceManagerShell';
 import { WorkspaceOwnSettings } from '../features/workspaces/WorkspaceOwnSettings';
@@ -18,10 +18,11 @@ import { useWorkspaceImport } from '../features/workspaces/useWorkspaceImport';
 import { WorkspaceImportReview, WorkspaceImportResults } from '../features/workspaces/workspaceImportReview';
 import { CloudAgentRegistration } from '../features/workspaces/CloudAgentRegistration';
 import { SourceSettingsDialog } from '../features/workspaces/SourceSettingsDialog';
+import { useWorkspaceEdit } from '../features/workspaces/useWorkspaceEdit';
 import { type WorkspaceNotice, WorkspaceNoticePanel, scanNotice, scanSummary, scanWarnings } from '../features/workspaces/workspaceNotice';
-import { errorMessage, buildWorkspaceInput, normalizeKnowledgeSettings, cloneRuntimeConfig, inferWorkspaceNameFromRemoteURL, workspaceRemovalMessage, pathFromDrop, settingsEditorFromResult, shownInByPath, sourcesFromDraft, toggleSourceSurface, type SettingsEditorState } from '../features/workspaces/workspaceDraft';
+import { errorMessage, buildWorkspaceInput, normalizeKnowledgeSettings, inferWorkspaceNameFromRemoteURL, workspaceRemovalMessage, pathFromDrop, settingsEditorFromResult, toggleSourceSurface, type SettingsEditorState } from '../features/workspaces/workspaceDraft';
 import { SourcesField, BranchField, KnowledgeSettingsFields, RuntimeSettingsFields, KnowledgeRoots, JiraConnectionFields, OverviewSection } from '../features/workspaces/workspaceFields';
-import { type WorkspaceDetailTab, detailTabs, detailTabLabels, type WorkspaceEditSection, type OverviewSectionKey, workspaceDetailSubtitle, isIntegrationEditSection, integrationSaveLabel } from '../features/workspaces/workspaceDetailTabs';
+import { type WorkspaceDetailTab, detailTabs, detailTabLabels, type OverviewSectionKey, workspaceDetailSubtitle, isIntegrationEditSection, integrationSaveLabel } from '../features/workspaces/workspaceDetailTabs';
 
 
 const sourceSurfaceLabels: Record<SourceSurface, string> = { workstream: 'Workstream', knowledge: 'Knowledge' };
@@ -42,9 +43,6 @@ export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContex
   const [registrationLogOpen, setRegistrationLogOpen] = useState(false);
   const [pendingOperations, setPendingOperations] = useState<string[]>([]);
   const [pathDragging, setPathDragging] = useState(false);
-  const [editingId, setEditingId] = useState('');
-  const [editingSection, setEditingSection] = useState<WorkspaceEditSection>('');
-  const [editDraft, setEditDraft] = useState<{ name: string; path: string; baselineBranch: string; sources: string; shownIn: Record<string, SourceSurface[]>; jira: JiraConnection | null; knowledge: KnowledgeSettings; runtime: WorkspaceRuntimeConfig | null }>({ name: '', path: '', baselineBranch: '', sources: '', shownIn: {}, jira: null, knowledge: {}, runtime: null });
   const [selectedWorkspaceIds, setSelectedWorkspaceIds] = useState<string[]>([]);
   const [workspacesToRemove, setWorkspacesToRemove] = useState<WorkspaceConfig[] | null>(null);
   const [settingsEditor, setSettingsEditor] = useState<SettingsEditorState | null>(null);
@@ -78,6 +76,8 @@ const busy = pendingOperations.length > 0;
       ? current.includes(operation) ? current : [...current, operation]
       : current.filter((item) => item !== operation));
   };
+  const { editingId, editingSection, editDraft, setEditDraft, startEdit, discardEdit, confirmDiscardEdit, saveEdit } = useWorkspaceEdit({ setBusy, onNotice: setNotice, onChanged });
+
 
   useEffect(() => {
     setSelectedWorkspaceIds((current) => current.filter((id) => workspaces.some((workspace) => workspace.id === id)));
@@ -197,32 +197,10 @@ const busy = pendingOperations.length > 0;
     }
   };
 
-  const startEdit = (repo: WorkspaceConfig, section: Exclude<WorkspaceEditSection, ''>) => {
-    setEditingId(repo.id);
-    setEditingSection(section);
-      setEditDraft({
-        name: repo.name,
-        path: repo.path,
-        baselineBranch: repo.baselineBranch,
-        sources: sourcePaths(repo).join(', '),
-        shownIn: shownInByPath(repo),
-        jira: repo.jira ? { ...repo.jira } : null,
-        knowledge: { enabled: repo.knowledge?.enabled ?? true, enrichExecutable: repo.knowledge?.enrichExecutable ?? '', enrichArgs: [...(repo.knowledge?.enrichArgs ?? [])] },
-        runtime: cloneRuntimeConfig(repo.runtime)
-      });
-    setNotice(null);
-  };
-
-  const discardEdit = () => {
-    setEditingId('');
-    setEditingSection('');
-  };
-
   const toggleOverviewSection = (section: OverviewSectionKey) => {
     setCollapsedOverviewSections((current) => ({ ...current, [section]: !current[section] }));
   };
 
-  const confirmDiscardEdit = () => !editingId || window.confirm('Discard unsaved workspace changes?');
 
   const selectWorkspace = (workspaceId: string) => {
     if (workspaceId === selectedWorkspaceId) return;
@@ -263,35 +241,6 @@ const busy = pendingOperations.length > 0;
     setRegistrationStep(2);
   };
 
-  const saveEdit = async (repo: WorkspaceConfig) => {
-    setBusy(true);
-    setNotice(null);
-    try {
-      if (editingSection === 'runtime') {
-        await api.saveWorkspaceRuntime(repo.id, editDraft.runtime);
-      } else {
-        await api.updateWorkspace(repo.id, {
-          name: editDraft.name,
-          path: editDraft.path,
-          baselineBranch: editDraft.baselineBranch,
-          sources: sourcesFromDraft(parseSources(editDraft.sources), editDraft.shownIn),
-          registrationMode: repo.registrationMode,
-          remoteUrl: repo.remoteUrl,
-          jira: editDraft.jira ?? undefined,
-          knowledge: normalizeKnowledgeSettings(editDraft.knowledge)
-        });
-      }
-      setEditingId('');
-      setEditingSection('');
-      setNotice({ tone: 'success', title: 'Workspace updated', details: [editDraft.name || repo.name] });
-      onChanged();
-    } catch (err) {
-      setNotice({ tone: 'error', title: `Update failed for ${repo.name}`, details: [errorMessage(err)] });
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const removeWorkspaces = async (targets: WorkspaceConfig[]) => {
     if (targets.length === 0) {
       setWorkspacesToRemove(null);
@@ -314,8 +263,7 @@ const busy = pendingOperations.length > 0;
           details.push(`${workspace.name}: ${errorMessage(err)}`);
         }
       }
-      setEditingId('');
-      setEditingSection('');
+      discardEdit();
       setSelectedWorkspaceIds((current) => Array.from(new Set(
         current.filter((id) => !targets.some((workspace) => workspace.id === id)).concat(Array.from(failedWorkspaceIds))
       )));
