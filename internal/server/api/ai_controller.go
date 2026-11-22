@@ -1,15 +1,10 @@
 package api
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -269,141 +264,22 @@ func (a *aiController) embeddedAISessionChannel(w http.ResponseWriter, r *http.R
 		return
 	}
 	defer connection.Close()
-	connection.SetReadLimit(maxTerminalFrameBytes)
-	const terminalReadTimeout = time.Minute
-	const terminalWriteTimeout = 10 * time.Second
-	_ = connection.SetReadDeadline(time.Now().Add(terminalReadTimeout))
-	connection.SetPongHandler(func(string) error {
-		return connection.SetReadDeadline(time.Now().Add(terminalReadTimeout))
-	})
-	var writeMu sync.Mutex
-	writeChannel := func(payload channelOutput) error {
-		writeMu.Lock()
-		defer writeMu.Unlock()
-		if err := connection.SetWriteDeadline(time.Now().Add(terminalWriteTimeout)); err != nil {
-			return err
-		}
-		return connection.WriteJSON(payload)
-	}
+	channel := newTerminalChannel(id, manager, connection)
 	output, buffered, unsubscribe, err := manager.Subscribe(id)
 	if err != nil {
 		return
 	}
 	defer unsubscribe()
-	if len(buffered) > 0 {
-		if err := writeChannel(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(buffered), Encoding: "base64"}); err != nil {
-			return
-		}
+	if len(buffered) > 0 && channel.writeOutput(buffered) != nil {
+		return
 	}
 	state, _ := manager.Get(id)
-	if err := writeChannel(channelOutput{Type: "state", State: state.State, ExitCode: state.ExitCode}); err != nil {
+	if channel.writeState(state) != nil {
 		return
 	}
 	readDone := make(chan struct{})
-	go func() {
-		defer close(readDone)
-		windowStarted := time.Now()
-		windowBytes := 0
-		for {
-			messageType, reader, err := connection.NextReader()
-			if err != nil || messageType != websocket.TextMessage {
-				return
-			}
-			var message channelInput
-			decoder := json.NewDecoder(io.LimitReader(reader, maxTerminalFrameBytes))
-			decoder.DisallowUnknownFields()
-			if err := decoder.Decode(&message); err != nil {
-				_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal message"})
-				return
-			}
-			var extra any
-			if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
-				_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal message"})
-				return
-			}
-			switch message.Type {
-			case "input":
-				decoded, err := base64.StdEncoding.DecodeString(message.Data)
-				if err != nil || len(decoded) == 0 || len(decoded) > maxTerminalInputBytes {
-					_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal input"})
-					return
-				}
-				if time.Since(windowStarted) >= time.Second {
-					windowStarted, windowBytes = time.Now(), 0
-				}
-				windowBytes += len(decoded)
-				if windowBytes > maxTerminalInputBytesPerSecond {
-					_ = writeChannel(channelOutput{Type: "error", Message: "terminal input rate exceeded"})
-					return
-				}
-				if err := manager.Write(id, decoded); err != nil {
-					_ = writeChannel(channelOutput{Type: "error", Message: "terminal input rejected"})
-					return
-				}
-			case "resize":
-				// A size outside the PTY's limits is refused but the channel stays
-				// open: a viewer briefly laid out at a sliver must not lose the
-				// session, which the manager cancels once nobody is watching.
-				if message.Columns == 0 || message.Rows == 0 || message.Columns > maxTerminalDimension || message.Rows > maxTerminalDimension {
-					_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal size"})
-					continue
-				}
-				if err := manager.Resize(id, message.Columns, message.Rows); err != nil {
-					_ = writeChannel(channelOutput{Type: "error", Message: "terminal resize rejected"})
-					continue
-				}
-			case "cancel":
-				if _, err := manager.Cancel(id); err != nil {
-					_ = writeChannel(channelOutput{Type: "error", Message: "terminal cancel rejected"})
-					return
-				}
-			case "heartbeat":
-				if message.Data != "" || message.Columns != 0 || message.Rows != 0 {
-					_ = writeChannel(channelOutput{Type: "error", Message: "invalid terminal message"})
-					return
-				}
-			default:
-				_ = writeChannel(channelOutput{Type: "error", Message: "unknown terminal message"})
-				return
-			}
-		}
-	}()
-	ticker := time.NewTicker(250 * time.Millisecond)
-	defer ticker.Stop()
-	pingTicker := time.NewTicker(30 * time.Second)
-	defer pingTicker.Stop()
-	lastState := state.State
-	for {
-		select {
-		case data, ok := <-output:
-			if !ok {
-				return
-			}
-			if err := writeChannel(channelOutput{Type: "output", Data: base64.StdEncoding.EncodeToString(data), Encoding: "base64"}); err != nil {
-				return
-			}
-		case <-ticker.C:
-			current, err := manager.Get(id)
-			if err != nil {
-				return
-			}
-			if current.State != lastState {
-				if err := writeChannel(channelOutput{Type: "state", State: current.State, ExitCode: current.ExitCode}); err != nil {
-					return
-				}
-				lastState = current.State
-				if current.State != "running" && current.State != "starting" {
-					return
-				}
-			}
-		case <-pingTicker.C:
-			if err := connection.WriteControl(websocket.PingMessage, nil, time.Now().Add(terminalWriteTimeout)); err != nil {
-				return
-			}
-		case <-readDone:
-			return
-		}
-	}
+	go channel.readLoop(readDone)
+	channel.pump(output, state.State, readDone)
 }
 
 func (a *aiController) aiSessionEligibility(w http.ResponseWriter, r *http.Request) {
