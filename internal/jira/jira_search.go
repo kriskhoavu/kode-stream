@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -127,23 +126,9 @@ func (c *Client) SearchIssues(ctx context.Context, connection models.JiraConnect
 	if connection.DeploymentType == "cloud" {
 		endpoint = connection.BaseURL + "/rest/api/3/search/jql?" + query.Encode()
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.authorize(request, connection); err != nil {
-		return nil, err
-	}
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("Jira is unavailable: %w", err)
-	}
-	if err := responseError(response, fmt.Errorf("Jira search was not found")); err != nil {
-		return nil, err
-	}
 	var payload jiraSearchResponse
-	if err := decodeBounded(response, &payload); err != nil {
-		return nil, fmt.Errorf("decode Jira search: %w", err)
+	if err := c.getJSON(ctx, connection, endpoint, fmt.Errorf("Jira search was not found"), "Jira search", &payload); err != nil {
+		return nil, err
 	}
 	issues := make([]SearchedIssue, 0, len(payload.Issues))
 	for i, raw := range payload.Issues {

@@ -108,19 +108,21 @@ type jiraIssueResponse struct {
 		Priority *struct {
 			Name string `json:"name"`
 		} `json:"priority"`
-		Labels     []string `json:"labels"`
-		Created    string   `json:"created"`
-		Updated    string   `json:"updated"`
-		Attachment []struct {
-			ID       string     `json:"id"`
-			Filename string     `json:"filename"`
-			MimeType string     `json:"mimeType"`
-			Size     int64      `json:"size"`
-			Created  string     `json:"created"`
-			Content  string     `json:"content"`
-			Author   jiraPerson `json:"author"`
-		} `json:"attachment"`
+		Labels     []string         `json:"labels"`
+		Created    string           `json:"created"`
+		Updated    string           `json:"updated"`
+		Attachment []jiraAttachment `json:"attachment"`
 	} `json:"fields"`
+}
+
+type jiraAttachment struct {
+	ID       string     `json:"id"`
+	Filename string     `json:"filename"`
+	MimeType string     `json:"mimeType"`
+	Size     int64      `json:"size"`
+	Created  string     `json:"created"`
+	Content  string     `json:"content"`
+	Author   jiraPerson `json:"author"`
 }
 
 type jiraPerson struct {
@@ -136,85 +138,114 @@ func (c *Client) GetIssue(ctx context.Context, connection models.JiraConnection,
 		version = "3"
 	}
 	endpoint := connection.BaseURL + "/rest/api/" + version + "/issue/" + url.PathEscape(key) + "?fields=summary,status,description,issuetype,assignee,reporter,priority,labels,created,updated,attachment"
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return Issue{}, err
-	}
-	if err := c.authorize(request, connection); err != nil {
-		return Issue{}, err
-	}
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return Issue{}, fmt.Errorf("Jira is unavailable: %w", err)
-	}
-	if err := responseError(response, ErrNotFound); err != nil {
-		return Issue{}, err
-	}
 	var payload jiraIssueResponse
-	if err := decodeBounded(response, &payload); err != nil {
-		return Issue{}, fmt.Errorf("decode Jira issue: %w", err)
+	if err := c.getJSON(ctx, connection, endpoint, ErrNotFound, "Jira issue", &payload); err != nil {
+		return Issue{}, err
 	}
+	clip := &clipper{}
 	description, truncated := normalizeDescription(payload.Fields.Description)
+	clip.truncated = truncated
 	if description == "" {
 		// Projects often keep the prose in a custom field ("User Story
 		// Description" and friends) and leave the standard one empty. Only pay
 		// for the wider lookup when the standard field gave us nothing.
 		if custom, customTruncated, err := c.customDescription(ctx, connection, version, key); err == nil && custom != "" {
 			description = custom
-			truncated = truncated || customTruncated
+			clip.truncated = clip.truncated || customTruncated
 		}
 	}
-	keyValue, clipped := boundedString(payload.Key, maxScalarBytes)
-	truncated = truncated || clipped
-	summary, clipped := boundedString(payload.Fields.Summary, maxScalarBytes)
-	truncated = truncated || clipped
-	status, clipped := boundedString(payload.Fields.Status.Name, maxScalarBytes)
-	truncated = truncated || clipped
-	issueType, clipped := boundedString(payload.Fields.IssueType.Name, maxScalarBytes)
-	truncated = truncated || clipped
-	created, clipped := boundedString(payload.Fields.Created, maxScalarBytes)
-	truncated = truncated || clipped
-	updated, clipped := boundedString(payload.Fields.Updated, maxScalarBytes)
-	truncated = truncated || clipped
-	assignee, clipped := normalizePerson(payload.Fields.Assignee)
-	truncated = truncated || clipped
-	reporter, clipped := normalizePerson(payload.Fields.Reporter)
-	truncated = truncated || clipped
-	statusCategory, clipped := boundedString(payload.Fields.Status.StatusCategory.Key, maxScalarBytes)
-	truncated = truncated || clipped
-	issue := Issue{Key: keyValue, Summary: summary, Status: status, StatusCategory: statusCategory, Description: description, IssueType: issueType, Assignee: assignee, Reporter: reporter, Labels: boundedStrings(payload.Fields.Labels, maxLabels, maxScalarBytes, &truncated), CreatedAt: created, UpdatedAt: updated, BrowserURL: connection.BaseURL + "/browse/" + url.PathEscape(payload.Key), Attachments: []Attachment{}}
-	if payload.Fields.Priority != nil {
-		issue.Priority, clipped = boundedString(payload.Fields.Priority.Name, maxScalarBytes)
-		truncated = truncated || clipped
-	}
-	for i, value := range payload.Fields.Attachment {
-		if i >= maxAttachments {
-			truncated = true
-			break
-		}
-		person, personClipped := normalizePerson(&value.Author)
-		truncated = truncated || personClipped
-		if person == nil {
-			person = &Person{}
-		}
-		id, idClipped := boundedString(value.ID, maxScalarBytes)
-		filename, filenameClipped := boundedString(value.Filename, maxScalarBytes)
-		mediaType, mediaTypeClipped := boundedString(value.MimeType, maxScalarBytes)
-		attachmentCreated, createdClipped := boundedString(value.Created, maxScalarBytes)
-		contentURL, contentClipped := boundedString(value.Content, maxScalarBytes)
-		truncated = truncated || idClipped || filenameClipped || mediaTypeClipped || createdClipped || contentClipped
-		// A clipped proxy URL is not a stable authorization target. Do not expose
-		// that attachment at all.
-		if contentClipped {
-			continue
-		}
-		issue.Attachments = append(issue.Attachments, Attachment{ID: id, Filename: filename, MediaType: mediaType, SizeBytes: value.Size, CreatedAt: attachmentCreated, ContentURL: contentURL, Author: *person})
-	}
-	issue.Truncated = truncated
-	if truncated {
+	issue := issueFromResponse(payload, connection.BaseURL, description, clip)
+	issue.Truncated = clip.truncated
+	if clip.truncated {
 		issue.Warnings = []string{"Jira issue content was truncated to safe limits."}
 	}
 	return issue, nil
+}
+
+// clipper bounds Jira strings and remembers whether any was cut.
+type clipper struct{ truncated bool }
+
+func (c *clipper) text(value string) string {
+	bounded, clipped := boundedString(value, maxScalarBytes)
+	c.truncated = c.truncated || clipped
+	return bounded
+}
+
+func (c *clipper) person(value *jiraPerson) *Person {
+	person, clipped := normalizePerson(value)
+	c.truncated = c.truncated || clipped
+	return person
+}
+
+func issueFromResponse(payload jiraIssueResponse, baseURL, description string, clip *clipper) Issue {
+	fields := payload.Fields
+	issue := Issue{
+		Key:            clip.text(payload.Key),
+		Summary:        clip.text(fields.Summary),
+		Status:         clip.text(fields.Status.Name),
+		IssueType:      clip.text(fields.IssueType.Name),
+		CreatedAt:      clip.text(fields.Created),
+		UpdatedAt:      clip.text(fields.Updated),
+		Assignee:       clip.person(fields.Assignee),
+		Reporter:       clip.person(fields.Reporter),
+		StatusCategory: clip.text(fields.Status.StatusCategory.Key),
+		Description:    description,
+		BrowserURL:     baseURL + "/browse/" + url.PathEscape(payload.Key),
+	}
+	issue.Labels = boundedStrings(fields.Labels, maxLabels, maxScalarBytes, &clip.truncated)
+	if fields.Priority != nil {
+		issue.Priority = clip.text(fields.Priority.Name)
+	}
+	issue.Attachments = boundedAttachments(fields.Attachment, clip)
+	return issue
+}
+
+// boundedAttachments keeps at most maxAttachments attachments. An attachment
+// whose content URL was clipped is dropped: a clipped proxy URL is not a
+// stable authorization target.
+func boundedAttachments(values []jiraAttachment, clip *clipper) []Attachment {
+	attachments := []Attachment{}
+	for i, value := range values {
+		if i >= maxAttachments {
+			clip.truncated = true
+			break
+		}
+		person := clip.person(&value.Author)
+		if person == nil {
+			person = &Person{}
+		}
+		contentURL, contentClipped := boundedString(value.Content, maxScalarBytes)
+		clip.truncated = clip.truncated || contentClipped
+		attachment := Attachment{ID: clip.text(value.ID), Filename: clip.text(value.Filename), MediaType: clip.text(value.MimeType), SizeBytes: value.Size, CreatedAt: clip.text(value.Created), ContentURL: contentURL, Author: *person}
+		if contentClipped {
+			continue
+		}
+		attachments = append(attachments, attachment)
+	}
+	return attachments
+}
+
+// getJSON sends an authorized GET and decodes a bounded JSON answer. A 404
+// answers notFound.
+func (c *Client) getJSON(ctx context.Context, connection models.JiraConnection, endpoint string, notFound error, what string, target any) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	if err := c.authorize(request, connection); err != nil {
+		return err
+	}
+	response, err := c.httpClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("Jira is unavailable: %w", err)
+	}
+	if err := responseError(response, notFound); err != nil {
+		return err
+	}
+	if err := decodeBounded(response, target); err != nil {
+		return fmt.Errorf("decode %s: %w", what, err)
+	}
+	return nil
 }
 
 func (c *Client) authorize(request *http.Request, connection models.JiraConnection) error {
@@ -298,25 +329,11 @@ func boundedStrings(values []string, count, bytes int, truncated *bool) []string
 // matched by its display name rather than a hard-coded customfield id.
 func (c *Client) customDescription(ctx context.Context, connection models.JiraConnection, version, key string) (string, bool, error) {
 	endpoint := connection.BaseURL + "/rest/api/" + version + "/issue/" + url.PathEscape(key) + "?expand=names&fields=*all"
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return "", false, err
-	}
-	if err := c.authorize(request, connection); err != nil {
-		return "", false, err
-	}
-	response, err := c.httpClient.Do(request)
-	if err != nil {
-		return "", false, err
-	}
-	if err := responseError(response, ErrNotFound); err != nil {
-		return "", false, err
-	}
 	var payload struct {
 		Names  map[string]string          `json:"names"`
 		Fields map[string]json.RawMessage `json:"fields"`
 	}
-	if err := decodeBounded(response, &payload); err != nil {
+	if err := c.getJSON(ctx, connection, endpoint, ErrNotFound, "Jira issue fields", &payload); err != nil {
 		return "", false, err
 	}
 	ids := make([]string, 0, len(payload.Names))
