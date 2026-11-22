@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { Workflow } from 'lucide-react';
 import type { HarnessAgentRole, HarnessEngineId, HarnessRoleHealth, HarnessRoleId, HarnessRoleModel, HarnessSettings as Settings, HarnessSourceKind, HarnessSourceSettings, HarnessStatus, HarnessWorkspaceSettings } from '../../lib/types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -235,11 +235,12 @@ export function HarnessSettings({ client, status, workspaceId, part = 'workspace
 											{row.role === 'coder' ? (
 												<div className="hx-model-pair">
 													<ModelInput label="Easy" value={model.model} onChange={(value) => updateModel(row.role, { model: value })} />
-													<ModelInput label="Hard" value={model.highDifficultyModel} placeholder="Same as Easy" onChange={(value) => updateModel(row.role, { highDifficultyModel: value })} />
-													<details className="hx-explainer">
-														<summary>What counts as hard?</summary>
-														<p>The Planner rates each plan easy or hard. Hard means the plan touches many files, changes how two parts talk to each other, or its check found must-fix items twice. Hard work goes to the stronger model; blank keeps it on the easy one.</p>
-													</details>
+													<ModelInput label="Hard" value={model.highDifficultyModel} placeholder="Same as Easy" onChange={(value) => updateModel(row.role, { highDifficultyModel: value })} aside={(
+														<details className="hx-explainer">
+															<summary>What counts as hard?</summary>
+															<p>The Planner rates each plan easy or hard. Hard means the plan touches many files, changes how two parts talk to each other, or its check found must-fix items twice. Hard work goes to the stronger model; blank keeps it on the easy one.</p>
+														</details>
+													)} />
 												</div>
 											) : <ModelInput label={`${row.name} model for “${row.does}”`} hideLabel value={model.model} onChange={(value) => updateModel(row.role, { model: value })} />}
 										</td>
@@ -392,14 +393,15 @@ function EngineSelect({ value, engines, label, onChange }: { value: HarnessEngin
 	);
 }
 
-function ModelInput({ label, value, placeholder, hideLabel = false, onChange }: { label: string; value: string; placeholder?: string; hideLabel?: boolean; onChange: (model: string) => void }) {
+function ModelInput({ label, value, placeholder, hideLabel = false, aside, onChange }: { label: string; value: string; placeholder?: string; hideLabel?: boolean; aside?: ReactNode; onChange: (model: string) => void }) {
 	const listId = useId();
+	const inputId = useId();
 	return (
-		<label className="hx-model-input">
-			<span className={hideLabel ? 'sr-only' : undefined}>{label}</span>
-			<input value={value} list={listId} title={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value.trim())} />
+		<div className="hx-model-input">
+			<span className={hideLabel ? 'sr-only' : 'hx-model-label'}><label htmlFor={inputId}>{label}</label>{aside}</span>
+			<input id={inputId} value={value} list={listId} title={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value.trim())} />
 			<datalist id={listId}>{modelSuggestions.map((model) => <option key={model} value={model}>{modelLabel(model)}</option>)}</datalist>
-		</label>
+		</div>
 	);
 }
 
