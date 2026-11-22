@@ -5,7 +5,7 @@ import { ApiError, api } from '../../shared/api';
 import { newIdempotencyKey } from '../../shared/api/idempotency';
 import type { ClaudeTranscript, ClaudeTurn, EmbeddedAISessionResult, HarnessRun, HarnessRunDetail, SafeSessionRecord } from '../../lib/types';
 import type { HarnessClient } from '../harness/harnessClient';
-import { LiveTab } from '../harness/RunDrawer';
+import { LiveTab } from '../harness/LiveTab';
 import { RunPlanPanel } from '../harness/RunPlanPanel';
 import { AISessionLaunchControl } from '../ai-session/AISessionLaunchControl';
 import { AgentChip, providerLabel } from '../ai-session/providerDisplay';

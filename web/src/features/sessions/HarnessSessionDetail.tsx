@@ -6,7 +6,7 @@ import type { HarnessClient } from '../harness/harnessClient';
 import { HxStatusBadge } from '../harness/HxStatusBadge';
 import { PipelineStepper } from '../harness/PipelineStepper';
 import { pipelineModel } from '../harness/pipeline';
-import { useAgentTranscript } from '../harness/RunDrawer';
+import { useAgentTranscript } from '../harness/runAgents';
 import { StopRunButton, canStopRun } from '../harness/StopRunButton';
 import { agentRoleLabels, formatCost, formatMinutes, hxStatuses, hxSteps, plural } from '../harness/vocabulary';
 import type { HxStep } from '../harness/vocabulary';
