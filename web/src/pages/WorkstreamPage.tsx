@@ -4,7 +4,7 @@ import { BookmarkPlus, Bot, RotateCw, Search, SlidersHorizontal, Trash2, X } fro
 import { FacetMenu, SelectedFilters } from '../components/FacetMenu';
 import { useModalDialog } from '../components/overlay';
 import { api, statusLabels, statusOrder } from '../shared/api';
-import type { WorkstreamBranchLoadResult, ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
+import type { ItemStatus, ItemSummary, WorkspaceConfig } from '../lib/types';
 import { sourcesShownIn } from '../lib/sources';
 import { emptyFilters, filterPlans, sourceFacetOptions, sourceLabel } from '../features/workstream/filtering';
 import type { FacetOption, FilterKey, Filters } from '../features/workstream/filtering';
@@ -31,12 +31,12 @@ import { NewWorkItemDialog } from '../features/workstream/NewWorkItemDialog';
 import { SourceItemsDialog } from '../features/workstream/SourceItemsDialog';
 import { useSavedFilters } from '../features/workstream/useSavedFilters';
 import { useBoardDrag } from '../features/workstream/useBoardDrag';
-import { useWorkspaceGuard } from '../features/workstream/useWorkspaceGuard';
 import '../features/harness/harness.css';
 import '../features/workstream/harnessCards.css';
 import { ModalLayer } from '../components/ModalLayer';
 import { type NewWorkItemDraft } from '../features/workstream/newWorkItem';
 import { useBoardView } from '../features/workstream/useBoardView';
+import { useWorkstreamCheckout } from '../features/workstream/useWorkstreamCheckout';
 import { useWorkspaceGitInfo } from '../features/workstream/useWorkspaceGitInfo';
 import { boardKinds, boardLayouts, taskColumnLabels, taskStartColumn } from '../features/workstream/boardPreferences';
 import { unique } from '../features/workstream/workstreamUtils';
@@ -61,10 +61,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 }) {
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [query, setQuery] = useState('');
-  const [items, setPlans] = useState<ItemSummary[]>([]);
-  const [loading, setLoading] = useState(true);
-  const loadedWorkspaceRef = useRef<string | undefined>(undefined);
-  const [error, setError] = useState('');
+  const checkout = useWorkstreamCheckout(workspace, refreshKey);
+  const { items, setItems, loading, error, setError, selectedBranch, branchContext, track } = checkout;
   const [scanState, setScanState] = useState('');
   const [openFacet, setOpenFacet] = useState<FilterKey | ''>('');
   const { savedFilters, saveFilterOpen, setSaveFilterOpen, saveFilterName, setSaveFilterName, saveCurrentFilter, applySavedFilter, deleteSavedFilter } = useSavedFilters({ workspaceId: workspace?.id, filters, query, setFilters, setQuery });
@@ -74,12 +72,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const [newItemSeed, setNewItemSeed] = useState<Partial<NewWorkItemDraft>>();
   const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(() => new Set());
   const [createdItemId, setCreatedItemId] = useState('');
-  // Holds a just-created item until a reload reports it, so a rescan that has
-  // not caught up yet cannot make the new card flash and vanish.
-  const pendingCreatedItemRef = useRef<ItemSummary | null>(null);
   const { gitStatus: workspaceGitStatus, currentBranch: workspaceBranchCurrent, branches: workspaceBranchList } = useWorkspaceGitInfo(workspace?.id);
-  const [selectedBranch, setSelectedBranch] = useState('');
-  const [branchContext, setBranchContext] = useState<WorkstreamBranchLoadResult | null>(null);
   const { byItem: itemAgents, reload: reloadItemAgents } = useItemSessions(workspace?.id, selectedBranch);
   const harness = useBoardHarness();
   const harnessOn = Boolean(harness.state.loaded && harness.state.status?.enabled && harness.state.status.storageSupported);
@@ -125,72 +118,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 	// Every asynchronous board workflow is scoped to this generation. A route
 	// change/unmount invalidates outstanding responses before they can paint a
 	// different workspace.
-	const track = useWorkspaceGuard(workspace?.id);
-	const checkoutAbortRef = useRef<AbortController | undefined>(undefined);
-	useEffect(() => () => checkoutAbortRef.current?.abort(), [workspace?.id]);
   const text = query;
-
-  const withPendingCreated = (loaded: ItemSummary[]) => {
-    const pending = pendingCreatedItemRef.current;
-    if (!pending) return loaded;
-    if (loaded.some((candidate) => candidate.id === pending.id)) {
-      pendingCreatedItemRef.current = null;
-      return loaded;
-    }
-    return [pending, ...loaded];
-  };
-
-  // silent keeps the board on screen while it refreshes, so a background reload
-  // never blanks the columns the user is already looking at.
-  const loadCheckout = async (force = false, { silent = false }: { silent?: boolean } = {}) => {
-    if (!workspace) return;
-		checkoutAbortRef.current?.abort();
-		const controller = new AbortController();
-		checkoutAbortRef.current = controller;
-		const workspaceID = workspace.id;
-		const active = track(workspaceID);
-    if (!silent) setLoading(true);
-    setError('');
-    try {
-      const result = await api.loadWorkstreamCheckout(workspace.id, { force }, controller.signal);
-			if (controller.signal.aborted || !active()) return;
-      setBranchContext(result);
-      setSelectedBranch(result.branch);
-      setPlans(withPendingCreated(result.items));
-    } catch (err) {
-			if (controller.signal.aborted) return;
-      try {
-        const fallbackItems = await api.items(new URLSearchParams({ workspaceId: workspace.id }), controller.signal);
-			if (controller.signal.aborted || !active()) return;
-        setBranchContext(null);
-        setSelectedBranch(workspace.baselineBranch);
-        setPlans(fallbackItems);
-        setError('');
-      } catch {
-			if (controller.signal.aborted || !active()) return;
-        setError(err instanceof Error ? err.message : 'Failed to load checkout');
-        setPlans([]);
-      }
-    } finally {
-		if (!controller.signal.aborted && active()) setLoading(false);
-		if (checkoutAbortRef.current === controller) checkoutAbortRef.current = undefined;
-    }
-  };
-
-  useEffect(() => {
-    if (!workspace) {
-      setPlans([]);
-      setBranchContext(null);
-      setSelectedBranch('');
-      setLoading(false);
-      return;
-    }
-    // A refreshKey bump is the app refreshing (on window focus, among others),
-    // not a new board: reload the same workspace silently so the cards stay.
-    const sameWorkspace = loadedWorkspaceRef.current === workspace.id;
-    loadedWorkspaceRef.current = workspace.id;
-    void loadCheckout(false, { silent: sameWorkspace });
-  }, [workspace?.id, refreshKey]);
 
   useEffect(() => {
     if (!focusedItemId || loading) return;
@@ -281,11 +209,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const scan = async () => {
     if (!workspace) return;
-		checkoutAbortRef.current?.abort();
-		const controller = new AbortController();
-		checkoutAbortRef.current = controller;
+		const { controller, active, finish } = checkout.begin();
 		const workspaceID = workspace.id;
-		const active = track(workspaceID);
     // On the Tasks board, Refresh also asks the workspace's sources (Jira) at once, rather than at the next poll.
     const pollScouts = tasksShown && harnessOn ? harness.client.pollScouts : undefined;
     setScanState(pollScouts ? 'Checking Jira' : 'Refreshing');
@@ -297,29 +222,24 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 			if (controller.signal.aborted || !active()) return;
       notifyReliabilityChanged();
       setScanState(polled || `${result.itemCount} items indexed`);
-      setBranchContext(result);
-      setSelectedBranch(result.branch);
-      setPlans(result.items);
+      checkout.apply(result);
       onWorkspacesChanged();
     } catch (err) {
 		if (!controller.signal.aborted && active()) setScanState(err instanceof Error ? err.message : 'Refresh failed');
 	} finally {
-		if (checkoutAbortRef.current === controller) checkoutAbortRef.current = undefined;
+		finish();
     }
   };
 
   const reloadPlans = async (options?: { silent?: boolean }) => {
     if (!workspace) return;
-    await loadCheckout(false, options);
+    await checkout.loadCheckout(false, options);
   };
 
   // Show the new card on the board rather than jumping to the detail page.
   // The refresh is silent so the columns never blank out.
   const showCreatedItem = (item: ItemSummary) => {
-    pendingCreatedItemRef.current = item;
-    setPlans((current) => current.some((candidate) => candidate.id === item.id)
-      ? current.map((candidate) => (candidate.id === item.id ? { ...candidate, ...item } : candidate))
-      : [item, ...current]);
+    checkout.rememberCreated(item);
     setCreatedItemId(item.id);
     // A new work item is a plan: show the board that holds it.
     if (tasksShown) setBoardKind('plans');
@@ -335,17 +255,17 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 		const workspaceID = workspace?.id;
 		const active = track(workspaceID);
     setError('');
-    setPlans((current) => applyItemStatus(current, itemId, status));
+    setItems((current) => applyItemStatus(current, itemId, status));
     setPendingItemIds((current) => new Set(current).add(itemId));
     try {
 		const result = await api.updateStatus(itemId, { status, expectedRevision: item.metadataRevision });
 			if (!active()) return;
-      setPlans((current) => current.map((candidate) => candidate.id === itemId ? { ...candidate, ...result.item } : candidate));
+      setItems((current) => current.map((candidate) => candidate.id === itemId ? { ...candidate, ...result.item } : candidate));
       notifyReliabilityChanged();
       await onWorkspacesChanged();
     } catch (err) {
 			if (!active()) return;
-      setPlans((current) => current.map((candidate) => (
+      setItems((current) => current.map((candidate) => (
         candidate.id === itemId && candidate.status === status ? { ...candidate, status: previousStatus } : candidate
       )));
       setError(err instanceof Error ? err.message : 'Status update failed');
@@ -393,7 +313,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
         {harnessOn ? <ViewSwitcher label="Show on the board" options={boardKinds} value={shownKind} onChange={setBoardKind} /> : <span />}
         {workspace && (
           <div className="workspace-context" aria-label="Workspace context">
-            <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} gitStatus={workspaceGitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await loadCheckout(true); await onWorkspacesChanged(); }} />
+            <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={currentBranch} branches={branchOptions} gitStatus={workspaceGitStatus} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" onSwitched={async () => { await checkout.loadCheckout(true); await onWorkspacesChanged(); }} />
             {onOpenReview && <button className="secondary" type="button" onClick={onOpenReview}>Review branch</button>}
             {sourcesShownIn(workspace, 'workstream').slice(0, 3).map((directory) => (
               <span key={directory}>{directory}</span>
