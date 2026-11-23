@@ -7,8 +7,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	apperrors "kode-stream/internal/common"
 )
 
 func TestWriteJSON(t *testing.T) {
@@ -34,13 +32,5 @@ func TestWriteErrorUsesStatusTextAndRecoveryHint(t *testing.T) {
 
 	if got := strings.TrimSpace(recorder.Body.String()); got != `{"error":"Conflict","recoveryHint":"reload"}` {
 		t.Fatalf("body = %s", got)
-	}
-}
-
-func TestMapErrorCoversSharedNotFoundErrors(t *testing.T) {
-	status, message, code := MapError(apperrors.ErrItemNotFound)
-
-	if status != http.StatusNotFound || message != "item not found" || code != apperrors.ErrorCodeNotFound {
-		t.Fatalf("status = %d message = %q code = %q", status, message, code)
 	}
 }

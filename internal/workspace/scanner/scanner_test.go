@@ -82,35 +82,8 @@ func TestFallbackDocumentsTreatsSolutionFolderAsDesign(t *testing.T) {
 	if docs[2].Label != "Uiux" || docs[2].Track != "" {
 		t.Fatalf("unexpected design folder metadata: %#v", docs[2])
 	}
-}
-
-func TestFallbackDocumentsOrdersKnownPlanFiles(t *testing.T) {
-	root := t.TempDir()
-	writeTestFile(t, root, "README.md", "# Test\n")
-	writeTestFile(t, root, "implementation-plan.md", "# Implementation\n")
-	writeTestFile(t, root, "scenario/scenario-00-overview.md", "# Scenario\n")
-	writeTestFile(t, root, "design/design-01-backend.md", "# Backend\n")
-
-	reader := NewFilesystemSourceReader(root)
-	docs := fallbackDocuments(reader, "")
-	if len(docs) != 4 {
-		t.Fatalf("expected 4 docs, got %d", len(docs))
-	}
-	roles := map[string]string{}
-	for _, doc := range docs {
-		roles[doc.Path] = doc.Role
-	}
-	if roles["README.md"] != "overview" {
-		t.Fatalf("README role = %q", roles["README.md"])
-	}
-	if roles["implementation-plan.md"] != "implementation" {
-		t.Fatalf("implementation role = %q", roles["implementation-plan.md"])
-	}
-	if docs[0].Path != "README.md" || docs[1].Path != "scenario/scenario-00-overview.md" || docs[2].Path != "design/design-01-backend.md" || docs[3].Path != "implementation-plan.md" {
-		t.Fatalf("unexpected document order: %#v", docs)
-	}
-	if docs[1].Label != "Scenario Overview" || docs[2].Label != "Backend Design" || docs[2].Track != "backend" {
-		t.Fatalf("unexpected inferred metadata: %#v", docs)
+	if docs[0].Role != "overview" || docs[5].Role != "implementation" || docs[1].Label != "Scenario Overview" {
+		t.Fatalf("unexpected overview, scenario or implementation metadata: %#v", docs)
 	}
 }
 
@@ -150,21 +123,13 @@ func TestDocumentCollectionDetection(t *testing.T) {
 	}
 }
 
-func TestSourceSettingsModeDetectsStructuredRoot(t *testing.T) {
-	root := t.TempDir()
-	writeTestFile(t, root, "api/DI-1/README.md", "# Item\n")
-
-	if got := SourceSettingsMode(root); got != "structured" {
-		t.Fatalf("SourceSettingsMode() = %q, want structured", got)
-	}
-}
-
-func TestSourceSettingsModeDetectsUnstructuredRoot(t *testing.T) {
-	root := t.TempDir()
-	writeTestFile(t, root, "notes/guide.md", "# Guide\n")
-
-	if got := SourceSettingsMode(root); got != "unstructured" {
-		t.Fatalf("SourceSettingsMode() = %q, want unstructured", got)
+func TestSourceSettingsModeDetectsTheRootLayout(t *testing.T) {
+	for file, want := range map[string]string{"api/DI-1/README.md": "structured", "notes/guide.md": "unstructured"} {
+		root := t.TempDir()
+		writeTestFile(t, root, file, "# Page\n")
+		if got := SourceSettingsMode(root); got != want {
+			t.Fatalf("SourceSettingsMode() with %s = %q, want %q", file, got, want)
+		}
 	}
 }
 

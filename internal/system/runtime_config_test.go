@@ -85,31 +85,22 @@ func TestResolveRuntimeConfigCloudRejectsUnimplementedAppOIDC(t *testing.T) {
 	}
 }
 
-func TestValidateCloudRuntimeConfigRequiresDeploymentEnv(t *testing.T) {
-	err := ValidateCloudRuntimeConfig(RuntimeConfig{Mode: models.RuntimeModeCloud})
-	if err == nil {
-		t.Fatal("expected missing cloud env error")
+func TestValidateCloudRuntimeConfigRejectsIncompleteOrUnsafeSettings(t *testing.T) {
+	valid := RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "oauth2_proxy", PublicURL: "https://cloud.example.com", CookieSecret: "secret", AdminUsers: []string{"admin@example.com"}}
+	withAuth := func(mode string) RuntimeConfig { config := valid; config.AuthMode = mode; return config }
+	withProxies := func(cidr string) RuntimeConfig {
+		config := valid
+		config.TrustedProxyCIDRs = []string{cidr}
+		return config
 	}
-}
-
-func TestValidateCloudRuntimeConfigRejectsInvalidAuthMode(t *testing.T) {
-	err := ValidateCloudRuntimeConfig(RuntimeConfig{
-		Mode:         models.RuntimeModeCloud,
-		AuthMode:     "basic",
-		PublicURL:    "https://cloud.example.com",
-		CookieSecret: "secret",
-		AdminUsers:   []string{"admin@example.com"},
-	})
-	if err == nil {
-		t.Fatal("expected invalid auth mode error")
-	}
-}
-
-func TestValidateCloudRuntimeConfigRejectsCatchAllTrustedProxyCIDRs(t *testing.T) {
-	for _, cidr := range []string{"0.0.0.0/0", "::/0"} {
-		config := RuntimeConfig{Mode: models.RuntimeModeCloud, AuthMode: "oauth2_proxy", PublicURL: "https://cloud.example.com", CookieSecret: "secret", AdminUsers: []string{"admin@example.com"}, TrustedProxyCIDRs: []string{cidr}}
+	for name, config := range map[string]RuntimeConfig{
+		"missing deployment settings": {Mode: models.RuntimeModeCloud},
+		"unknown auth mode":           withAuth("basic"),
+		"catch-all IPv4 proxy":        withProxies("0.0.0.0/0"),
+		"catch-all IPv6 proxy":        withProxies("::/0"),
+	} {
 		if err := ValidateCloudRuntimeConfig(config); err == nil {
-			t.Fatalf("catch-all CIDR %q was accepted", cidr)
+			t.Fatalf("%s was accepted", name)
 		}
 	}
 }

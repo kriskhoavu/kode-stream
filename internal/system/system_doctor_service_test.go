@@ -32,31 +32,20 @@ func (r doctorRuntime) CurrentExecutable() (string, error) { return r.executable
 func (r doctorRuntime) ResolvePaths() (Paths, error)       { return Paths{Dir: r.dir}, nil }
 func (r doctorRuntime) CanWriteDir(string) error           { return nil }
 
-func TestDoctorProbesRemoteOnlyOnce(t *testing.T) {
+func TestDoctorProbesTheRemoteOnceAndReportsItsFailure(t *testing.T) {
 	dir := t.TempDir()
 	executable := filepath.Join(dir, "kode-stream")
 	if err := os.WriteFile(executable, []byte("binary"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	git := &countingDoctorGit{}
-	service := &DoctorService{runtime: doctorRuntime{dir: dir, executable: executable}, git: git, getwd: func() (string, error) { return dir, nil }}
-	result := service.Run(Options{Repo: "https://github.com/acme/repo.git"})
-	if !result.OK || git.calls != 1 {
-		t.Fatalf("result=%#v LSRemote calls=%d", result, git.calls)
-	}
-}
-
-func TestDoctorFailingRemoteProbeIsReportedOnceWithFailureExitCode(t *testing.T) {
-	dir := t.TempDir()
-	executable := filepath.Join(dir, "kode-stream")
-	if err := os.WriteFile(executable, []byte("binary"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	git := &countingDoctorGit{err: errors.New("remote unavailable")}
-	service := &DoctorService{runtime: doctorRuntime{dir: dir, executable: executable}, git: git, getwd: func() (string, error) { return dir, nil }}
-	result := service.Run(Options{Repo: "https://github.com/acme/repo.git"})
-	if result.OK || result.ExitCode(false) != 1 || git.calls != 1 || result.Summary.Failed == 0 {
-		t.Fatalf("result=%#v exit=%d calls=%d", result, result.ExitCode(false), git.calls)
+	for _, probeErr := range []error{nil, errors.New("remote unavailable")} {
+		git := &countingDoctorGit{err: probeErr}
+		service := &DoctorService{runtime: doctorRuntime{dir: dir, executable: executable}, git: git, getwd: func() (string, error) { return dir, nil }}
+		result := service.Run(Options{Repo: "https://github.com/acme/repo.git"})
+		failed := probeErr != nil
+		if git.calls != 1 || result.OK == failed || (result.ExitCode(false) == 1) != failed || (result.Summary.Failed > 0) != failed {
+			t.Fatalf("probe error %v: result=%#v exit=%d LSRemote calls=%d", probeErr, result, result.ExitCode(false), git.calls)
+		}
 	}
 }
 

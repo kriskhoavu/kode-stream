@@ -88,19 +88,33 @@ func TestNameStatusSinceTruncatesAt500Entries(t *testing.T) {
 	}
 }
 
-func TestNameStatusSinceRejectsUnknownCommit(t *testing.T) {
+func TestSinceQueriesRejectARefThatIsNotACommit(t *testing.T) {
 	root := newGitRepo(t)
 	writeGitFile(t, root, "base.md", "base\n")
 	gitCommit(t, root, "base")
-
+	head := gitRevParse(t, root, "HEAD")
+	tree := gitRevParse(t, root, head+"^{tree}")
+	const missing = "0000000000000000000000000000000000000000"
 	adapter := New()
-	_, _, err := adapter.NameStatusSince(root, "0000000000000000000000000000000000000000")
-	var unknown *ErrUnknownCommit
-	if !errors.As(err, &unknown) {
-		t.Fatalf("err = %v, want *ErrUnknownCommit", err)
-	}
-	if unknown.Ref != "0000000000000000000000000000000000000000" {
-		t.Fatalf("unknown.Ref = %q", unknown.Ref)
+
+	for _, tc := range []struct {
+		name string
+		ref  string
+		call func() error
+	}{
+		{"name-status from a missing commit", missing, func() error { _, _, err := adapter.NameStatusSince(root, missing); return err }},
+		{"name-status from a tree", "", func() error { _, _, err := adapter.NameStatusSince(root, tree); return err }},
+		{"rev-list count from a missing commit", "", func() error { _, err := adapter.RevListCount(root, missing, head); return err }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var unknown *ErrUnknownCommit
+			if err := tc.call(); !errors.As(err, &unknown) {
+				t.Fatalf("err = %v, want *ErrUnknownCommit", err)
+			}
+			if tc.ref != "" && unknown.Ref != tc.ref {
+				t.Fatalf("unknown.Ref = %q, want %q", unknown.Ref, tc.ref)
+			}
+		})
 	}
 }
 
@@ -329,21 +343,6 @@ func TestDiffFileSinceTruncatesUTF8OnRuneBoundary(t *testing.T) {
 	}
 }
 
-func TestNameStatusSinceRejectsTreeRef(t *testing.T) {
-	root := newGitRepo(t)
-	writeGitFile(t, root, "base.md", "base\n")
-	gitCommit(t, root, "base")
-	head := gitRevParse(t, root, "HEAD")
-	tree := gitRevParse(t, root, head+"^{tree}")
-
-	adapter := New()
-	_, _, err := adapter.NameStatusSince(root, tree)
-	var unknown *ErrUnknownCommit
-	if !errors.As(err, &unknown) {
-		t.Fatalf("err = %v, want *ErrUnknownCommit for a tree ref", err)
-	}
-}
-
 func TestDiffFileSinceRejectsInvalidPath(t *testing.T) {
 	root := newGitRepo(t)
 	writeGitFile(t, root, "a.md", "a\n")
@@ -381,20 +380,6 @@ func TestRevListCountCountsCommitsBetweenRefs(t *testing.T) {
 	}
 	if count != 2 {
 		t.Fatalf("count = %d, want 2", count)
-	}
-}
-
-func TestRevListCountRejectsUnknownCommit(t *testing.T) {
-	root := newGitRepo(t)
-	writeGitFile(t, root, "a.md", "1\n")
-	gitCommit(t, root, "one")
-	head := gitRevParse(t, root, "HEAD")
-
-	adapter := New()
-	_, err := adapter.RevListCount(root, "0000000000000000000000000000000000000000", head)
-	var unknown *ErrUnknownCommit
-	if !errors.As(err, &unknown) {
-		t.Fatalf("err = %v, want *ErrUnknownCommit", err)
 	}
 }
 
