@@ -112,28 +112,18 @@ describe('useAppState runtime context', () => {
     expect(result.current.contentRefreshKey).toBe(acceptedKey);
   });
 
-  it('keeps a newer accepted snapshot when an older request later fails and refreshes on focus', async () => {
-    let calls = 0;
-    vi.stubGlobal('fetch', vi.fn((path: string) => Promise.resolve({ ok: true, json: async () => path === '/api/state' ? { mode: 'cloud', role: calls++ < 2 ? 'editor' : 'viewer', capabilities: { write: true } } : [{ id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', createdAt: '' }] })));
+  it.each(['focus', 'visibilitychange'])('refreshes a visible application on %s', async (event) => {
+    vi.stubGlobal('fetch', vi.fn((path: string) => Promise.resolve({ ok: true, json: async () => path === '/api/state' ? { mode: 'local' } : [{ id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', createdAt: '' }] })));
     const { result } = renderHook(() => useAppState());
     await waitFor(() => expect(result.current.dataStatus).toBe('ready'));
     const key = result.current.contentRefreshKey;
-    await act(async () => { window.dispatchEvent(new Event('focus')); });
+    const descriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+    act(() => { (event === 'focus' ? window : document).dispatchEvent(new Event(event)); });
     await waitFor(() => expect(result.current.contentRefreshKey).toBeGreaterThan(key));
     expect(result.current).toMatchObject({ dataStatus: 'ready', activeRepo: { id: 'ws' } });
+    if (descriptor) Object.defineProperty(document, 'visibilityState', descriptor);
   });
-
-	it('refreshes a visible application after visibility is restored', async () => {
-		vi.stubGlobal('fetch', vi.fn((path: string) => Promise.resolve({ ok: true, json: async () => path === '/api/state' ? { mode: 'local' } : [] })));
-		const { result } = renderHook(() => useAppState());
-		await waitFor(() => expect(result.current.dataStatus).toBe('ready'));
-		const key = result.current.contentRefreshKey;
-		const descriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
-		Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
-		act(() => document.dispatchEvent(new Event('visibilitychange')));
-		await waitFor(() => expect(result.current.contentRefreshKey).toBeGreaterThan(key));
-		if (descriptor) Object.defineProperty(document, 'visibilityState', descriptor);
-	});
 
   it('continues in memory when preference storage throws', async () => {
     const broken = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); }, removeItem: () => { throw new Error('blocked'); } };

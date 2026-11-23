@@ -4,18 +4,14 @@ import type { GitStatus } from '../../lib/types';
 import { BranchCheckoutPicker } from './BranchCheckoutPicker';
 
 describe('BranchCheckoutPicker Git status', () => {
-  it('shows a green icon without visible status text when the checkout is in sync', () => {
-    renderPicker(gitStatus({ upstream: 'origin/main', fetchedAt: new Date().toISOString() }));
+  it.each([
+    ['in sync', 0, 'Git in sync with origin/main', 'is-synced', 'in sync'],
+    ['drifted', 2, 'Git not in sync with origin/main: 2 behind', 'is-not-synced', '2 behind']
+  ])('shows an icon without visible status text when the checkout is %s', (_state, behind, name, className, text) => {
+    renderPicker(gitStatus({ upstream: 'origin/main', behind, fetchedAt: new Date().toISOString() }));
 
-    expect(screen.getByRole('img', { name: 'Git in sync with origin/main' })).toHaveClass('is-synced');
-    expect(screen.queryByText('in sync')).not.toBeInTheDocument();
-  });
-
-  it('shows a warning icon without visible status text when the checkout has drifted', () => {
-    renderPicker(gitStatus({ upstream: 'origin/main', behind: 2, fetchedAt: new Date().toISOString() }));
-
-    expect(screen.getByRole('img', { name: 'Git not in sync with origin/main: 2 behind' })).toHaveClass('is-not-synced');
-    expect(screen.queryByText('2 behind')).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name })).toHaveClass(className);
+    expect(screen.queryByText(text)).not.toBeInTheDocument();
   });
 });
 

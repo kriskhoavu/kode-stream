@@ -90,12 +90,11 @@ describe('Knowledge settings', () => {
 });
 
 describe('inferWorkspaceNameFromRemoteURL', () => {
-  it('infers name from SSH URLs', () => {
-    expect(inferWorkspaceNameFromRemoteURL('git@bitbucket.org:team/kode-stream.git')).toBe('kode-stream');
-  });
-
-  it('infers name from HTTPS URLs', () => {
-    expect(inferWorkspaceNameFromRemoteURL('https://bitbucket.org/team/repo')).toBe('repo');
+  it.each([
+    ['git@bitbucket.org:team/kode-stream.git', 'kode-stream'],
+    ['https://bitbucket.org/team/repo', 'repo']
+  ])('infers the name from %s', (url, name) => {
+    expect(inferWorkspaceNameFromRemoteURL(url)).toBe(name);
   });
 });
 

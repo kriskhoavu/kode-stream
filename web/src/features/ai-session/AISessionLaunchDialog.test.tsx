@@ -221,6 +221,11 @@ describe('AISessionLaunchDialog', () => {
 		render(<AISessionLaunchDialog itemId="item-1" onClose={vi.fn()} onLaunched={vi.fn()} />);
 		fireEvent.click(await screen.findByRole('button', { name: /skills/i }));
 		await screen.findByText('Technical design');
+		fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
+		expect(screen.getByRole('checkbox', { name: /Implementation planning/i })).toBeChecked();
+		expect(screen.getByLabelText('Selected skills')).toHaveTextContent('Implementation planning');
+		expect(screen.getByLabelText('Selected skills')).toHaveTextContent('Technical design');
+		fireEvent.click(screen.getByRole('button', { name: 'Clear' }));
 		fireEvent.change(screen.getByLabelText(/filter skills/i), { target: { value: 'design' } });
 		expect(screen.getByText('Technical design')).toBeInTheDocument();
 		expect(screen.queryByText('Implementation planning')).not.toBeInTheDocument();
@@ -231,29 +236,6 @@ describe('AISessionLaunchDialog', () => {
 		fireEvent.change(screen.getByLabelText(/filter skills/i), { target: { value: '' } });
 		fireEvent.click(screen.getAllByRole('tab', { name: /global/i })[0]);
 		expect(screen.getByText('Test scenarios')).toBeInTheDocument();
-	});
-
-	it('selects all matching capabilities in the active scope at once', async () => {
-		mockOptions();
-		vi.mocked(api.aiProviderCapabilities).mockResolvedValue({
-			provider: 'codex',
-			skills: [
-				capability('implementation-planning', 'Implementation planning'),
-				capability('technical-design', 'Technical design'),
-				capability('test-scenarios', 'Test scenarios', 'global')
-			],
-			agents: [],
-			supportsNativeSelection: false,
-			supportsPromptFallback: true
-		});
-		render(<AISessionLaunchDialog itemId="item-1" onClose={vi.fn()} onLaunched={vi.fn()} />);
-		fireEvent.click(await screen.findByRole('button', { name: /skills/i }));
-		await screen.findByText('Technical design');
-		fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
-		expect(screen.getByRole('checkbox', { name: /Implementation planning/i })).toBeChecked();
-		expect(screen.getByRole('checkbox', { name: /Technical design/i })).toBeChecked();
-		expect(screen.getByLabelText('Selected skills')).toHaveTextContent('Implementation planning');
-		expect(screen.getByLabelText('Selected skills')).toHaveTextContent('Technical design');
 	});
 
 	it('collapses long capability lists until expanded', async () => {

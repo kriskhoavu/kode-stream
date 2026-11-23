@@ -498,19 +498,14 @@ describe('filterPlans', () => {
   ];
   const workspace = { id: 'r1', name: 'Discovery', path: '/repo', baselineBranch: 'main', sources: ['items', 'docs'], createdAt: new Date().toISOString() };
 
-  it('uses OR within a facet', () => {
-    const result = filterPlans(items, { sources: ['items', 'docs'], scopes: [], statuses: [], branches: [], authors: [], workedBy: [] }, '', workspace);
-    expect(result.map((plan) => plan.id)).toEqual(['p1', 'p2']);
-  });
+  const none = { sources: [], scopes: [], statuses: [], branches: [], authors: [], workedBy: [] };
 
-  it('filters by scope', () => {
-    const result = filterPlans(items, { sources: [], scopes: ['api'], statuses: [], branches: [], authors: [], workedBy: [] }, '', workspace);
-    expect(result.map((plan) => plan.id)).toEqual(['p1']);
-  });
-
-  it('uses AND across facets', () => {
-    const result = filterPlans(items, { sources: ['docs'], scopes: ['docs'], statuses: ['unsorted'], branches: [], authors: ['Giang'], workedBy: [] }, '', workspace);
-    expect(result.map((plan) => plan.id)).toEqual(['p2']);
+  it.each([
+    ['uses OR within a facet', { sources: ['items', 'docs'] }, ['p1', 'p2']],
+    ['filters by scope', { scopes: ['api'] }, ['p1']],
+    ['uses AND across facets', { sources: ['docs'], scopes: ['docs'], statuses: ['unsorted'], authors: ['Giang'] }, ['p2']]
+  ])('%s', (_name, facets, ids) => {
+    expect(filterPlans(items, { ...none, ...facets }, '', workspace).map((plan) => plan.id)).toEqual(ids);
   });
 });
 

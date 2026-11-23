@@ -141,28 +141,23 @@ describe('WorkstreamPage with the harness', () => {
 		expect(await screen.findByTitle('Configure source items')).toBeInTheDocument();
 	});
 
-	it('lists what needs you above the board and approves from there', async () => {
+	it.each([
+		['approves', { decision: 'approve' }, (strip: HTMLElement) => {
+			expect(within(strip).getByText('waits for you to approve the plan for it · Three steps, one file.')).toBeInTheDocument();
+			fireEvent.click(within(strip).getByRole('button', { name: 'Approve' }));
+		}],
+		['asks for changes with a reason', { decision: 'reject', reason: 'Split the second step.' }, (strip: HTMLElement) => {
+			fireEvent.click(within(strip).getByRole('button', { name: 'Ask for changes' }));
+			fireEvent.change(within(strip).getByLabelText('What should change?'), { target: { value: 'Split the second step.' } });
+			fireEvent.click(within(strip).getByRole('button', { name: 'Send' }));
+		}]
+	])('lists what needs you above the board and %s from there', async (_action, expected, decide) => {
 		const fetchMock = stubBoard();
 		renderBoard();
-		const strip = await screen.findByRole('region', { name: /Needs you/ });
-		expect(within(strip).getByText('waits for you to approve the plan for it · Three steps, one file.')).toBeInTheDocument();
-		expect(within(strip).getByRole('button', { name: 'Ask for changes' })).toBeInTheDocument();
-		fireEvent.click(within(strip).getByRole('button', { name: 'Approve' }));
+		decide(await screen.findByRole('region', { name: /Needs you/ }));
 		await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/api/harness/approvals/a-3/decide' && init?.method === 'POST')).toBe(true));
 		const body = JSON.parse(String(fetchMock.mock.calls.find(([url]) => String(url) === '/api/harness/approvals/a-3/decide')?.[1]?.body));
-		expect(body.decision).toBe('approve');
-	});
-
-	it('asks for changes with a reason', async () => {
-		const fetchMock = stubBoard();
-		renderBoard();
-		const strip = await screen.findByRole('region', { name: /Needs you/ });
-		fireEvent.click(within(strip).getByRole('button', { name: 'Ask for changes' }));
-		fireEvent.change(within(strip).getByLabelText('What should change?'), { target: { value: 'Split the second step.' } });
-		fireEvent.click(within(strip).getByRole('button', { name: 'Send' }));
-		await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/api/harness/approvals/a-3/decide' && init?.method === 'POST')).toBe(true));
-		const body = JSON.parse(String(fetchMock.mock.calls.find(([url]) => String(url) === '/api/harness/approvals/a-3/decide')?.[1]?.body));
-		expect(body).toMatchObject({ decision: 'reject', reason: 'Split the second step.' });
+		expect(body).toMatchObject(expected);
 	});
 
 	it('offers the Worked by facet and narrows the board with it', async () => {
@@ -184,6 +179,8 @@ describe('WorkstreamPage with the harness', () => {
 		expect(screen.queryByText('By hand')).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: /Worked by/ })).not.toBeInTheDocument();
 		expect(screen.queryByRole('region', { name: /Needs you/ })).not.toBeInTheDocument();
+		expect(screen.queryByRole('group', { name: 'Show on the board' })).not.toBeInTheDocument();
+		expect(screen.getByRole('group', { name: 'Board view' })).toBeInTheDocument();
 	});
 });
 
@@ -240,14 +237,6 @@ describe('WorkstreamPage board views', () => {
 		await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url) === `/api/harness/tasks/${found.id}/start` && init?.method === 'POST')).toBe(true));
 		fireEvent.click(within(side).getByRole('button', { name: 'Look now' }));
 		await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url) === '/api/harness/scout/poll' && init?.method === 'POST')).toBe(true));
-	});
-
-	it('shows only the plans while the harness is off, still as a Board or a List', async () => {
-		stubBoard({ enabled: false });
-		renderBoard();
-		await screen.findByText('Quiet card');
-		expect(screen.queryByRole('group', { name: 'Show on the board' })).not.toBeInTheDocument();
-		expect(screen.getByRole('group', { name: 'Board view' })).toBeInTheDocument();
 	});
 });
 
