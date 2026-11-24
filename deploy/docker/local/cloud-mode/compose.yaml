@@ -11,6 +11,8 @@ services:
     environment:
       KODE_STREAM_MODE: cloud
       KODE_STREAM_AUTH_MODE: oauth2_proxy
+      # Docker's default address pools. The app trusts identity headers only from these.
+      KODE_STREAM_TRUSTED_PROXY_CIDRS: ${KODE_STREAM_TRUSTED_PROXY_CIDRS:-172.16.0.0/12,192.168.0.0/16}
       KODE_STREAM_PORT: "4317"
       KODE_STREAM_BIND_ADDR: 0.0.0.0
       KODE_STREAM_DATA_DIR: /var/lib/kode-stream
