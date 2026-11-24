@@ -96,7 +96,6 @@ services:
       OAUTH2_PROXY_PASS_USER_HEADERS: "true"
       OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
       OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
-      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
       OAUTH2_PROXY_REDEEM_REFRESH: "true"
       OAUTH2_PROXY_UPSTREAMS: http://kode-stream:4317/
       OAUTH2_PROXY_REDIRECT_URL: http://kode-stream.localhost:4318/oauth2/callback

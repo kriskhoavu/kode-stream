@@ -37,6 +37,8 @@ Expose OAuth2Proxy and keep the app port private. Point OAuth2Proxy at Keycloak 
 3. Skip login for `GET /api/health`, `GET /api/agents/channel` and `POST /api/workspaces/from-agent`. The agent
    authenticates those with its token.
 4. Allow WebSocket upgrade on `/api/agents/channel`, with a long idle timeout.
+5. Leave the `Authorization` header alone. `--pass-authorization-header` replaces the agent's token on
+   `POST /api/workspaces/from-agent`, and the app then answers 401.
 
 Kode Stream never validates access tokens. It trusts identity headers only from the trusted proxy CIDRs. Direct access
 to the app port bypasses login. Use it only for local smoke tests.
