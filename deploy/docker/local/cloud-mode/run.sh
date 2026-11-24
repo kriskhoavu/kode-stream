@@ -43,7 +43,7 @@ wait_for_health() {
 # Signs the token the way the server does: the user ID is the subject's hash, the cookie secret is the HMAC key.
 generate_agent_token() {
   python3 - "$COOKIE_SECRET" "$ADMIN_SUBJECT" "$ADMIN_EMAIL" "$AGENT_NAME" "$AGENT_PLATFORM" <<'PY'
-import base64, datetime, hashlib, hmac, json, sys
+import base64, datetime, hashlib, hmac, json, secrets, sys
 
 secret, subject, email, name, platform = sys.argv[1:6]
 
@@ -56,6 +56,8 @@ def stable_id(value: str) -> str:
 user_id = stable_id(subject)
 expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=30)
 token = {
+    "id": raw_urlsafe(secrets.token_bytes(24)),
+    "workspacePublicationId": raw_urlsafe(secrets.token_bytes(24)),
     "userId": user_id,
     "userEmail": email,
     "agentId": stable_id(f"{user_id}:{name}"),
