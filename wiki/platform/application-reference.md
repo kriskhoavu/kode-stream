@@ -34,7 +34,7 @@ Large surfaces may load lazily, but the production build still reports a large m
 <!-- chunkId: platform-application-reference-release -->
 <!-- keywords: GitHub release, darwin, linux, windows, checksum -->
 
-[live] A tagged release builds macOS arm64 and amd64, Linux amd64 and Windows amd64 artifacts and publishes checksums. Evidence: `.github/workflows/release.yml:142`.
+[live] A tagged release builds macOS arm64 and amd64, Linux amd64 and Windows amd64 artifacts and publishes checksums. Evidence: `.github/workflows/release.yml:133`.
 
 Each binary includes the frontend. Release CI checks the lockfile's registry origin and exercises the local and cloud database paths before it packages.
 
