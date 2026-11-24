@@ -2,8 +2,7 @@
 
 First-time tap setup. Releases follow [release.md](release.md).
 
-1. Create the tap. The name must be `homebrew-<name>`, so `brew tap kriskhoavu/tap` resolves to
-   `kriskhoavu/homebrew-tap`:
+1. Create the tap. Homebrew maps `brew tap kriskhoavu/tap` to the repository `kriskhoavu/homebrew-tap`:
 
    ```bash
    gh repo create kriskhoavu/homebrew-tap --public --description "Homebrew tap for kode-stream"
@@ -17,7 +16,7 @@ First-time tap setup. Releases follow [release.md](release.md).
    cp cmd/scripts/distribution/kode-stream.rb homebrew-tap/Formula/kode-stream.rb
    ```
 
-   The template has placeholder checksums and `v0.0.0` URLs. `kode-stream.rb` must declare `class KodeStream`.
+   The template has placeholder checksums and `v0.0.0` URLs. The file `kode-stream.rb` must declare `class KodeStream`.
 
 3. Publish a release ([release.md](release.md) step 1), then point the tap at it:
 
@@ -33,7 +32,7 @@ First-time tap setup. Releases follow [release.md](release.md).
    brew audit --strict --formula kriskhoavu/tap/kode-stream
    ```
 
-To test formula edits before pushing, commit them, then tap the local checkout:
+To test formula edits before you push, commit them and tap the local checkout:
 
 ```bash
 brew tap kriskhoavu/localtest /path/to/homebrew-tap
@@ -41,5 +40,5 @@ brew install kriskhoavu/localtest/kode-stream
 brew untap kriskhoavu/localtest
 ```
 
-The tap carries only `kode-stream.rb`. Deleting a formula breaks `brew upgrade` for its users. Prefer `deprecate!`
-with a migration note.
+The tap carries only `kode-stream.rb`. Deleting a formula breaks `brew upgrade` for its users. Use `deprecate!` with a
+migration note instead.

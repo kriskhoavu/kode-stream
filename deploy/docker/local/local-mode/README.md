@@ -2,13 +2,13 @@
 
 Runs Kode Stream in Local mode inside Docker on `127.0.0.1:4317`. A host directory is mounted at `/workspace`.
 
-| Storage             | Command                                          | App state                                    |
-|---------------------|--------------------------------------------------|----------------------------------------------|
-| `datadir` (default) | `make up`                                        | YAML and JSONL in the `kode-stream-local-data` volume |
-| `database`          | `KODE_STREAM_STORAGE_OPTION=database make up`    | SQLite in the same volume                    |
+| Storage             | Command                                       | App state                                             |
+|---------------------|-----------------------------------------------|-------------------------------------------------------|
+| `datadir` (default) | `make up`                                     | YAML and JSONL in the `kode-stream-local-data` volume |
+| `database`          | `KODE_STREAM_STORAGE_OPTION=database make up` | SQLite in the same volume                             |
 
 `make up` runs `run.sh`, which validates the storage option and the mount first. Switching the option does not move
-state. Use the app's storage sync first if you need to keep it. See the
+state. To keep it, run the app's storage sync first. See the
 [storage reference](../../../../wiki/platform/storage-reference.md).
 
 ## Workspace Mount
@@ -20,6 +20,7 @@ KODE_STREAM_LOCAL_WORKSPACE=/absolute/path/to/repository make up
 ```
 
 Register `/workspace` or a subdirectory in the app. The container needs write access to it for edits and Git.
+`KODE_STREAM_LOCAL_PORT` changes the host port.
 
 ## Container Limits
 

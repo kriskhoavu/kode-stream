@@ -25,17 +25,11 @@ jobs:
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: |
-          if [[ -n "$MACOS_CERT_P12_BASE64" && -n "$MACOS_CERT_P12_PASSWORD" && -n "$MACOS_CODESIGN_IDENTITY" ]]; then
-            echo "macos_enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "macos_enabled=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          if [[ -n "$WINDOWS_CERT_PFX_BASE64" && -n "$WINDOWS_CERT_PASSWORD" ]]; then
-            echo "windows_enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "windows_enabled=false" >> "$GITHUB_OUTPUT"
-          fi
+          macos=false windows=false
+          [[ -n "$MACOS_CERT_P12_BASE64" && -n "$MACOS_CERT_P12_PASSWORD" && -n "$MACOS_CODESIGN_IDENTITY" ]] && macos=true
+          [[ -n "$WINDOWS_CERT_PFX_BASE64" && -n "$WINDOWS_CERT_PASSWORD" ]] && windows=true
+          echo "macos_enabled=$macos" >> "$GITHUB_OUTPUT"
+          echo "windows_enabled=$windows" >> "$GITHUB_OUTPUT"
 
   verify:
     runs-on: ubuntu-latest
@@ -68,10 +62,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      # A lockfile generated behind an internal mirror pins every tarball to
-      # that host: the build then fails wherever the mirror is unreachable, and
-      # the host and the whole dependency list are published with it. Allowlist
-      # rather than denylist, so a mirror nobody thought to name still fails.
+      # Allowlist, not denylist: a lockfile from any private mirror fails here, named or not.
       - name: Lockfile resolves only from the public registry
         run: |
           hosts=$(grep -o '"resolved": "https://[^/"]*' package-lock.json \
@@ -179,11 +170,9 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          mkdir -p dist
           BIN_NAME="kode-stream"
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            BIN_NAME="kode-stream.exe"
-          fi
+          [ "${{ matrix.goos }}" = "windows" ] && BIN_NAME="kode-stream.exe"
+          mkdir -p dist
           go build -trimpath -ldflags "-s -w" -o "dist/${BIN_NAME}" ./cmd/kode-stream
 
       - name: Package artifact

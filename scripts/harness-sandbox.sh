@@ -1,17 +1,4 @@
 #!/usr/bin/env bash
-# Builds a small sandbox for trying the harness's pipeline end to end without
-# an issue tracker or a pull request:
-#
-#   <dir>/repo        the workspace: a tiny Go module, origin = remote.git
-#   <dir>/remote.git  a local bare remote; hand-off pushes feature/* here
-#   <dir>/tasks       the local task folder; one Markdown file per task
-#
-# Usage:
-#   scripts/harness-sandbox.sh init [dir]   create the sandbox and SANDBOX-1
-#   scripts/harness-sandbox.sh next [dir]   reset the sandbox, add the next task
-#   scripts/harness-sandbox.sh status [dir] print the paths and the settings
-#
-# dir defaults to $HARNESS_SANDBOX, else ~/kode-stream-sandbox.
 set -euo pipefail
 
 command="${1:-}"
@@ -21,12 +8,23 @@ remote="$dir/remote.git"
 tasks="$dir/tasks"
 
 usage() {
-	sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+	cat <<'EOF'
+Builds a sandbox for trying the harness pipeline without an issue tracker or a pull request:
+
+  <dir>/repo        the workspace: a tiny Go module, origin = remote.git
+  <dir>/remote.git  a local bare remote; hand-off pushes feature/* here
+  <dir>/tasks       the local task folder; one Markdown file per task
+
+Usage:
+  scripts/harness-sandbox.sh init [dir]   create the sandbox and SANDBOX-1
+  scripts/harness-sandbox.sh next [dir]   reset the sandbox, add the next task
+  scripts/harness-sandbox.sh status [dir] print the paths and the settings
+
+dir defaults to $HARNESS_SANDBOX, else ~/kode-stream-sandbox.
+EOF
 	exit "${1:-0}"
 }
 
-# The task every round asks for. Small enough for one plan and one build,
-# with a test the Test step runs and room to ask for a change at Review.
 write_task() {
 	local key="$1"
 	cat >"$tasks/$key.md" <<EOF
@@ -117,9 +115,7 @@ EOF
 	status
 }
 
-# next puts the checkout back on the first commit, drops every branch a run
-# left, and adds a fresh task: a finished task never reopens, so each try
-# needs a new key.
+# A finished task never reopens, so each reset adds a task with a new key.
 next() {
 	[ -d "$repo/.git" ] || { echo "No sandbox at $dir. Run 'init' first." >&2; exit 1; }
 	git -C "$repo" worktree prune

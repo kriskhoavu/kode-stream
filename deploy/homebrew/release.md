@@ -1,7 +1,6 @@
 # Homebrew Release Procedure
 
-Publish a GitHub release through CI, point `kriskhoavu/homebrew-tap` at it, and check the formula installs before
-anyone else gets it.
+Publish a GitHub release through CI, point `kriskhoavu/homebrew-tap` at it, and check that the formula installs.
 
 ## Prerequisites
 
@@ -11,7 +10,7 @@ anyone else gets it.
 
 ## Preflight
 
-CI builds on Linux. Each check guards a known release failure.
+CI builds on Linux. Each check below guards a known release failure.
 
 ```bash
 go test ./... -count=3 -race   # catches timing tests that pass only on macOS
@@ -20,8 +19,8 @@ grep -o '"resolved": "https://[^/"]*' package-lock.json | sort -u  # must be reg
 git ls-files --error-unmatch package-lock.json                     # must be tracked
 ```
 
-CI installs with `npm ci` and caches with `setup-node`, so the lockfile must be committed and resolve from the public
-registry. If your `~/.npmrc` points at a private registry, regenerate the lockfile in a clean directory:
+CI installs with `npm ci`, so the lockfile must be committed and resolve from the public registry. If your `~/.npmrc`
+points at a private registry, regenerate the lockfile in a clean directory:
 
 ```bash
 mkdir /tmp/lockgen && cp package.json /tmp/lockgen/ && cd /tmp/lockgen
@@ -34,7 +33,7 @@ Regenerating in place fails with `Cannot read properties of null (reading 'edges
 
 ## 1. Publish The Release
 
-The tag push triggers `.github/workflows/release.yml`. It runs `verify`, builds darwin arm64 and amd64, linux amd64 and
+The tag push starts `.github/workflows/release.yml`. It runs `verify`, builds darwin arm64 and amd64, linux amd64 and
 windows amd64, writes `SHA256SUMS` and publishes.
 
 ```bash
@@ -50,10 +49,10 @@ To retry after a fix, move the tag:
 git push origin :refs/tags/v<version> && git tag -d v<version>   # then tag and push again
 ```
 
-`gh workflow run release.yml --ref main` runs `verify` and `build` without a tag. `publish` needs the tag.
+`gh workflow run release.yml --ref master` runs `verify` and `build` without a tag. `publish` needs the tag.
 
-Signing runs only when the `MACOS_CERT_*` or `WINDOWS_CERT_*` secrets exist. They do not, so binaries are unsigned and
-macOS shows a Gatekeeper prompt on first run.
+Signing runs only when the `MACOS_*` or `WINDOWS_CERT_*` secrets exist. They do not, so the binaries are unsigned. macOS
+shows a Gatekeeper prompt on first run.
 
 ## 2. Verify The Release
 
@@ -72,9 +71,8 @@ tar -xzf kode-stream_<version>_darwin_arm64.tar.gz && ./kode-stream   # prints U
 cmd/scripts/distribution/update_homebrew_formula_from_release.sh <version> ../homebrew-tap
 ```
 
-The script downloads `SHA256SUMS`, rewrites the formula with `update_formula.py`, commits and pushes. It rewrites the
-version in every URL and all checksums together. It fails if an asset is missing, the formula is unchanged, or any URL
-stays on another version.
+The script downloads `SHA256SUMS`, rewrites every URL version and checksum with `update_formula.py`, commits and pushes.
+It fails if an asset is missing, the formula is unchanged, or any URL stays on another version.
 
 ## 4. Validate The Formula
 
@@ -86,35 +84,32 @@ brew audit --strict --formula kriskhoavu/tap/kode-stream   # must exit 0
 kode-stream doctor
 ```
 
-The formula has no `version` line, because the audit rejects it as redundant. So URLs carry the version literally.
-`desc` stays under 80 characters and does not start with the formula name.
+The audit rejects a `version` line as redundant, so the URLs carry the version literally. `desc` stays under 80
+characters and does not start with the formula name.
 
 ## Fallback Without CI
 
-`cmd/scripts/distribution/release_and_update_tap.sh <version> ../homebrew-tap` builds every target locally and uploads
-with `--clobber`. Use it only when Actions is down. If the tag push also started the workflow, let it finish or cancel
-it first, or the tap may carry checksums from the losing build.
+Use `cmd/scripts/distribution/release_and_update_tap.sh <version> ../homebrew-tap` only when Actions is down. It builds
+every target locally and uploads with `--clobber`. If the tag push also started the workflow, let it finish or cancel
+it first. Otherwise the tap may carry checksums from the losing build.
 
 ## Troubleshooting
 
-| Error                                         | Cause and fix                                                                                  |
-|-----------------------------------------------|------------------------------------------------------------------------------------------------|
-| `Dependencies lock file is not found`         | `package-lock.json` is not committed. Commit it. Do not switch CI to `npm install`              |
-| `npm error Exit handler never called!`        | Read the debug log it names. A lockfile from a private mirror shows as `ENOTFOUND` errors. On Node 20 the step passes and the build later fails with `Cannot find module 'react'`, so CI pins Node 22 |
-| Tests pass on macOS, fail in CI               | A test asserts a guarantee at the wrong layer, or shutdown does not wait for its goroutines. Reproduce with `-count=3 -race` |
-| Every install fails its checksum              | A URL stayed on the old version. `update_formula.py` refuses this. Always run step 4           |
-| `No available formula ... Did you mean ...?`  | A stale tap clone. `brew untap kriskhoavu/tap` and reinstall                                    |
-| `Homebrew requires formulae to be in a tap`   | Tap a local checkout: `brew tap kriskhoavu/localtest /path/to/homebrew-tap`. Commit first      |
-| `SHA256SUMS` returns 404                      | The workflow failed or is still running                                                        |
+| Error                                        | Cause and fix                                                                                                                       |
+|----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `Dependencies lock file is not found`        | `package-lock.json` is not committed. Commit it. Do not switch CI to `npm install`                                                  |
+| `npm error Exit handler never called!`       | A private-mirror lockfile. The debug log shows `ENOTFOUND`. Node 20 hides it until `Cannot find module 'react'`, so CI pins Node 22 |
+| Tests pass on macOS, fail in CI              | A test asserts at the wrong layer, or shutdown skips its goroutines. Reproduce with `-count=3 -race`                                |
+| Every install fails its checksum             | A URL stayed on the old version. `update_formula.py` refuses this. Always run step 4                                                |
+| `No available formula ... Did you mean ...?` | A stale tap clone. `brew untap kriskhoavu/tap` and reinstall                                                                        |
+| `Homebrew requires formulae to be in a tap`  | Tap a local checkout: `brew tap kriskhoavu/localtest /path/to/homebrew-tap`. Commit first                                           |
+| `SHA256SUMS` returns 404                     | The workflow failed or is still running                                                                                             |
 
 ## Cloud Image
 
-1. `npm run build`, then `docker build -f deploy/docker/image/kode-stream/Dockerfile -t kode-stream:<version> .`.
-2. Start it on Postgres with the Cloud environment. Check `/api/health` and the expected `migrationVersion`.
-3. Confirm startup rejects `KODE_STREAM_STORAGE_OPTION=datadir`.
-4. Run `./run.sh smoke-storage` and Settings sync in both directions. A backup must appear under
-   `backups/storage-sync/`.
-5. Follow [Cloud deployment](../cloud-deployment.md) for proxy, Agent and upgrade checks.
+1. Build and deploy the image as in [Cloud deployment](../cloud-deployment.md#upgrade-and-rollback), steps 3 to 5.
+2. Confirm that startup rejects `KODE_STREAM_STORAGE_OPTION=datadir`.
+3. Run `make smoke-storage` and Settings sync in both directions. A backup must appear under `backups/storage-sync/`.
 
 ## Related Files
 

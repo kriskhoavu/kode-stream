@@ -62,8 +62,6 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
     volumes:
       - ./keycloak/kode-stream-realm.json:/opt/keycloak/data/import/kode-stream-realm.json:ro
     networks:
