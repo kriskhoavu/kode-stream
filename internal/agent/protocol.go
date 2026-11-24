@@ -18,11 +18,27 @@ const (
 )
 
 type Frame struct {
-	Type    string                 `json:"type"`
-	Agent   models.CloudAgent      `json:"agent,omitempty"`
-	Command models.CommandEnvelope `json:"command,omitempty"`
-	Result  *CommandResult         `json:"result,omitempty"`
-	Error   string                 `json:"error,omitempty"`
+	Type       string                 `json:"type"`
+	Agent      models.CloudAgent      `json:"agent,omitempty"`
+	Workspaces []PublishedWorkspace   `json:"workspaces,omitempty"`
+	Command    models.CommandEnvelope `json:"command,omitempty"`
+	Result     *CommandResult         `json:"result,omitempty"`
+	Error      string                 `json:"error,omitempty"`
+}
+
+// PublishedWorkspace tells a connecting agent which revision its next publish of that workspace must name.
+type PublishedWorkspace struct {
+	Name     string `json:"name"`
+	Revision int64  `json:"revision"`
+}
+
+func PublishedRevision(workspaces []PublishedWorkspace, name string) int64 {
+	for _, workspace := range workspaces {
+		if workspace.Name == name {
+			return workspace.Revision
+		}
+	}
+	return 0
 }
 
 type CommandResult struct {

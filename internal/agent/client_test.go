@@ -33,7 +33,8 @@ func TestClientConnectsSendsHeartbeatAndPublishesWorkspaceMetadata(t *testing.T)
 			return
 		}
 		defer conn.Close()
-		if err := conn.WriteJSON(Frame{Type: FrameConnected}); err != nil {
+		connected := Frame{Type: FrameConnected, Workspaces: []PublishedWorkspace{{Name: "other", Revision: 9}, {Name: filepath.Base(repo), Revision: 2}}}
+		if err := conn.WriteJSON(connected); err != nil {
 			return
 		}
 		for {
@@ -85,7 +86,7 @@ func TestClientConnectsSendsHeartbeatAndPublishesWorkspaceMetadata(t *testing.T)
 	default:
 		t.Fatal("server did not receive heartbeat")
 	}
-	if published.Name != filepath.Base(repo) || published.BaselineBranch != "main" || len(published.Sources) != 1 || published.Sources[0] != "plans" || !published.PublishedSummary {
+	if published.Name != filepath.Base(repo) || published.BaselineBranch != "main" || len(published.Sources) != 1 || published.Sources[0] != "plans" || !published.PublishedSummary || published.Revision != 2 {
 		t.Fatalf("published = %#v", published)
 	}
 }

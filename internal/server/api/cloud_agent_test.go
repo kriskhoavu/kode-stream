@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
 
+	appagent "kode-stream/internal/agent"
 	"kode-stream/internal/common/models"
 )
 
@@ -75,6 +77,36 @@ func TestCloudAgentEnrollmentTokenCannotBeReplayed(t *testing.T) {
 		t.Fatal("replayed enrollment token connected")
 	} else if response == nil || response.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("replay response=%v err=%v", response, err)
+	}
+}
+
+func TestCloudAgentChannelSendsTheAgentsPublishedRevisions(t *testing.T) {
+	apiHandler, _, _, _ := reliabilityTestAPI(t)
+	apiHandler = withTestRuntime(apiHandler, testCloudRuntimeConfig())
+	server := httptest.NewServer(apiHandler.Routes())
+	defer server.Close()
+	ctx := context.Background()
+	for _, workspace := range []models.WorkspaceConfig{
+		{ID: "mine", Name: "Platform", OwnerUserID: "user", AgentID: "agent"},
+		{ID: "other-agent", Name: "Platform", OwnerUserID: "user", AgentID: "agent-2"},
+	} {
+		if _, conflict, err := apiHandler.cloud.workspaces.PublishAgentWorkspace(ctx, workspace, 0); err != nil || conflict {
+			t.Fatalf("publish %s conflict=%v err=%v", workspace.ID, conflict, err)
+		}
+	}
+	token := apiHandler.cloud.signAgentToken(agentConnectToken{ID: "revisions", UserID: "user", AgentID: "agent", Name: "Agent", ExpiresAt: time.Now().UTC().Add(time.Minute)})
+	conn, _, err := websocket.DefaultDialer.Dial(websocketURL(server.URL, "/api/agents/channel?token="+url.QueryEscape(token)), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	var connected appagent.Frame
+	if err := conn.ReadJSON(&connected); err != nil {
+		t.Fatal(err)
+	}
+	want := []appagent.PublishedWorkspace{{Name: "Platform", Revision: 1}}
+	if connected.Type != appagent.FrameConnected || !reflect.DeepEqual(connected.Workspaces, want) {
+		t.Fatalf("connected = %#v", connected)
 	}
 }
 

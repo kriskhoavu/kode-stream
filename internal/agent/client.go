@@ -74,6 +74,7 @@ func (c *Client) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		metadata.Revision = PublishedRevision(connected.Workspaces, metadata.Name)
 		if err := PublishWorkspaceMetadata(ctx, c.config.HTTPClient, c.config.CloudURL, token, metadata); err != nil {
 			return err
 		}

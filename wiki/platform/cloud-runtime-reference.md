@@ -40,7 +40,9 @@ Identity headers count only from a remote address inside a trusted proxy network
 <!-- chunkId: platform-cloud-runtime-reference-agent-backed-workspaces -->
 <!-- keywords: cloud agent, heartbeat, deep link, command delivery -->
 
-[live] Agent pairing, the outbound connection to `/api/agents/channel`, heartbeat and metadata publication work. Workspace command delivery returns 503 until a durable command lifecycle exists. The default dispatcher also reports dispatch as unimplemented. Evidence: `internal/server/api/cloud_workspace_access.go:49`, `internal/agent/protocol.go:39`.
+[live] Agent pairing, the outbound connection to `/api/agents/channel`, heartbeat and metadata publication work. Workspace command delivery returns 503 until a durable command lifecycle exists. The default dispatcher also reports dispatch as unimplemented. Evidence: `internal/server/api/cloud_workspace_access.go:49`, `internal/agent/protocol.go:55`.
+
+[live] The `connected` frame lists each workspace the Agent has published, with its revision. The Agent publishes again with that revision, so a restarted Agent updates the workspace it published before. Evidence: `internal/server/api/cloud_workspace.go:46`, `internal/agent/client.go:77`.
 
 "Connected" is a prerequisite, not proof that file, Git, terminal, runtime, AI or verification commands can run.
 

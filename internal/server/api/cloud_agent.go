@@ -276,7 +276,12 @@ func (a *cloudController) cloudAgentChannel(w http.ResponseWriter, r *http.Reque
 			log.Printf("cloud_agent_persistence_failure operation=%q owner_user_id=%q agent_id=%q error=%q", "disconnect", token.UserID, token.AgentID, persistErr)
 		}
 	}()
-	if err := writeFrame(appagent.Frame{Type: appagent.FrameConnected, Agent: agent}); err != nil {
+	published, err := a.workspaces.PublishedByAgent(r.Context(), token.UserID, token.AgentID)
+	if err != nil {
+		_ = writeFrame(appagent.Frame{Type: "error", Error: "Cloud workspace persistence is unavailable"})
+		return
+	}
+	if err := writeFrame(appagent.Frame{Type: appagent.FrameConnected, Agent: agent, Workspaces: published}); err != nil {
 		return
 	}
 	for {

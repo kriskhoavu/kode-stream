@@ -43,6 +43,20 @@ func (s *cloudWorkspaceStore) List(ctx context.Context, userID string) ([]models
 	return result, nil
 }
 
+func (s *cloudWorkspaceStore) PublishedByAgent(ctx context.Context, userID, agentID string) ([]appagent.PublishedWorkspace, error) {
+	workspaces, err := s.List(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	published := []appagent.PublishedWorkspace{}
+	for _, workspace := range workspaces {
+		if workspace.AgentID == agentID && workspace.AccessMode == models.WorkspaceAccessModeAgentBacked {
+			published = append(published, appagent.PublishedWorkspace{Name: workspace.Name, Revision: workspace.CloudPublicationRevision})
+		}
+	}
+	return published, nil
+}
+
 func (s *cloudWorkspaceStore) Get(ctx context.Context, userID, workspaceID string) (models.WorkspaceConfig, bool, error) {
 	if s.persistence != nil {
 		return s.persistence.GetWorkspace(ctx, userID, workspaceID)
