@@ -56,13 +56,10 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [tab, setTab] = useState<Tab>('preview');
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('info');
-  // The item's agent sessions: listed in the Agents tab, shown in the main pane
-  // while one is in focus, and held connected until the page leaves the item.
   const [agentFocus, setAgentFocus] = useState<AgentFocus>();
   const { byItem: itemAgents, reload: reloadAgents } = useItemSessions(plan?.workspaceId, plan?.branch ?? '');
   const agents = itemAgents.get(itemId);
   const { heldLiveSessionIds, release: releaseHeldSession } = useHeldAgentSessions(agents, agentFocus, itemId);
-  // The harness's work on this item, for the Agents tab's "Harness run" mode and the full-width run view.
   const harness = useBoardHarness();
   const work = useMemo(() => workForItem(plan, harness.state), [plan, harness.state]);
   const [agentsMode, setAgentsMode] = useState<AgentsMode>('run');
@@ -196,9 +193,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     return () => controller.abort();
   }, [itemId]);
 
-  // A refreshKey bump is the app refreshing (on window focus, among others),
-  // not a new item: refresh the item, its file tree and diff in place, and
-  // leave the open tabs and any unsaved edit alone.
+  // A refreshKey bump refreshes this item in place and keeps open tabs and unsaved edits.
   const refreshKeyLoadedRef = useRef(refreshKey);
   useEffect(() => {
     if (refreshKeyLoadedRef.current === refreshKey) return;
@@ -239,7 +234,6 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   }, [plan?.workspaceId, plan?.itemPath]);
 
 
-  // One listener for the page's life: it reads whether metadata is unsaved through a ref.
   const dirtyMetadataRef = useRef(false);
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -336,13 +330,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
   const hasFiles = useMemo(() => hasFile(files), [files]);
   const visibleWarnings = useMemo(() => visibleItemWarnings(plan), [plan]);
   const fileStateByPath = useMemo(() => buildFileStateMap(plan, gitStatus, file, dirtyFile), [plan, gitStatus, file, dirtyFile]);
-  /*
-   * Derived, not stored in state. An effect would resolve the workspace one
-   * render after `plan` arrives, so the page would render the pre-explorer
-   * fallback for a frame and then swap layouts. That swap replaces every node
-   * in the right panel, including the Info/Jira/Quality tab bar, and a click
-   * landing in the window is dispatched into a detached button and lost.
-   */
+  // Derived, not effect state: a one-frame layout swap drops clicks on the tab bar.
   const workspaceConfig = useMemo(() => plan ? workspaces.find((workspace) => workspace.id === plan.workspaceId) ?? null : null, [plan, workspaces]);
   const quality = useItemQuality({ plan, workspaceConfig, workspaces });
   const explorerWorkspaces = useMemo(() => workspaceConfig ? [workspaceConfig] : [], [workspaceConfig]);
@@ -564,12 +552,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
     </>
   );
 
-  /*
-   * An empty workspace list means the app has not finished loading workspaces,
-   * not that this item's workspace is missing: an item always belongs to one.
-   * Keep showing the loading state until the lookup can actually succeed or
-   * fail, so the layout gate below settles on its first render.
-   */
+  // An empty workspace list means workspaces are still loading. An item always has one.
   if (!plan || (!workspaceConfig && workspaces.length === 0)) {
     return <section className="empty-state"><button className="ghost" onClick={goBack}><ArrowLeft size={16} /> Back</button>{error ? <p className="error">{error}</p> : <p>Loading item...</p>}</section>;
   }

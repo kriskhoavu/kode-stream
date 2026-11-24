@@ -7,16 +7,9 @@ import { HxStatusBadge } from './HxStatusBadge';
 import { agentRoleLabels, formatCost, hxStatuses, modelLabel, plural } from './vocabulary';
 import { type LiveStep, liveSteps, agentStatus, useAgentSession, useAgentTranscript } from './runAgents';
 
-// The live terminal pulls in xterm; load it only when someone opens the Live tab.
+// Load xterm only when someone opens the Live tab.
 const SessionTerminal = lazy(() => import('../ai-session/SessionTerminal').then((module) => ({ default: module.SessionTerminal })));
 
-/**
- * What each agent said, in the order it happened: every conversation of the
- * run as one numbered list, grouped by the stage that ran it, oldest first,
- * with the working agent chosen by default. A running agent's transcript is
- * read again every few seconds; its live terminal is shown instead when the
- * backend exposes the run as a session.
- */
 export function LiveTab({ client, focus, stages, agentRuns, onReload }: { client: HarnessClient; focus?: string; stages: HarnessStage[]; agentRuns: HarnessAgentRun[]; onReload: () => Promise<unknown> }) {
 	const steps = useMemo(() => liveSteps(stages, agentRuns), [stages, agentRuns]);
 	const rounds = useMemo(() => steps.flatMap((step) => step.agentRuns), [steps]);
@@ -24,7 +17,6 @@ export function LiveTab({ client, focus, stages, agentRuns, onReload }: { client
 	const [chosen, setChosen] = useState<string | undefined>(focus);
 	useEffect(() => { if (focus) setChosen(focus); }, [focus]);
 	const selected = rounds.find((agentRun) => agentRun.id === chosen) ?? working ?? rounds.at(-1);
-	// Which stages the person folded or unfolded by hand; the rest fold unless they hold the chosen or the working agent.
 	const [folded, setFolded] = useState<Record<string, boolean>>({});
 	const stageOpen = (step: LiveStep) => folded[step.id] ?? step.agentRuns.some((agentRun) => agentRun.id === selected?.id || agentRun.state === 'running');
 	const session = useAgentSession(client, selected?.id);

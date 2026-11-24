@@ -4,15 +4,9 @@ import { RecentGitActivity } from '../../components/RecentGitActivity';
 import { readTogglePreference, writePreference } from '../../shared/preferences/store';
 import type { ItemGit } from './useItemGit';
 
-/**
- * The Git panel an item shows: the checkout, its local changes to pick and
- * commit, a new branch, and the item's recent activity. `onOpenPath` makes
- * each changed path a link.
- */
 export function ItemGitPanel({ git, className, activityOpenPreference, branchPlaceholder, onOpenPath, unavailable }: {
 	git: ItemGit;
 	className: string;
-	/** Where the Recent Activity panel remembers whether it is open. */
 	activityOpenPreference: string;
 	branchPlaceholder: string;
 	onOpenPath?: (change: GitChange) => void;

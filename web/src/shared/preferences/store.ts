@@ -34,7 +34,6 @@ export function readStringPreference(key: string, fallback = '', source = storag
   }
 }
 
-/** A preference stored as '1' (on) or '0' (off). */
 export function readTogglePreference(key: string, source = storage()): boolean {
   return readStringPreference(key, '', source) === '1';
 }
@@ -53,8 +52,7 @@ export function writePreference(key: string, value: unknown, source = storage())
 export function removePreference(key: string, source = storage()): boolean {
   try {
     source?.removeItem(preferenceKey(key));
-    // Retire the legacy key only after a successful write/remove attempt. It remains
-    // readable above so existing installations retain their valid preferences.
+    // Remove the legacy key only after the write succeeds.
     source?.removeItem(key);
     return Boolean(source);
   } catch {

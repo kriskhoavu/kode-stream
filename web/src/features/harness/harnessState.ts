@@ -14,7 +14,6 @@ import { channelLabels, stageKindLabels } from './vocabulary';
 
 export type HarnessConnection = 'connecting' | 'live' | 'reconnecting' | 'polling' | 'offline';
 
-/** A decision this browser sent, kept until the server's event reconciles it. */
 export interface SentDecision {
 	approvalId: string;
 	decision: HarnessDecision;
@@ -116,7 +115,7 @@ export function harnessReducer(state: HarnessState, action: HarnessAction): Harn
 function applyEvent(state: HarnessState, event: HarnessEvent): HarnessState {
 	if (event.seq <= state.lastSeq) return state;
 	let next: HarnessState = { ...state, lastSeq: event.seq };
-	// A run or gate event carries its task, whose state, run and needs-you change with it.
+	// A run or gate event carries its task, so the task updates with it.
 	if ('task' in event && event.task && event.type !== 'task.discovered' && event.type !== 'task.updated' && event.type !== 'task.ranked' && event.type !== 'task.pinned') {
 		next.tasks = { ...next.tasks, [event.task.id]: event.task };
 	}
@@ -233,30 +232,25 @@ function upsert<T extends { id: string }>(items: T[], item: T): T[] {
 	return copy;
 }
 
-// ── Selectors ────────────────────────────────────────────────────────────────
-
 const doneTaskStates = new Set(['done']);
 
 export function waitingApprovals(state: HarnessState): HarnessApproval[] {
-	// A clarify gate waits for a ticket's reporter, not for you.
+	// A clarify gate waits for the ticket's reporter, not for you.
 	return Object.values(state.approvals)
 		.filter((approval) => approval.state === 'requested' && approval.gate !== 'clarify')
 		.sort((a, b) => Date.parse(b.requestedAt) - Date.parse(a.requestedAt));
 }
 
-/** The queue as the Sorter ranked it: waiting on you first, then pinned, then by score. */
 export function queueTasks(tasks: Record<string, HarnessTask>, options: { includeFinished?: boolean } = {}): HarnessTask[] {
 	return Object.values(tasks)
 		.filter((task) => options.includeFinished || !(task.state === 'dismissed' || task.state === 'stale'))
 		.sort(compareTasks);
 }
 
-/** Whether a person may start the task: one waiting in the queue, or one whose last run was stopped. */
 export function canStartTask(task: Pick<HarnessTask, 'state'>): boolean {
 	return task.state === 'ranked' || task.state === 'discovered' || task.state === 'cancelled';
 }
 
-/** Whether a start was asked for and not yet taken. A stopped task's old request was spent on the run that stopped. */
 export function startPending(task: Pick<HarnessTask, 'state' | 'startRequested'>): boolean {
 	return Boolean(task.startRequested) && task.state !== 'cancelled';
 }
@@ -267,7 +261,6 @@ export function compareTasks(a: HarnessTask, b: HarnessTask): number {
 	return b.score - a.score || a.source.key.localeCompare(b.source.key);
 }
 
-/** The dependencies of a task that are not done yet, by source key. */
 export function waitsFor(task: HarnessTask, tasks: Record<string, HarnessTask>): string[] {
 	return task.dependsOn
 		.map((id) => tasks[id])
@@ -275,7 +268,6 @@ export function waitsFor(task: HarnessTask, tasks: Record<string, HarnessTask>):
 		.map((dependency) => dependency.source.key);
 }
 
-/** How a decision reads once made: "Approved by you", "Approved via Webex by Anna". */
 export function decisionLine(approval: HarnessApproval, sent?: SentDecision): string {
 	if (approval.state === 'requested') {
 		if (sent?.state === 'sending') return 'Sending…';

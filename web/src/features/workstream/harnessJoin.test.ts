@@ -74,7 +74,6 @@ describe('finished tasks', () => {
 		} });
 		const join = joinHarness([item('p1', 'PM-1')], state, 'ws');
 		expect(join.byItemId.get('p1')?.status).toBe('done');
-		// A stopped task is not finished: it stays a card, and a person may start it again.
 		expect(join.synthetic.map((card) => card.identifier).sort()).toEqual(['PM-4', 'PM-5']);
 		expect(join.byItemId.get('harness:e')?.status).toBe('stopped');
 		expect(tasksForWorkspace(state, 'ws', { finished: true }).map((entry) => entry.source.key)).toEqual(['PM-2', 'PM-1', 'PM-3']);
@@ -88,7 +87,6 @@ describe('taskColumn', () => {
 	it('moves a task with its run: started is Draft, an approved plan is In Progress, the pull request is Review', () => {
 		expect(taskColumn(task('PM-1'))).toBe('unsorted');
 		expect(taskColumn(task('PM-1', { state: 'running' }))).toBe('draft');
-		// Start moves a task to Draft at once, before a Planner takes it.
 		expect(taskColumn(task('PM-1', { startRequested: true }))).toBe('draft');
 		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't'))).toBe('draft');
 		expect(taskColumn(task('PM-1', { state: 'running' }), run('r', 't', { currentStage: stage('r', 'plan', { state: 'running' }) }))).toBe('draft');

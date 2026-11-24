@@ -2,13 +2,8 @@ import { useRef, useState } from 'react';
 import { useDismiss } from './useDismiss';
 import { ChevronDown, Search, X } from 'lucide-react';
 
-/** One choice in a facet: the stored value and the words shown for it. */
 export type FacetOption = { value: string; label: string };
 
-/**
- * A multi-select filter menu and the chips of what is selected. Lifted out of
- * the Workstream page so other boards (the harness queue) share one control.
- */
 export function FacetMenu({ title, options, selected, open, onOpen, onClose, onToggle, onClear }: {
   title: string;
   options: FacetOption[];

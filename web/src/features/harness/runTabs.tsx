@@ -8,7 +8,6 @@ import { FindingsList } from './FindingsPanel';
 import { hxSteps, plural, sourceLabels } from './vocabulary';
 import { useAgentSession } from './runAgents';
 
-/** The ticket as its tracker shows it: the Jira panel the Workstream page uses, read by key in the task's workspace. */
 export function TicketTab({ task, fixture }: { task: HarnessTask; fixture: boolean }) {
 	if (task.source.kind === 'jira' && !fixture) return <div className="hx-ticket"><JiraItemPanel workspaceId={task.workspaceId} issueKey={task.source.key} /></div>;
 	return (
@@ -33,7 +32,6 @@ export function latestAgentRun(agentRuns: HarnessAgentRun[] = []): HarnessAgentR
 	return [...agentRuns].sort((a, b) => Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? '')).at(-1);
 }
 
-/** Every review in the run, newest first, each with its must-fix items and suggestions. */
 export function FindingsByRound({ agentRuns }: { agentRuns: HarnessAgentRun[] }) {
 	const reviews = agentRuns
 		.filter((agentRun) => (agentRun.role === 'plan_reviewer' || agentRun.role === 'code_reviewer') && agentRun.state === 'succeeded')
@@ -51,11 +49,6 @@ export function FindingsByRound({ agentRuns }: { agentRuns: HarnessAgentRun[] })
 	);
 }
 
-/**
- * The run's changed files. When the backend exposes the agent's work as a
- * Kode Stream session, the session's own Changes panel (with diffs) is used;
- * otherwise the run's file list.
- */
 export function ChangesTab({ client, runId, agentRun }: { client: HarnessClient; runId: string; agentRun?: HarnessAgentRun }) {
 	const session = useAgentSession(client, agentRun?.id);
 	const [changes, setChanges] = useState<SessionChanges | undefined>();

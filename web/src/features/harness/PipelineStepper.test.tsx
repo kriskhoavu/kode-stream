@@ -24,7 +24,6 @@ describe('PipelineStepper', () => {
 		expect(next).toHaveAttribute('tabindex', '0');
 		fireEvent.keyDown(next, { key: 'Home' });
 		expect(screen.getAllByRole('button')[0]).toHaveFocus();
-		// Start is a small circle: its words are its name, not its text.
 		expect(screen.getAllByRole('button')[0]).toHaveAccessibleName(/^Start, Done/);
 		expect(screen.getAllByRole('button')[0]).toHaveClass('hx-stage-dot');
 	});

@@ -17,13 +17,6 @@ import { PlanTree, ChangesTree, AgentsList } from './workbench/WorkbenchTrees';
 import { TaskInfo, Answers, CheckerList, StepList } from './workbench/WorkbenchSide';
 import { Reader } from './workbench/WorkbenchReader';
 
-/**
- * A harness run read like a plan: what the run wrote (Plan), what it changed
- * in the code (Changes) and what each agent said (Agents) on the left, the
- * chosen file or conversation in the middle, and the task on the right. It
- * reads the run's own copy while it has one, else its branch, so a finished
- * run still shows its work.
- */
 export function RunWorkbench({ client, detail, request }: { client: HarnessClient; detail: HarnessRunDetail; request?: WorkbenchRequest }) {
 	const { run, task } = detail;
 	const version = `${run.id}:${run.revision}:${run.state}:${run.currentStageId ?? ''}`;
@@ -50,13 +43,11 @@ export function RunWorkbench({ client, detail, request }: { client: HarnessClien
 		if (active === key) setActive(rest.at(-1));
 	};
 
-	// Start on the plan's first file, once the plan is read.
 	useEffect(() => {
 		if (!active && planFiles[0]) show(`plan:${planFiles[0].path}`);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [planFiles]);
 
-	// A step clicked in the pipeline opens what that step made.
 	useEffect(() => {
 		if (!request) return;
 		const { card } = request;
@@ -129,7 +120,6 @@ function modeCount(mode: Mode, planCount: number, codeFiles: SessionFile[], step
 	return <><span className="hx-add">+{additions}</span> <span className="hx-del">−{deletions}</span> · {plural(codeFiles.length, 'file')}</>;
 }
 
-/** What the left panel's list holds: the plan's folder, the branch the changes were read from, or the run's conversations. */
 function modeLabel(mode: Mode, plan: HarnessRunPlan | undefined, changes: SessionChanges | undefined, run: HarnessRunDetail['run']): string {
 	if (mode === 'plan') return plan?.files.length ? commonFolder(plan.files.map((file) => file.path)).replace(/^plans\//, '').replace(/\/$/, '') : 'Plan';
 	if (mode === 'agents') return 'By step';
@@ -137,10 +127,6 @@ function modeLabel(mode: Mode, plan: HarnessRunPlan | undefined, changes: Sessio
 	return changes?.from === 'worktree' ? 'Live, not committed' : 'Code';
 }
 
-/**
- * The line under a run page's title: where the task came from, as a link,
- * then the run's branch and its pull request once there is one.
- */
 export function RunPagePath({ lead, run }: { lead: ReactNode; run?: HarnessRunDetail['run'] }) {
 	return (
 		<div className="workspace-item-path" aria-label="Item location">
@@ -151,4 +137,3 @@ export function RunPagePath({ lead, run }: { lead: ReactNode; run?: HarnessRunDe
 	);
 }
 
-/* ---------- loading ---------- */

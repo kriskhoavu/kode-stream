@@ -16,7 +16,6 @@ export const partLabels: Record<SettingsFilePart, string> = {
 
 const onOff = (value?: boolean) => value === undefined ? 'default' : value ? 'on' : 'off';
 
-/** One line on what a part of a file holds. */
 export function partSummary(part: SettingsFilePart, content?: SettingsFileContent): string {
 	const harness = content?.harness;
 	switch (part) {
@@ -32,12 +31,7 @@ export function partSummary(part: SettingsFilePart, content?: SettingsFileConten
 
 export type SettingsFileMode = 'export' | 'import';
 
-/**
- * A workspace's settings shared through its repository, opened from the
- * workspace's header. Kode Stream never reads the file on its own: Export
- * writes the chosen parts of this workspace's settings into it, and Import
- * lays the chosen parts of it over them.
- */
+// Kode Stream never reads the file on its own. Only Export and Import touch it.
 export function SettingsFileDialog({ mode, workspaceId, workspaceName, onClose, onImported }: {
 	mode: SettingsFileMode;
 	workspaceId: string;

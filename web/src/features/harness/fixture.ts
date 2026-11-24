@@ -20,13 +20,7 @@ import type {
 } from '../../lib/types';
 import type { HarnessClient, HarnessFeedHandlers } from './harnessClient';
 
-/**
- * A believable harness held in memory, for `npm run dev` without a backend and
- * for demos. It is loaded only in development (see `loadHarnessClient`), so
- * none of it reaches the production bundle. Its agent runs progress on a
- * timer, a new approval arrives after half a minute, and every decision moves
- * the run on, so all three screens and their motion can be seen.
- */
+// Loaded only in development (see `loadHarnessClient`), so it never reaches the production bundle.
 
 const OPUS = 'claude-opus-5-5';
 const SONNET = 'claude-sonnet-5-5';
@@ -34,7 +28,6 @@ const min = 60_000;
 
 type TaskSeed = [key: string, milestone: string, title: string, deps: string[], extra?: Partial<HarnessTask>];
 
-// A small game project in six milestones; each task waits for the tasks it names.
 const seeds: TaskSeed[] = [
 	['PM-01', 'M0', 'Create Jira project and board', [], { state: 'done' }],
 	['PM-02', 'M0', 'Add login form', [], { state: 'running', estimatedMinutes: 90 }],
@@ -247,7 +240,6 @@ export function createFixtureStore(now = Date.now()): Store {
 		{ severity: 'advisory', title: 'Say which page opens after sign-in.' }
 	];
 
-	// PM-02: the run in the pipeline mockup, building after Anna approved the plan from Webex.
 	const pm02 = addRun('PM-02', 31 * min);
 	approval('appr-pm02-start', 'PM-02', 'start', 32 * min, { state: 'approved', decidedAt: at(31 * min), decidedBy: { actorId: 'khoa', displayName: 'Khoa' }, channel: 'dashboard', revision: 2 });
 	agent(pm02, 'plan', 'planner', 1, 30 * min, { turns: 69, durationMs: 7 * min, costUsd: 2.73, summary: 'Wrote a five-step plan for the login form.' });
@@ -260,13 +252,11 @@ export function createFixtureStore(now = Date.now()): Store {
 	agent(pm02, 'implement', 'coder', 1, 5 * min - 14_000, { state: 'running', turns: 23, costUsd: 1.9, progress: 'Writing LoginForm.tsx and its test' });
 	stage(pm02, 'implement', { state: 'running', round: 1, turns: 23, costUsd: 1.9, startedAt: at(5 * min - 14_000), engine: 'claudecode', model: SONNET });
 
-	// ART-01: planning, first round.
 	const art01 = addRun('ART-01', 8 * min);
 	approval('appr-art01-start', 'ART-01', 'start', 9 * min, { state: 'approved', decidedAt: at(8 * min), decidedBy: { actorId: 'anna', displayName: 'Anna' }, channel: 'webex', revision: 2 });
 	agent(art01, 'plan', 'planner', 1, 7 * min - 12_000, { state: 'running', turns: 31, costUsd: 0.84, progress: 'Reading the style references' });
 	stage(art01, 'plan', { state: 'running', startedAt: at(7 * min - 12_000), engine: 'claudecode', model: OPUS });
 
-	// SRV-01: built, now in code check.
 	const srv01 = addRun('SRV-01', 52 * min);
 	agent(srv01, 'plan', 'planner', 1, 51 * min, { turns: 40, durationMs: 6 * min, costUsd: 1.8 });
 	agent(srv01, 'plan', 'plan_reviewer', 1, 45 * min, { turns: 12, durationMs: 2 * min, costUsd: 0.6, verdict: 'approve' });
@@ -277,7 +267,6 @@ export function createFixtureStore(now = Date.now()): Store {
 	agent(srv01, 'implement', 'code_reviewer', 1, 3 * min - 41_000, { state: 'running', turns: 9, costUsd: 0.42, progress: 'Reading internal/server/server.go' });
 	stage(srv01, 'implement', { state: 'running', turns: 97, durationMs: 33 * min, costUsd: 5.52, startedAt: at(39 * min) });
 
-	// CLI-01: testing, second run.
 	const cli01 = addRun('CLI-01', 70 * min);
 	stage(cli01, 'plan', { state: 'passed', turns: 30, durationMs: 9 * min, costUsd: 2.2, startedAt: at(70 * min), finishedAt: at(61 * min) });
 	approval('appr-cli01-plan', 'CLI-01', 'plan', 61 * min, { state: 'approved', decidedAt: at(58 * min), decidedBy: { actorId: 'anna', displayName: 'Anna' }, channel: 'webex', revision: 2 });
@@ -285,7 +274,6 @@ export function createFixtureStore(now = Date.now()): Store {
 	stage(cli01, 'implement', { state: 'passed', turns: 70, durationMs: 40 * min, costUsd: 4.9, startedAt: at(58 * min), finishedAt: at(18 * min) });
 	stage(cli01, 'qa', { state: 'running', round: 2, startedAt: at(60_000 + 5_000) });
 
-	// UX-11: the plan is checked and waits for a person.
 	const ux11 = addRun('UX-11', 14 * min);
 	agent(ux11, 'plan', 'planner', 1, 13 * min, { turns: 52, durationMs: 6 * min, costUsd: 2.6 });
 	agent(ux11, 'plan', 'plan_reviewer', 1, 7 * min, { turns: 18, durationMs: 2 * min, costUsd: 0.9, verdict: 'changes_requested', blocking: 1, advisory: 3 });
@@ -299,7 +287,6 @@ export function createFixtureStore(now = Date.now()): Store {
 		context: { verdict: 'approve', blocking: 0, advisory: 4, rounds: 2, durationMs: 10 * min, costUsd: 4.47, difficulty: 'easy', subtasks: 4 }
 	});
 
-	// SRV-04: stuck after three plan rounds.
 	const srv04 = addRun('SRV-04', 49 * min, { state: 'blocked' });
 	for (let round = 1; round <= 3; round++) {
 		agent(srv04, 'plan', 'planner', round, (50 - round * 13) * min, { turns: 30 + round, durationMs: 8 * min, costUsd: 1.4 });
@@ -312,7 +299,6 @@ export function createFixtureStore(now = Date.now()): Store {
 		context: { blocking: 1, rounds: 3, durationMs: 41 * min, costUsd: 6.1 }
 	});
 
-	// PM-01: finished this morning with a draft pull request.
 	const pm01 = addRun('PM-01', 3 * 60 * min, { state: 'passed', finishedAt: at(2 * 60 * min), prUrl: 'https://github.com/example/airship/pull/3103' });
 	kinds.forEach((kind) => stage(pm01, kind, { state: 'passed', turns: kind === 'implement' ? 120 : 20, durationMs: 10 * min, costUsd: kind === 'implement' ? 9.4 : 2.05, startedAt: at(3 * 60 * min), finishedAt: at(2 * 60 * min) }));
 	approval('appr-pm01-pr', 'PM-01', 'review', 2 * 60 * min + 5 * min, { state: 'approved', decidedAt: at(2 * 60 * min + 2 * min), decidedBy: { actorId: 'khoa', displayName: 'Khoa' }, channel: 'dashboard', revision: 2 });
@@ -368,7 +354,6 @@ function round2(value: number) {
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const progressLines = ['Reading the plan', 'Running npm test', 'Editing the form validation', 'Checking the diff', 'Writing a test for an expired token', 'Running the type check'];
 
-/** An in-memory HarnessClient over a fixture store, with a timer that moves work along. */
 export function createFixtureClient(options: { tickMs?: number; arrivalMs?: number; now?: () => number } = {}): HarnessClient {
 	const now = options.now ?? Date.now;
 	const store = createFixtureStore(now());
@@ -477,7 +462,6 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 		}
 	};
 
-	// Half a minute in, CLI-01's tests pass and it asks for its draft pull request.
 	const arrive = () => {
 		const run = runOf('run-cli-01');
 		if (!run || run.state !== 'running') return;
@@ -594,7 +578,6 @@ export function createFixtureClient(options: { tickMs?: number; arrivalMs?: numb
 		start: (task) => delay(() => {
 			const current = store.tasks.get(task.id) as HarnessTask;
 			current.startRequested = true;
-			// A stopped task goes back to the queue, as the harness does.
 			if (current.state === 'cancelled' || current.state === 'discovered') { current.state = 'ranked'; current.note = undefined; }
 			current.revision += 1;
 			emit({ type: 'task.updated', task: current } as Omit<HarnessEvent, 'seq' | 'at'>);

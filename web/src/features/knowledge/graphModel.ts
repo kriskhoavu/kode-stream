@@ -12,8 +12,6 @@ interface Hierarchy {
 	layers: Map<string, number>;
 }
 
-// With `focusSlug` the graph is that page's neighbourhood, laid out around it
-// rather than across the whole wiki's sections; see focusPositions.
 export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string, focusSlug?: string): { nodes: Node[]; edges: Edge[]; neighbors: Set<string> } {
 	const neighbors = new Set<string>();
 	for (const edge of graph.edges) {
@@ -37,8 +35,7 @@ export function adaptKnowledgeGraph(graph: KnowledgeGraph, selectedSlug?: string
 			data: {
 				label: node.title, node, hierarchyRole: role, isDomain: isDomainNode(node.id),
 				groupLabel: focused ? groupLabelOf(node) : undefined,
-				// In focus, a neighbour from another bucket is marked, since an area
-				// name (Orders) can recur in several buckets (domains, e2e-testing).
+				// An area name can recur across buckets, so mark a neighbour from another bucket.
 				otherBucket: focusBucket !== undefined && bucketKey(groupingOf(node)) !== focusBucket
 			},
 			ariaLabel: `${node.title}, ${role} node, ${node.domain}, ${node.inbound} incoming and ${node.outbound} outgoing links`,
@@ -96,7 +93,7 @@ function withDomainParents(graph: KnowledgeGraph): KnowledgeGraph {
 	};
 }
 
-// Sections are built from the original graph so grouping and positioning agree.
+// Build sections from the original graph so grouping and positions agree.
 function sectionsOf(nodes: KnowledgeGraphNode[]): Section[] {
 	const order: string[] = [];
 	const byBucket = new Map<string, Map<string | undefined, KnowledgeGraphNode[]>>();
@@ -217,12 +214,7 @@ function domainSectionPositions(nodes: KnowledgeGraphNode[]): Map<string, { x: n
 	return positions;
 }
 
-// A focused page sits in the middle. The pages linking to it stand in rows
-// above and the pages it links to in rows below, matching the nodes' handles
-// (in at the top, out at the bottom), so no link has to cross the page. A page
-// linked both ways goes below. Each side is ordered by group, then title, so
-// pages from one area stand together; the group itself is named on the node
-// instead of being drawn, since a group node would pull its whole section in.
+// Linking pages sit above and linked pages below, matching the handles, so no link crosses the page.
 function focusPositions(graph: KnowledgeGraph, focusSlug: string): Map<string, { x: number; y: number }> {
 	const outbound = new Set(graph.edges.filter((edge) => edge.source === focusSlug && edge.target !== focusSlug).map((edge) => edge.target));
 	const inbound = new Set(graph.edges.filter((edge) => edge.target === focusSlug && edge.source !== focusSlug && !outbound.has(edge.source)).map((edge) => edge.source));
@@ -239,8 +231,6 @@ function focusPositions(graph: KnowledgeGraph, focusSlug: string): Map<string, {
 		for (let index = 0; index < nodes.length; index++) {
 			const row = Math.floor(index / perRow);
 			const inRow = Math.min(perRow, nodes.length - row * perRow);
-			// Rows above fill from the farthest row inward, so the nearest row
-			// to the page is the last, and possibly short, one.
 			const distance = direction === 1 ? row : rows - 1 - row;
 			positions.set(nodes[index].id, {
 				x: ((index % perRow) - (inRow - 1) / 2) * nodeSpacingX,
@@ -253,8 +243,6 @@ function focusPositions(graph: KnowledgeGraph, focusSlug: string): Map<string, {
 	return positions;
 }
 
-// The bucket and area a page belongs to, as the overview names its group
-// nodes. Both are named because an area name recurs across buckets.
 function groupLabelOf(node: KnowledgeGraphNode): string {
 	const grouping = groupingOf(node);
 	const bucket = formatDomain(grouping.bucket || rootGroupKey);
@@ -266,8 +254,6 @@ function edgeKey(edge: { source: string; target: string }): string { return `${e
 function domainNodeID(domain: string): string { return `${domainNodePrefix}${domain}`; }
 function isDomainNode(id: string): boolean { return id.startsWith(domainNodePrefix); }
 function formatDomain(domain: string): string { return formatSegment(domain); }
-// A bucket's own landing page is redundant once the bucket is drawn as a group
-// node, but only when that bucket actually has areas beneath it.
 function isContainerOverview(node: KnowledgeGraphNode, bucketsWithAreas: Set<string>): boolean {
 	const grouping = groupingOf(node);
 	if (grouping.area || !grouping.bucket) return false;
@@ -281,9 +267,6 @@ function byTitle(nodes: Map<string, KnowledgeGraphNode>): (left: string, right: 
 	return (left, right) => (nodes.get(left)?.title ?? left).localeCompare(nodes.get(right)?.title ?? right) || left.localeCompare(right);
 }
 
-// nodeBucket exposes the grouping bucket for filters, so the graph filters and
-// the graph layout agree on what a bucket is, including for an index written
-// before the taxonomy existed.
 export function nodeBucket(node: KnowledgeGraphNode): string {
 	return groupingOf(node).bucket;
 }

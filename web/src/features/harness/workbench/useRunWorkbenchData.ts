@@ -43,4 +43,3 @@ export function useFileDiff(client: HarnessClient, runId: string, path: string |
 	return state;
 }
 
-/* ---------- left panel ---------- */

@@ -15,14 +15,12 @@ export const harnessApi = {
   harnessAgentRun: (agentRunId: string, signal?: AbortSignal) => request<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>(`/api/harness/agent-runs/${encodeURIComponent(agentRunId)}`, { signal }, !signal),
   cancelHarnessRun: (runId: string, expectedRevision: number, reason?: string) => request<HarnessRun>(`/api/harness/runs/${encodeURIComponent(runId)}/cancel`, { method: 'POST', body: JSON.stringify({ expectedRevision, reason }) }, false),
   harnessApprovals: async (signal?: AbortSignal) => (await request<{ approvals?: HarnessApproval[] | null }>('/api/harness/approvals', { signal }, !signal)).approvals ?? [],
-  /** Resolves to the decided approval, or `undefined` when someone else already decided it (409 `already_decided`). */
+  /** Resolves to undefined when someone else decided first (409 `already_decided`). */
   approveHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason?: string) => decideHarnessGate(approval, 'approve', idempotencyKey, reason),
-  /** `replan` sends a change at Review back to Plan; `reject` sends it back to Build, or asks for changes at any other gate. */
   rejectHarnessGate: (approval: Pick<HarnessApproval, 'id' | 'revision'>, idempotencyKey: string, reason: string, decision: 'reject' | 'replan' = 'reject') => decideHarnessGate(approval, decision, idempotencyKey, reason),
-  /** Starts a person's session in the worktree of a run waiting at Review. */
   startHarnessReviewSession: (runId: string, input: { provider: string; idempotencyKey: string; columns: number; rows: number }) => request<EmbeddedAISessionResult>(`/api/harness/runs/${encodeURIComponent(runId)}/review-session`, { method: 'POST', body: JSON.stringify(input) }, false),
   pinHarnessTask: (task: Pick<HarnessTask, 'id' | 'revision'>, pinned: boolean) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/pin`, { method: 'POST', body: JSON.stringify({ pinned, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
-  /** `before` names the task this one should now sit above in the Task Queue; omitted means last. */
+  /** `before` names the task this one sits above. Omitted means last. */
   setHarnessPriority: (task: Pick<HarnessTask, 'id' | 'revision'>, input: { priorityOverride?: number; before?: string }) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/priority`, { method: 'POST', body: JSON.stringify({ ...input, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   setHarnessTaskQuestions: (task: Pick<HarnessTask, 'id' | 'revision'>, askQuestions: boolean | null) => request<HarnessTask>(`/api/harness/tasks/${encodeURIComponent(task.id)}/questions`, { method: 'POST', body: JSON.stringify({ askQuestions, expectedRevision: task.revision }) }, false).then(normalizeHarnessTask),
   createHarnessTask: (input: HarnessCreateTaskInput) => request<HarnessTask>('/api/harness/tasks', { method: 'POST', body: JSON.stringify(input) }, false).then(normalizeHarnessTask),
@@ -52,7 +50,6 @@ async function decideHarnessGate(approval: Pick<HarnessApproval, 'id' | 'revisio
   try {
     return await request<HarnessApproval>(`/api/harness/approvals/${encodeURIComponent(approval.id)}/decide`, { method: 'POST', body: JSON.stringify({ decision, reason: reason?.trim() || undefined, idempotencyKey, expectedRevision: approval.revision }) }, false);
   } catch (error) {
-    // Someone decided it first (another tab, Webex). The later approval.decided event says who.
     if (error instanceof ApiError && error.status === 409 && error.code === 'already_decided') return undefined;
     throw error;
   }

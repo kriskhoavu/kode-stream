@@ -4,7 +4,6 @@ import type { WorkspaceConfig } from '../lib/types';
 import { sourcePaths } from '../lib/sources';
 import type { Route } from './router';
 
-/** The left navigation: the pages, the registered workspaces and when the last scan ran. */
 export function LeftNav({ route, navigate, workspaces, activeWorkspaceId, lastSync, collapsed, onToggle, showAgentSpace, onSelectWorkspace }: {
   route: Route;
   navigate: (route: Route) => void;
@@ -58,7 +57,6 @@ export function LeftNav({ route, navigate, workspaces, activeWorkspaceId, lastSy
   );
 }
 
-/** The top bar's workspace menu: every workspace with its location, branch and sources. */
 export function WorkspaceMenu({ workspaces, activeWorkspaceId, onSelect, onManage }: {
   workspaces: WorkspaceConfig[];
   activeWorkspaceId?: string;

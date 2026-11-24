@@ -14,24 +14,14 @@ import type { HarnessController } from '../harness/useHarness';
 import { agentRoleLabels, agentRoleToRole, hxStatuses, roleLabels, stageKindLabels } from '../harness/vocabulary';
 import type { CardWork } from './harnessJoin';
 
-/** The gates a note can reach an agent through, and the decision that carries it. */
 const noteGates: Partial<Record<HarnessApprovalGate, 'approve' | 'reject'>> = { resume: 'approve', plan: 'reject', question: 'approve' };
 
-/**
- * The card's Agents tab in its "Harness run" mode: the compact stepper, who
- * is working, the Checker's findings, the ledger and the steering actions.
- * The hand-driven sessions are the tab's other mode.
- */
 export function HarnessRunTab({ work, harness, onOpenConversation, onOpenPlan, onOpenFull, onTakeOver }: {
 	work: CardWork;
 	harness: HarnessController;
-	/** Opens one agent's conversation in the card's main pane. */
 	onOpenConversation: (agentRunId: string) => void;
-	/** Opens the plan the run wrote in the card's main pane, before it is merged. */
 	onOpenPlan?: (runId: string) => void;
-	/** Shows the run whole, full width. */
 	onOpenFull?: () => void;
-	/** Hands the card to a person: the working role pauses and the Sessions mode opens. */
 	onTakeOver: () => void;
 }) {
 	const { state } = harness;

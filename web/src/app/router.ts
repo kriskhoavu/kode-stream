@@ -4,7 +4,6 @@ export type WorkbenchView = 'canvas' | 'sessions';
 export interface CanvasLocation { workspaceId?: string; selectedNodeId?: string; view?: WorkbenchView; }
 export interface ReviewLocation { workspaceId?: string; branch?: string; }
 export type ItemView = 'run';
-/** The tabs of a harness run's drawer, on the card's full-width run view. */
 export type HarnessRunTab = 'ticket' | 'plan' | 'stages' | 'findings' | 'changes' | 'live' | 'links';
 
 export type Route =
@@ -15,7 +14,7 @@ export type Route =
   | { name: 'canvas'; location?: CanvasLocation }
   | { name: 'review'; location?: ReviewLocation }
   | { name: 'item'; itemId: string; /** `run` shows the item's harness run whole, full width. */ view?: ItemView }
-  /** An old link to a harness run: it redirects to the card that holds the run. */
+  /** Redirects to the card that holds the run. */
   | { name: 'harness-run'; runId: string }
   | { name: 'not-found'; path: string };
 
@@ -43,7 +42,6 @@ export function routeFromPath(path: string, search = ''): Route {
     return view ? { name: 'item', itemId, view } : { name: 'item', itemId };
   }
   if (path === '/harness' || path.startsWith('/harness/')) {
-    // The Harness page is gone: a run's link opens its card, every other path opens the board.
     const segments = path.replace(/\/+$/, '').split('/').slice(2);
     const runId = segments.length === 2 && segments[0] === 'runs' ? decodeURIComponent(segments[1]) : '';
     return runId ? { name: 'harness-run', runId } : { name: 'workstream' };
@@ -91,7 +89,6 @@ export function canvasLocationFromSearch(search: string): CanvasLocation | undef
 	const query = new URLSearchParams(search);
 	const workspaceId = query.get('workspaceId')?.trim() || undefined;
 	const selectedNodeId = query.get('selectedNodeId')?.trim() || undefined;
-	// Sessions is Agent Space's first view; a link to a node on the canvas opens the canvas.
 	const asked = query.get('view');
 	const view: WorkbenchView | undefined = asked === 'canvas' || asked === 'sessions' ? asked : selectedNodeId ? 'canvas' : undefined;
 	return workspaceId || selectedNodeId || view ? { workspaceId, selectedNodeId, view } : undefined;
@@ -136,7 +133,7 @@ export function knowledgePath(location?: KnowledgeLocation): string {
 	return query.size ? `/knowledge?${query.toString()}` : '/knowledge';
 }
 
-/** `agent` names a session to open in the focused card's drawer; it means nothing without `itemId`. */
+/** `agent` means nothing without `itemId`. */
 function workstreamFocusFromSearch(search: string): { focusedItemId?: string; focusedSessionId?: string } {
   const query = new URLSearchParams(search);
   const focusedItemId = query.get('itemId')?.trim() || undefined;

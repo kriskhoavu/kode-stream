@@ -51,9 +51,7 @@ describe('RunDrawer', () => {
 		const { client, state } = await setup('task-pm-02', 'run-pm-02');
 		render(<Harnessed state={state} client={client} taskId="task-pm-02" queue={[]} initialTab="live" />);
 		const rounds = await screen.findByRole('tablist', { name: 'Agent rounds' });
-		// The Builder is step 5: the four Plan conversations come before it.
 		expect(within(rounds).getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['5Builder · round 1working']);
-		// The finished Plan stage is folded; the Build stage, where the Builder works, is open.
 		const plan = within(rounds).getByRole('button', { name: /^Plan/ });
 		expect(plan).toHaveAttribute('aria-expanded', 'false');
 		expect(plan).toHaveTextContent('steps 1–4');
@@ -177,10 +175,9 @@ describe('RunDrawer', () => {
 		render(<Harnessed state={state} client={client} taskId="task-pm-02" queue={[]} />);
 		const drawer = screen.getByRole('complementary');
 		expect(drawer.style.getPropertyValue('--drawer-width')).toBe('560px');
-		// A task outside the Task Queue it is shown with has no place to move from.
 		expect(screen.queryByRole('button', { name: 'Move up' })).not.toBeInTheDocument();
 		const grip = screen.getByRole('button', { name: 'Resize details panel' });
-		// jsdom's PointerEvent drops clientX, so the pointer is a mouse event under the pointer's name.
+		// jsdom's PointerEvent drops clientX, so the pointer is a MouseEvent.
 		const pointer = (target: EventTarget, type: string, clientX: number) => act(() => { target.dispatchEvent(new MouseEvent(type, { clientX, bubbles: true })); });
 		pointer(grip, 'pointerdown', 800);
 		pointer(window, 'pointermove', 600);

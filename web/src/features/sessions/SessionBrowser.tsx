@@ -27,7 +27,6 @@ function buildGroups(rows: AgentSession[], grouping: SessionBrowserGrouping): Gr
 		const existing = buckets.get(key);
 		if (existing) {
 			existing.rows.push(row);
-			// A harness task names the group by its key and title, which reads better than a plan title alone.
 			if (row.kind === 'harness') existing.title = title;
 		} else buckets.set(key, { key, title, rows: [row] });
 	}
@@ -48,17 +47,8 @@ function searchText(session: AgentSession): string {
 	return `${key} ${task?.title ?? ''} ${runs.map((detail) => detail.run.branch).join(' ')} ${agents} harness run`;
 }
 
-/**
- * The session browser: a filterable, grouped card list on the left and the
- * selected session on the right. It lists two kinds of session side by side
- * (see `agentSessions.ts`): an interactive session shows its live terminal,
- * a harness session its conversation, and both their Changes. Shared by the
- * Workbench Sessions view (grouped by plan). The grouping option remains
- * reusable for callers that aggregate more than one workspace.
- */
 export function SessionBrowser({ rows, harness, renderHarnessDetail, grouping, persistKey, onStop, onRemove, onReload, onOpenOnBoard, onOpenOnCard, emptyMessage = 'No sessions yet. Start one from a plan on the Workbench.' }: {
 	rows: GlobalSessionRow[];
-	/** The harness's agents, listed beside the interactive sessions. Without it the list has one kind and no kind filter. */
 	harness?: HarnessSessionRow[];
 	renderHarnessDetail?: (row: HarnessSessionRow) => ReactNode;
 	grouping: SessionBrowserGrouping;
@@ -67,7 +57,6 @@ export function SessionBrowser({ rows, harness, renderHarnessDetail, grouping, p
 	onRemove?: (row: GlobalSessionRow) => Promise<unknown>;
 	onReload: () => Promise<unknown> | void;
 	onOpenOnBoard?: (row: GlobalSessionRow) => void;
-	/** Opens the session in its plan's Workstream card drawer; offered only for a session launched from a plan. */
 	onOpenOnCard?: (row: GlobalSessionRow) => void;
 	emptyMessage?: string;
 }) {
@@ -173,8 +162,7 @@ function SessionDetail({ row, tagged, onStop, onReload, onOpenOnBoard, onOpenOnC
 
 	useEffect(() => { setTab('terminal'); }, [row.record.id]);
 
-	// Re-renders the header every second while the session is live, so the
-	// running duration keeps advancing instead of freezing at first render.
+	// Re-render every second while live so the duration keeps advancing.
 	useEffect(() => {
 		if (!live) return;
 		const timer = window.setInterval(() => setTick((tick) => tick + 1), 1000);

@@ -5,7 +5,6 @@ import { MarkdownPreview } from '../content-viewer/renderers/MarkdownPreview';
 import type { HarnessClient } from './harnessClient';
 import { plainError } from './useHarness';
 
-/** The folder every plan file sits in, said once above the list rather than on every file. */
 export function commonFolder(paths: string[]): string {
 	if (paths.length === 0) return '';
 	const folders = paths.map((path) => path.split('/').slice(0, -1));
@@ -20,11 +19,6 @@ export function commonFolder(paths: string[]): string {
 
 const readmePattern = /(^|\/)readme\.md$/i;
 
-/**
- * Where a file comes in a plan's reading order, by its path inside the plan
- * folder: the overview, the implementation plan, the solutions, the scenarios,
- * the test automation, any other document, then data such as plan.yaml.
- */
 function readingRank(path: string): number {
 	const lower = path.toLowerCase();
 	if (lower === 'readme.md') return 0;
@@ -36,7 +30,6 @@ function readingRank(path: string): number {
 	return 6;
 }
 
-/** A plan's files in the order a reviewer reads them; a folder's README before the rest of that folder. */
 export function orderPlanFiles<T extends { path: string }>(files: T[]): T[] {
 	const folder = commonFolder(files.map((file) => file.path));
 	const inner = (path: string) => path.slice(folder.length);
@@ -45,25 +38,19 @@ export function orderPlanFiles<T extends { path: string }>(files: T[]): T[] {
 		|| a.path.localeCompare(b.path, undefined, { numeric: true }));
 }
 
-/** Where the plan was read from, in plain words. */
 export function planSourceLine(plan: HarnessRunPlan): string {
 	if (plan.from === 'worktree') return 'Live from the harness\'s own copy. Not merged yet.';
 	if (plan.from === 'branch') return `From branch ${plan.branch}. Not merged yet.`;
 	return '';
 }
 
-/**
- * The plan a harness run wrote, readable at any time before it is merged: live
- * while the run works, from its branch once it stopped. Read only: the run
- * owns its copy until a person takes over or the branch is merged.
- */
 export function RunPlanPanel({ client, run }: { client: HarnessClient; run: HarnessRun }) {
 	const [plan, setPlan] = useState<HarnessRunPlan | undefined>();
 	const [error, setError] = useState('');
 	const [chosen, setChosen] = useState<string | undefined>();
 	const [reload, setReload] = useState(0);
 	const docRef = useRef<HTMLElement | null>(null);
-	// Paging moves to the next document's start: the reader has just finished the one before it.
+	// Paging lands on the next document's start, because the reader just finished the one before.
 	const turnTo = (path: string) => {
 		setChosen(path);
 		requestAnimationFrame(() => docRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }));

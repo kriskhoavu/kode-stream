@@ -76,7 +76,6 @@ export function Reader({ client, detail, keyed, open, steps, planFiles, codeFile
 	);
 }
 
-/** A path's first folder and its last three parts; the folders between fold into one "…". */
 export function crumbs(path: string): string[] {
 	const parts = path.split('/');
 	return parts.length <= 5 ? parts : [parts[0], '…', ...parts.slice(-3)];
@@ -126,7 +125,6 @@ export function threadMeta(agentRun: HarnessAgentRun): string {
 	return [plural(agentRun.turns, 'turn'), formatMinutes(agentRun.durationMs), formatCost(agentRun.costUsd)].join(' · ');
 }
 
-/** Every conversation of one section, or of the whole run, one after another. */
 export function Section({ client, steps, titled, onOpen }: { client: HarnessClient; steps: LiveStep[]; titled: boolean; onOpen: (key: WorkbenchKey) => void }) {
 	return (
 		<div className="hx-workbench-section">
@@ -150,4 +148,3 @@ export function Section({ client, steps, titled, onOpen }: { client: HarnessClie
 	);
 }
 
-/* ---------- right panel ---------- */

@@ -9,33 +9,20 @@ import { SourceBadge } from './SourceBadge';
 import { taskStatus } from './vocabulary';
 import { canStartTask, startPending, waitsFor } from './harnessState';
 
-/**
- * The queue in rank order: what the Sorter will hand out next, first. With
- * the optional handlers it also shows each row's score, lets a person start,
- * retry or remove a task, select a row for the side panel, and drag a row above
- * another to move it in the Task Queue.
- */
 export function QueueList({ tasks, allTasks, runs, onPin, onOpen, onSelect, selectedId, showScore = false, onStart, onRetry, canRetry, onMove, onStop, onRemove, pendingIds }: {
 	tasks: HarnessTask[];
 	allTasks: Record<string, HarnessTask>;
-	/** The runs by id, so a row whose run is under way can offer Stop. */
 	runs?: Record<string, HarnessRun>;
-	/** Stops a row's run, after a confirmation. */
 	onStop?: (run: HarnessRun) => Promise<void>;
-	/** Removes a row's task in any state, after a confirmation. */
 	onRemove?: (task: HarnessTask) => Promise<void>;
 	onPin: (task: HarnessTask, pinned: boolean) => void;
 	onOpen: (task: HarnessTask) => void;
-	/** Chooses a row for the side panel. */
 	onSelect?: (task: HarnessTask) => void;
 	selectedId?: string;
 	showScore?: boolean;
-	/** Starts a task now; shown on a task not yet started. */
 	onStart?: (task: HarnessTask) => void;
-	/** Retries a task that is stuck; shown where `canRetry` says so. */
 	onRetry?: (task: HarnessTask) => void;
 	canRetry?: (task: HarnessTask) => boolean;
-	/** Move `task` above `before` in the Task Queue; no `before` means last. */
 	onMove?: (task: HarnessTask, before?: HarnessTask) => void;
 	pendingIds?: Set<string>;
 }) {

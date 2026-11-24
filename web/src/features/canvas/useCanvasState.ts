@@ -93,7 +93,7 @@ export function useCanvasState(workspaceId?: string) {
 		loadAbortRef.current = controller;
 		const generation = ++requestRef.current;
 		try {
-			// Re-resolve the default layout because a checkout can change between refreshes.
+			// A checkout can change between refreshes, so resolve the default layout again.
 			const next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId, controller.signal), controller.signal);
 			if (controller.signal.aborted || generation !== requestRef.current) return;
 			const discarded = discardPendingChangesFor(next);
@@ -148,11 +148,7 @@ export function useCanvasState(workspaceId?: string) {
 			if (caught instanceof ApiError && caught.code === 'placement_conflict') {
 				const affected = caught.nodeIds?.length ? caught.nodeIds : batch.map((entry) => entry.patch.nodeId);
 				setConflicts((previous) => previous.filter((id) => !affected.includes(id)));
-				// A conflict means the layout moved under us, not that the move was
-				// unwanted. Rebase onto the revision the server now reports and try
-				// again, so a deliberate arrangement (a reset moves every node at
-				// once) is not silently half-applied with the sections already drawn
-				// for the arrangement the nodes never reached.
+				// A conflict means the layout moved, so rebase and retry instead of dropping the move.
 				let latest: CanvasProjection | undefined;
 				try {
 					latest = await api.canvasLayout(current.layout.id, controller.signal);
@@ -160,15 +156,11 @@ export function useCanvasState(workspaceId?: string) {
 					setProjection(latest);
 				} catch {
 					if (controller.signal.aborted) return;
-					// The next normal refresh will reconcile the layout; conflicts stay unobtrusive.
+					// The next refresh reconciles the layout.
 				}
-				// Without a fresh layout a change stays pending on its current revision: a failed
-				// refetch must not lose the move any more than a conflict does.
 				const { rebased, exhausted } = rebaseConflicts(dirtyRef.current, affected, latest);
 				setError(exhausted ? 'Some positions could not be saved because the layout changed elsewhere. Reload to see the current arrangement.' : '');
 				setSaveStatus(dirtyRef.current.size > 0 ? 'saving' : 'saved');
-				// `rebased` covers entries kept for another attempt; the size check keeps
-				// the queue moving for nodes in the batch that never conflicted.
 				if (rebased || dirtyRef.current.size > 0) setDirtyVersion((version) => version + 1);
 				return;
 			}
@@ -235,9 +227,7 @@ export function useCanvasState(workspaceId?: string) {
 			const layoutID = latest.layout.id;
 			try {
 				const saved = await api.patchCanvasViewport(layoutID, latest.layout.version, viewport, controller.signal);
-				// The mutation is versioned when input arrives, rather than when the
-				// debounce fires. A late response can therefore never regress a newer
-				// optimistic viewport, even if it could not be aborted in time.
+				// The mutation is versioned on input, so a late response never overwrites a newer viewport.
 				if (controller.signal.aborted || mutation !== viewportMutationRef.current || projectionRef.current?.layout.id !== layoutID) return;
 				setProjection(saved);
 				setError('');
@@ -345,8 +335,7 @@ export function useCanvasState(workspaceId?: string) {
 		loadAbortRef.current = controller;
 		const generation = ++requestRef.current;
 		try {
-			// Re-resolve the checkout before hiding placements: a stale reference
-			// may have recovered since the confirmation was opened.
+			// A stale checkout may have recovered since the confirmation opened, so resolve it again.
 			let next = await placeNewNodes(await api.resolveDefaultCanvas(workspaceId, controller.signal), controller.signal);
 			if (controller.signal.aborted || generation !== requestRef.current) return;
 			if (next.layout.id !== current.layout.id) {

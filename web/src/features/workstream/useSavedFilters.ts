@@ -3,7 +3,6 @@ import type { SavedFilter } from '../../lib/types';
 import { api } from '../../shared/api';
 import { emptyFilters, type Filters } from './filtering';
 
-/** The board's saved views: loads the workspace's, saves the current filters as one, applies and deletes them. */
 export function useSavedFilters({ workspaceId, filters, query, setFilters, setQuery }: {
 	workspaceId?: string;
 	filters: Filters;

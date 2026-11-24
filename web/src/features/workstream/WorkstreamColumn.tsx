@@ -6,7 +6,6 @@ import { isDropStatus } from './dragAndDrop';
 
 export function WorkstreamColumn({ status, label, itemCount, loading, dragActive, dragTargetStatus, onDragOver, onDragLeave, onDrop, onCreate, children }: {
   status: ItemStatus;
-  /** The column's name where it is not the status's own. */
   label?: string;
   itemCount: number;
   loading: boolean;

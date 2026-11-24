@@ -1,6 +1,5 @@
 import type { HarnessApproval, HarnessRun, HarnessStage, HarnessStatus, HarnessTask } from '../../lib/types';
 
-/** Small builders for harness tests; each returns a complete object with sensible defaults. */
 export function task(key: string, patch: Partial<HarnessTask> = {}): HarnessTask {
 	return {
 		id: `task-${key}`, workspaceId: 'ws', source: { kind: 'jira', key, labels: [] }, title: `Title ${key}`, state: 'ranked',

@@ -19,13 +19,10 @@ import { transcriptActive, type ItemAgents } from './useItemSessions';
 import { agentRoleLabels } from '../harness/vocabulary';
 import './agents.css';
 
-/** What the card drawer's main pane shows: the document, a session, a transcript, a harness agent's conversation, or the launcher. */
 export type AgentFocus = { kind: 'session'; id: string } | { kind: 'transcript'; id: string } | { kind: 'harness'; id: string } | { kind: 'harness-plan'; id: string } | { kind: 'launch' };
 
-/** The card's Agents tab has two modes once the harness works on the card: its run, and the hand-driven sessions. */
 export type AgentsMode = 'run' | 'sessions';
 
-/** The harness run the card's main pane can show a conversation of. */
 export interface AgentPaneHarness { client: HarnessClient; run?: HarnessRun; detail?: HarnessRunDetail; reload: () => Promise<unknown> }
 
 const CLUSTER_LIMIT = 3;
@@ -35,7 +32,6 @@ export function agentFocusKey(focus?: AgentFocus): string {
 	return !focus ? '' : focus.kind === 'launch' ? 'launch' : `${focus.kind}:${focus.id}`;
 }
 
-/** The Claude conversation a session record is named after, if it is a Claude session. */
 export function claudeConversationOf(record: SafeSessionRecord): string | undefined {
 	return /^embedded-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:-|$)/.exec(record.id)?.[1];
 }
@@ -43,12 +39,6 @@ export function claudeConversationOf(record: SafeSessionRecord): string | undefi
 const stop = (event: MouseEvent | PointerEvent) => event.stopPropagation();
 
 
-/**
- * The card's agent chips: one per live session, then `+N`; a hollow chip for
- * a Claude conversation still active in the user's terminal; and, when none
- * of those exists, a launcher shown on hover or focus. Every chip is its own
- * button, so clicking it opens that agent rather than previewing the card.
- */
 export function AgentCluster({ agents, title, onOpen }: { agents?: ItemAgents; title: string; onOpen: (focus: AgentFocus) => void }) {
 	const live = agents?.live ?? [];
 	const active = (agents?.transcripts ?? []).filter((transcript) => transcriptActive(transcript));
@@ -71,11 +61,6 @@ export function AgentCluster({ agents, title, onOpen }: { agents?: ItemAgents; t
 	</span>;
 }
 
-/**
- * The drawer's Agents side tab. With a harness run on the card it has two
- * modes: "Harness run" (given as `harnessRun`) and "Sessions", the launcher,
- * the card's live sessions, its Claude conversations and its ended sessions.
- */
 export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError, allowEmbedded = true, harnessRun, mode, onModeChange }: { itemId: string; agents?: ItemAgents; focus?: AgentFocus; onFocus: (focus: AgentFocus) => void; onLaunched: (result: EmbeddedAISessionResult) => void; onError: (message: string) => void; allowEmbedded?: boolean; harnessRun?: React.ReactNode; mode?: AgentsMode; onModeChange?: (mode: AgentsMode) => void }) {
 	const [earlierOpen, setEarlierOpen] = useState(false);
 	const [message, setMessage] = useState('');
@@ -125,22 +110,12 @@ function AgentRow({ selected, chip, title, meta, onClick }: { selected: boolean;
 	</button></li>;
 }
 
-/**
- * Fetches a fresh grant and gives a running session to the terminal dock, so
- * the process keeps a viewer once the drawer's terminal unmounts.
- */
 export async function handOffToDock(record: SafeSessionRecord): Promise<void> {
 	const [session, grant] = await Promise.all([api.embeddedAISession(record.id), api.embeddedAISessionGrant(record.id)]);
 	attachEmbeddedSession({ session, grant, record });
 }
 
-/**
- * Keeps the live sessions an agent pane opened connected while the pane shows
- * something else. The server cancels a session shortly after its last viewer
- * leaves, so a live session focused once is held, its terminal mounted and
- * hidden, until resetKey changes or the owner unmounts; every held session is
- * then handed to the terminal dock.
- */
+// The server cancels a session soon after its last viewer leaves, so a focused live session stays mounted.
 export function useHeldAgentSessions(agents: ItemAgents | undefined, focus: AgentFocus | undefined, resetKey: string) {
 	const [held, setHeld] = useState<string[]>([]);
 	const live = agents?.live ?? [];
@@ -164,12 +139,6 @@ export function useHeldAgentSessions(agents: ItemAgents | undefined, focus: Agen
 	return { heldLiveSessionIds, release };
 }
 
-/**
- * The drawer's main pane while an agent is in focus. Every held session keeps
- * its pane, hidden when another view is shown: an embedded process is
- * cancelled shortly after its last viewer leaves, so leaving a live session's
- * pane must not unmount its terminal.
- */
 export function AgentPane({ focus, heldSessionIds, itemId, workspaceId, agents, harness, onBack, onFocus, onRelease, onReload }: { focus?: AgentFocus; heldSessionIds: string[]; itemId: string; workspaceId?: string; agents?: ItemAgents; harness?: AgentPaneHarness; onBack: () => void; onFocus: (focus: AgentFocus) => void; onRelease: (sessionId: string) => void; onReload: () => Promise<unknown> | void }) {
 	const back = <button type="button" className="secondary agent-pane-back" onClick={onBack}><ArrowLeft size={14} /> Back to document</button>;
 	const focusedSession = focus?.kind === 'session' ? focus.id : undefined;
@@ -286,7 +255,6 @@ function TranscriptPane({ conversation, transcript, itemId, workspaceId, back, o
 	</section>;
 }
 
-/** A harness agent's conversation, read the way the run page reads it, with the other rounds of the run beside it. */
 function HarnessConversationPane({ agentRunId, harness, back }: { agentRunId: string; harness?: AgentPaneHarness; back: React.ReactNode }) {
 	const detail = harness?.detail;
 	const agentRuns = detail?.agentRuns ?? (harness?.run?.activeAgentRun ? [harness.run.activeAgentRun] : []);

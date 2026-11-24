@@ -8,9 +8,8 @@ import type { HxStatus } from '../harness/vocabulary';
 import { formatAge, isSessionLive } from './sessionDisplay';
 import { providerLabel } from '../ai-session/providerDisplay';
 
-export type SessionGlyph = { kind: 'spinner' | 'dot'; tone: 'live' | 'success' | 'danger' | 'neutral'; label: string; /** The harness status whose badge shows it, as on a task's details. */ status: HxStatus };
+export type SessionGlyph = { kind: 'spinner' | 'dot'; tone: 'live' | 'success' | 'danger' | 'neutral'; label: string; status: HxStatus };
 
-/** State glyph + text label for a session card: spinner while live, a coloured dot once it has settled. */
 export function sessionGlyph(record: SafeSessionRecord): SessionGlyph {
 	if (isSessionLive(record)) return { kind: 'spinner', tone: 'live', label: record.state === 'starting' ? 'Starting' : 'Running', status: record.state === 'starting' ? 'starting' : 'working' };
 	if (record.state === 'cancelled') return { kind: 'dot', tone: 'neutral', label: 'Cancelled', status: 'stopped' };
@@ -20,14 +19,12 @@ export function sessionGlyph(record: SafeSessionRecord): SessionGlyph {
 	return { kind: 'dot', tone: 'danger', label: 'Exited', status: 'failed' };
 }
 
-/** Title shown on a card and in the detail header: plan title, else intent, else provider. */
 export function sessionTitle(row: GlobalSessionRow): string {
 	return row.planTitle || row.record.intent || row.record.provider;
 }
 
 export function SessionCard({ row, selected, tabIndex, cardRef, onSelect, onRemove, onKeyDown, tagged = false }: {
 	row: GlobalSessionRow;
-	/** Shows the Interactive tag, where harness sessions share the list. */
 	tagged?: boolean;
 	selected: boolean;
 	tabIndex: number;
@@ -66,13 +63,11 @@ export function SessionCard({ row, selected, tabIndex, cardRef, onSelect, onRemo
 	</li>;
 }
 
-/** The tag that says who drives a session: a person at a terminal, or the harness. */
 export function SessionKindTag({ kind }: { kind: SessionKind }) {
 	const Icon = kind === 'harness' ? Bot : SquareTerminal;
 	return <span className={`hx-chip session-kind-tag ${kind}`}><Icon aria-hidden="true" size={12} />{kind === 'harness' ? 'Harness' : 'Interactive'}</span>;
 }
 
-/** Glyph and label for a harness agent: spinner while it works, else how it ended. */
 export function harnessGlyph(agentRun: HarnessAgentRun): SessionGlyph {
 	switch (agentRun.state) {
 		case 'running': return { kind: 'spinner', tone: 'live', label: 'Working', status: 'working' };
@@ -87,7 +82,6 @@ export function harnessGlyph(agentRun: HarnessAgentRun): SessionGlyph {
 	}
 }
 
-/** An agent's name in a run: its role and round, "Builder · round 2". */
 export function harnessAgentTitle(agentRun: HarnessAgentRun): string {
 	return `${agentRoleLabels[agentRun.role]} · round ${agentRun.round}`;
 }
@@ -96,20 +90,17 @@ export function harnessAgentLabel(agentRun: HarnessAgentRun): string {
 	return [engineLabel(agentRun.engine), modelLabel(agentRun.model)].filter(Boolean).join(' · ');
 }
 
-/** A run's agents that have started, in the order they started. */
 export function startedAgents(detail: HarnessRunDetail): HarnessAgentRun[] {
 	return detail.agentRuns
 		.filter((agentRun) => agentRun.state !== 'queued')
 		.sort((a, b) => Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? ''));
 }
 
-/** The agent a run's card and detail open on: the one working, else the last to start. */
 export function focusAgent(detail: HarnessRunDetail): HarnessAgentRun | undefined {
 	const started = startedAgents(detail);
 	return started.find((agentRun) => agentRun.state === 'running') ?? started.at(-1);
 }
 
-/** Glyph and label for a whole run: spinner while an agent works, else where it stands. */
 export function harnessRunGlyph(run: HarnessRun): SessionGlyph {
 	switch (run.state) {
 		case 'running': return run.currentStage?.state === 'awaiting_approval'
@@ -122,11 +113,6 @@ export function harnessRunGlyph(run: HarnessRun): SessionGlyph {
 	}
 }
 
-/**
- * One card per ticket: the harness's agents for it, however many rounds they
- * took. It names the agent in play and the run's totals; the detail walks the
- * rounds.
- */
 export function HarnessSessionCard({ row, selected, tabIndex, cardRef, onSelect, onKeyDown }: {
 	row: HarnessSessionRow;
 	selected: boolean;

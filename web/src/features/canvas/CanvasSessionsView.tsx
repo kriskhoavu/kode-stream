@@ -6,18 +6,15 @@ import type { HarnessSessionRow } from '../sessions/agentSessions';
 import { HarnessSessionDetail } from '../sessions/HarnessSessionDetail';
 import { SessionBrowser } from '../sessions/SessionBrowser';
 
-/** How many of a workspace's runs list their agents: the newest, and every one still working. */
 const harnessRunLimit = 12;
 
 export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch, projection, onOpenOnBoard, onOpenOnCard, onOpenHarnessRun, onReload }: {
 	workspaceId: string;
 	workspaceName?: string;
 	checkoutBranch?: string;
-	/** The canvas, once it has loaded: it names each session's plan. Sessions show without it. */
 	projection?: CanvasProjection;
 	onOpenOnBoard: (sessionId: string) => void;
 	onOpenOnCard?: (itemId: string, sessionId: string) => void;
-	/** Opens a harness run's page. Without it harness sessions are not listed. */
 	onOpenHarnessRun?: (runId: string) => void;
 	onReload: () => Promise<unknown> | void;
 }) {
@@ -58,12 +55,6 @@ export function CanvasSessionsView({ workspaceId, workspaceName, checkoutBranch,
 	</div>;
 }
 
-/**
- * The harness's agents in this workspace, as harness sessions: one row per
- * ticket, holding the ticket's newest runs and their agents, live from the
- * harness's event feed. Undefined while the harness is off, so the list then
- * holds interactive sessions only.
- */
 function useHarnessSessions(workspaceId: string, wanted: boolean): { rows?: HarnessSessionRow[]; controller: ReturnType<typeof useBoardHarness> } {
 	const controller = useBoardHarness();
 	const { state, loadRun } = controller;
@@ -74,7 +65,7 @@ function useHarnessSessions(workspaceId: string, wanted: boolean): { rows?: Harn
 		.slice(0, harnessRunLimit), [state.runs, workspaceId]);
 	const revisions = runs.map((run) => `${run.id}:${run.revision}`).join(',');
 
-	// Each run's agents come with its detail; read it again whenever the run moves on.
+	// A run's detail carries its agents, so read it again whenever the run changes.
 	useEffect(() => {
 		if (!on) return;
 		for (const run of runs) {
@@ -97,7 +88,7 @@ function useHarnessSessions(workspaceId: string, wanted: boolean): { rows?: Harn
 			if (ticket) ticket.runs.push(current);
 			else tickets.set(key, { key, task, runs: [current] });
 		}
-		// `runs` is already working first, then newest; a ticket's runs keep that order.
+		// `runs` is already sorted, so each ticket keeps that order.
 		return [...tickets.values()];
 	}, [on, runs, state.details, state.tasks]);
 	return { rows, controller };

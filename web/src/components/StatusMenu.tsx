@@ -4,10 +4,6 @@ import { editableStatusOrder, statusLabels } from '../shared/api';
 import type { ItemStatus } from '../lib/types';
 import { useMenuPopover } from './overlay';
 
-/**
- * Moves an item to another status. `toned` draws it as a pill in the status's
- * colour, with a dot before each choice, where a row has room to show it.
- */
 export function StatusMenu({ value, onChange, ariaLabel = 'Change item status', toned = false }: { value: ItemStatus; onChange: (status: ItemStatus) => void; ariaLabel?: string; toned?: boolean }) {
   const [open, setOpen] = useState(false);
   const menuRef = useMenuPopover(open, () => setOpen(false));

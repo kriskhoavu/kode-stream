@@ -54,7 +54,6 @@ describe('KnowledgeBrowser', () => {
 
 		fireEvent.click(screen.getByRole('button', { name: 'Open a12 index' }));
 		expect(onSelect).toHaveBeenCalledWith('a12-index');
-		// The index is still a file in its folder, as it is on disk.
 		expect(screen.getByRole('button', { name: /A12 Documentation/ })).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /A12 Architecture Analysis/ })).toBeInTheDocument();
 		const landingControl = screen.getByRole('button', { name: 'Open a12 index' });
@@ -231,7 +230,6 @@ describe('tier colour and page type suppression', () => {
 	};
 	const rowFor = (title: string) => screen.getByRole('button', { name: new RegExp(title, 'i') });
 
-	// The tier is the grouping a reader scans, so its folder carries the colour.
 	it('marks each tier folder distinctly', () => {
 		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
 		openOffer();
@@ -240,8 +238,6 @@ describe('tier colour and page type suppression', () => {
 		expect(screen.getByRole('button', { name: /^reference$/i })).toHaveClass('tier-reference');
 	});
 
-	// A tier label already states what the pages under it are, so repeating the
-	// page type on every row is noise.
 	it('drops the page type on rows inside a tier', () => {
 		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
 		openOffer();
@@ -252,8 +248,6 @@ describe('tier colour and page type suppression', () => {
 		expect(rowFor('Offer Permissions').querySelector('.knowledge-page-type')).toBeNull();
 	});
 
-	// A page with no tier has no label above it, so its type is the only
-	// classification it has and must stay.
 	it('keeps the page type on rows with no tier', () => {
 		render(<KnowledgeBrowser pages={typedPages} warnings={[]} onSelect={vi.fn()} />);
 		fireEvent.click(screen.getByRole('button', { name: /^e2e-testing$/i }));
@@ -286,15 +280,12 @@ describe('collapsible tiers', () => {
 		fireEvent.click(tierToggle('concepts'));
 		expect(tierToggle('concepts')).toHaveAttribute('aria-expanded', 'true');
 		expect(screen.getByRole('button', { name: /Offer Approval/i })).toBeInTheDocument();
-		// The sibling tier stays shut; tiers open independently.
 		expect(screen.queryByRole('button', { name: /Offer Permissions/i })).not.toBeInTheDocument();
 
 		fireEvent.click(tierToggle('concepts'));
 		expect(screen.queryByRole('button', { name: /Offer Approval/i })).not.toBeInTheDocument();
 	});
 
-	// Without this a page opened from a link or a deep link would sit inside a
-	// shut tier and be invisible.
 	it('expands the tier holding the selected page', () => {
 		render(<KnowledgeBrowser pages={tierPages} selectedSlug="perms" warnings={[]} onSelect={vi.fn()} />);
 

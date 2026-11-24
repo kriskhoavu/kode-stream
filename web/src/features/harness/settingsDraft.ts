@@ -4,12 +4,10 @@ export function emptyWorkspaceSettings(workspaceId: string): HarnessWorkspaceSet
 	return { workspaceId, verificationCommands: [], scope: [], models: {}, procedure: {} };
 }
 
-/** A workspace's own settings in the draft, or empty ones when it has none yet. */
 export function ownSettings(draft: Settings, workspaceId: string | undefined): HarnessWorkspaceSettings {
 	return draft.workspaces.find((workspace) => workspace.workspaceId === workspaceId) ?? emptyWorkspaceSettings(workspaceId ?? '');
 }
 
-/** The draft's workspace list with `own` changed by `patch`, added when it was not listed. */
 export function withOwnSettings(draft: Settings, own: HarnessWorkspaceSettings, patch: Partial<HarnessWorkspaceSettings>): HarnessWorkspaceSettings[] {
 	const next = { ...own, ...patch };
 	return draft.workspaces.some((workspace) => workspace.workspaceId === own.workspaceId)
@@ -17,7 +15,6 @@ export function withOwnSettings(draft: Settings, own: HarnessWorkspaceSettings, 
 		: [...draft.workspaces, next];
 }
 
-/** A role's model in a workspace: its own choice, else the defaults it starts from. */
 export function effectiveRoleModel(draft: Settings, own: HarnessWorkspaceSettings, role: HarnessAgentRole): Required<HarnessRoleModel> {
 	const fallback = draft.modelPolicy[role];
 	const mine = own.models[role];
@@ -29,7 +26,6 @@ export function effectiveRoleModel(draft: Settings, own: HarnessWorkspaceSetting
 	};
 }
 
-/** A workspace's procedure with a role's skill and track changed; a role left with neither is removed. */
 export function withRoleSkill(procedure: HarnessWorkspaceSettings['procedure'], role: HarnessAgentRole, patch: Partial<{ skill: string; track: string }>): HarnessWorkspaceSettings['procedure'] {
 	const next = { ...(procedure[role] ?? { skill: '' }), ...patch };
 	const result = { ...procedure };

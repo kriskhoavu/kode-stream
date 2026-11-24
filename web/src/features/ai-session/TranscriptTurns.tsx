@@ -2,25 +2,15 @@ import type { ReactNode } from 'react';
 import type { ClaudeTurn } from '../../lib/types';
 import './transcript.css';
 
-/**
- * The text turns of a Claude Code conversation, as the Workstream page and the
- * harness drawer both show them: the person's turns on the right, the model's
- * on the left. Where the reader included them, the model's tool calls and
- * thinking are folded into the answer they led to, as one line that opens;
- * work the model has not answered yet stays open, so a running agent can be
- * followed.
- */
 function plural(count: number, one: string): string { return `${count} ${count === 1 ? one : `${one}s`}`; }
 
-export function TranscriptTurns({ turns, label, placeholder, names = { user: 'You', assistant: 'Claude' }, className, foldUser }: {
+export function TranscriptTurns({ turns, label, placeholder, names = { user: 'You', assistant: 'Claude' }, className, userFoldLabel }: {
 	turns?: ClaudeTurn[];
 	label: string;
-	/** Shown while `turns` is undefined. */
 	placeholder?: ReactNode;
 	names?: { user: string; assistant: string };
 	className?: string;
-	/** Folds the user's turns to one line that opens them, for a long brief the reader rarely needs. */
-	foldUser?: string;
+	userFoldLabel?: string;
 }) {
 	const blocks = turns ? transcriptBlocks(turns) : undefined;
 	return (
@@ -44,8 +34,8 @@ export function TranscriptTurns({ turns, label, placeholder, names = { user: 'Yo
 								</ol>
 							</details>
 						)}
-						{block.turn && (role === 'user' && foldUser
-							? <details className="agent-brief"><summary>{`${foldUser} · ${plural(block.turn.text.split('\n').length, 'line')}`}</summary><p>{block.turn.text}</p></details>
+						{block.turn && (role === 'user' && userFoldLabel
+							? <details className="agent-brief"><summary>{`${userFoldLabel} · ${plural(block.turn.text.split('\n').length, 'line')}`}</summary><p>{block.turn.text}</p></details>
 							: <p>{block.turn.text}</p>)}
 					</li>
 				);
@@ -56,11 +46,6 @@ export function TranscriptTurns({ turns, label, placeholder, names = { user: 'Yo
 
 type TranscriptBlock = { work: ClaudeTurn[]; turn?: ClaudeTurn };
 
-/**
- * Groups a conversation into blocks: each text turn, with the tool calls and
- * thinking that came just before an assistant turn folded into it. Work that
- * no answer follows yet is a block of its own.
- */
 export function transcriptBlocks(turns: ClaudeTurn[]): TranscriptBlock[] {
 	const blocks: TranscriptBlock[] = [];
 	let work: ClaudeTurn[] = [];

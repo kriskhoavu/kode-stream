@@ -13,15 +13,10 @@ import type {
 	HarnessTask
 } from '../../lib/types';
 
-/**
- * The single source of every word the harness shows. The screens are read by
- * people who never see the backend, so no state name, engine id or model id
- * reaches them except through this module (raw ids go in tooltips only).
- */
+// Every word the harness shows comes from this module. Raw ids appear only in tooltips.
 
 export type HxStatus = 'not_started' | 'up_next' | 'starting' | 'working' | 'waiting' | 'reporter' | 'done' | 'needs_fix' | 'failed' | 'stopped' | 'skipped' | 'manual';
 
-/** Colour family of a status; each maps to one --hx-* token. */
 export type HxTone = 'idle' | 'running' | 'waiting' | 'done' | 'stopped' | 'manual';
 
 export const hxStatuses: Record<HxStatus, { label: string; tone: HxTone; icon: LucideIcon }> = {
@@ -39,7 +34,6 @@ export const hxStatuses: Record<HxStatus, { label: string; tone: HxTone; icon: L
 	manual: { label: 'Done by hand', tone: 'manual', icon: UserCheck }
 };
 
-/** Stage words. Plan check, Code check and Fix are the reviewer and fixer halves of their stage. */
 export type HxStep = 'start' | 'plan' | 'plan_check' | 'approval' | 'build' | 'code_check' | 'test' | 'fix' | 'review' | 'draft_pr';
 
 export const hxSteps: Record<HxStep, { label: string; explain: string }> = {
@@ -64,7 +58,6 @@ export const stageKindLabels: Record<HarnessStageKind, string> = {
 	draft_pr: 'Draft pull request'
 };
 
-/** Where a run ended, after its status: "Stopped while planning". */
 export const stageKindWhere: Record<HarnessStageKind, string> = {
 	plan: 'while planning',
 	plan_approval: 'at your plan approval',
@@ -120,7 +113,6 @@ export function engineLabel(engine?: HarnessEngineId): string {
 	return engine ? engineLabels[engine] ?? engine : 'No model';
 }
 
-/** "opus" → "Opus"; "claude-opus-5-5" → "Opus 5.5"; anything else is shown as given. */
 export function modelLabel(model?: string): string {
 	if (!model) return '';
 	const concrete = /^claude-([a-z]+)-(\d+)(?:-(\d+))?/.exec(model);
@@ -129,7 +121,6 @@ export function modelLabel(model?: string): string {
 	return model;
 }
 
-/** The chip text for who is working: "Claude · Opus 5.5". */
 export function workerLabel(engine?: HarnessEngineId, model?: string): string {
 	if (!engine) return 'No model';
 	const name = modelLabel(model);
@@ -161,7 +152,6 @@ export function agentRunStatus(state: HarnessAgentRunState, verdict?: 'approve' 
 	}
 }
 
-/** A task's plain status. `waitsFor` lists dependencies not yet done; a ready task with none is "Up next". */
 export function taskStatus(task: HarnessTask, waitsFor: readonly string[] = []): HxStatus {
 	if (task.finishedOutside) return 'manual';
 	if (task.waitingFor) return 'reporter';
@@ -173,7 +163,6 @@ export function taskStatus(task: HarnessTask, waitsFor: readonly string[] = []):
 		case 'done': return 'done';
 		case 'dismissed':
 		case 'stale': return 'skipped';
-		// Started by a person, not yet taken by a Planner.
 		case 'ranked': return task.startRequested ? 'starting' : waitsFor.length ? 'not_started' : 'up_next';
 		default: return 'not_started';
 	}
@@ -194,7 +183,6 @@ export function formatMinutes(ms: number | undefined): string {
 	return rest ? `${hours} h ${rest} min` : `${hours} h`;
 }
 
-/** A running clock: "7:12", or "1:02:03" past an hour. */
 export function formatClock(ms: number): string {
 	const total = Math.max(0, Math.floor(ms / 1000));
 	const hours = Math.floor(total / 3600);

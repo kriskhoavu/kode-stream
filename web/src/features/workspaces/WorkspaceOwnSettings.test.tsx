@@ -42,7 +42,6 @@ describe('WorkspaceOwnSettings', () => {
 		expect(screen.getByRole('region', { name: 'Harness settings for ws-1' })).toHaveAttribute('data-view', 'choices');
 		fireEvent.click(screen.getByRole('tab', { name: 'Models and skills' }));
 		expect(screen.queryByRole('combobox', { name: 'Provider here' })).not.toBeInTheDocument();
-		// The same harness form stays mounted, so an unsaved edit survives the switch.
 		expect(screen.getByRole('region', { name: 'Harness settings for ws-1' })).toHaveAttribute('data-view', 'models');
 	});
 

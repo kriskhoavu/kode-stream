@@ -32,8 +32,6 @@ describe('ItemWorkspacePage embedded explorer', () => {
 		expect(await screen.findByTestId('embedded-explorer')).toBeInTheDocument();
 	});
 
-	// The app bumps refreshKey whenever the window regains focus; that must not
-	// close any open tab, drop an unsaved edit or reopen the default file.
 	it('refreshes in place on an app refresh, without reopening the default file', async () => {
 		apiMock.files.mockResolvedValue([{ id: 'README_md', name: 'README.md', path: 'README.md', type: 'file' }]);
 		const workspaces = [{ id: 'ws', name: 'Workspace', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '2026-07-10T00:00:00Z' }];

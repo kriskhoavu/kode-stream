@@ -2,20 +2,12 @@ import type { HarnessAgentRole, HarnessAgentRun, HarnessApproval, HarnessRun, Ha
 import type { HxStatus, HxStep } from './vocabulary';
 import { agentRunStatus, channelLabels, formatCost, formatMinutes, hxSteps, plural, stageStatus } from './vocabulary';
 
-/**
- * Turns a run's stages, agent runs and approvals into the stepper people
- * read: groups of plain steps, each with one status. Pure, so the stepper,
- * the drawer's vertical stepper and the tests share one reading.
- */
-
 export interface StepCard {
 	id: string;
 	step: HxStep;
 	label: string;
 	status: HxStatus;
-	/** Short facts under the name: who, how long, how much. */
 	meta: string[];
-	/** When the step is running, the moment it started, for a live timer. */
 	since?: string;
 	current: boolean;
 	agentRun?: HarnessAgentRun;
@@ -30,7 +22,6 @@ export interface StepGroup {
 export interface PipelineModel {
 	groups: StepGroup[];
 	current?: StepCard;
-	/** Index of the group the flow connector leads into, if work is moving. */
 	activeGroup: number;
 }
 
@@ -96,7 +87,7 @@ function roundLabel(name: string, stage: HarnessStage | undefined): string {
 }
 
 export function pipelineModel(detail: HarnessRunDetail, now = Date.now()): PipelineModel {
-	// Stages arrive by ordinal then creation, so a resumed stage follows the one it replaced and is the one in play.
+	// Stages arrive by ordinal then creation, so the last of a kind is the one in play.
 	const stageOf = (kind: HarnessStageKind) => detail.stages.filter((stage) => stage.kind === kind).at(-1);
 	const approvalOf = (gate: HarnessApproval['gate']) => detail.approvals
 		.filter((approval) => approval.gate === gate)
@@ -129,12 +120,11 @@ export function pipelineModel(detail: HarnessRunDetail, now = Date.now()): Pipel
 	const draft = stageOf('draft_pr');
 	const review = stageOf('review');
 	const reviewCard = approvalCard('review', 'review', review, approvalOf('review'), 'after the tests', now);
-	// A run that reached its pull request without a Review stage ran with Review turned off.
+	// A run that reached its pull request without a Review stage ran with Review off.
 	if (!review && draft) {
 		reviewCard.status = 'skipped';
 		reviewCard.meta = ['turned off'];
 	}
-	// Sent back, a review is done with: the run is building or planning again, and comes back to it.
 	if (review && review.state === 'passed' && reviewCard.status === 'needs_fix') reviewCard.meta = [`sent back · ${reviewCard.meta.join(' · ')}`];
 	const draftStatus: HxStatus = draft ? stageStatus(draft.state) : 'not_started';
 	const draftCard: StepCard = {
@@ -159,7 +149,6 @@ export function pipelineModel(detail: HarnessRunDetail, now = Date.now()): Pipel
 		{ id: 'handoff', label: 'Hand-off', cards: [draftCard] }
 	];
 
-	// The current step: the first waiting or working one, else the first not done.
 	const all = groups.flatMap((group) => group.cards);
 	const current = all.find((card) => card.status === 'waiting') ?? all.find((card) => card.status === 'working')
 		?? (detail.run.state === 'running' ? all.find((card) => card.status === 'not_started' || card.status === 'up_next') : undefined);
@@ -174,7 +163,6 @@ export function groupStatus(group: StepGroup): 'done' | 'active' | 'idle' {
 	return 'idle';
 }
 
-/** The run's overall status, for the picker and the header badge. */
 export function runStatus(run: HarnessRun): HxStatus {
 	if (run.state === 'running') return run.currentStage?.state === 'awaiting_approval' ? 'waiting' : 'working';
 	if (run.state === 'blocked') return 'stopped';

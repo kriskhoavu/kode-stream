@@ -10,7 +10,6 @@ type WorkspaceEdit = ReturnType<typeof useWorkspaceEdit>;
 
 export const sourceSurfaceLabels: Record<SourceSurface, string> = { workstream: 'Workstream', knowledge: 'Knowledge' };
 
-/** The Overview tab's General section: where the workspace lives, or its edit form. */
 export function WorkspaceGeneralSection({ repo, edit, busy, onReveal }: { repo: WorkspaceConfig; edit: WorkspaceEdit; busy: boolean; onReveal: (path: string) => void }) {
   return (
     <>
@@ -45,7 +44,6 @@ export function WorkspaceGeneralSection({ repo, edit, busy, onReveal }: { repo: 
   );
 }
 
-/** The Overview tab's Sources section: each source, where it shows and its structure, or the edit form. */
 export function WorkspaceSourcesSection({ repo, edit, busy, canWrite, onShownIn, onConfigure }: { repo: WorkspaceConfig; edit: WorkspaceEdit; busy: boolean; canWrite: boolean; onShownIn: (path: string, surface: SourceSurface) => void; onConfigure: (path: string) => void }) {
   return (
     <>
@@ -73,7 +71,6 @@ export function WorkspaceSourcesSection({ repo, edit, busy, canWrite, onShownIn,
   );
 }
 
-/** The Integrations tab: Jira, Knowledge, runtime and the harness sources, each with its edit form. */
 export function WorkspaceIntegrations({ repo, edit, busy, showHarness, settingsKey }: { repo: WorkspaceConfig; edit: WorkspaceEdit; busy: boolean; showHarness: boolean; settingsKey: string }) {
   return (
     <>

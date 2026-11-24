@@ -51,7 +51,6 @@ function renderBoard() {
 	return render(<WorkstreamPage workspace={workspace} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 }
 
-/** Tasks is the board's first view; the plans on the branch sit behind the other toggle. */
 async function showPlans() {
 	fireEvent.click(await screen.findByRole('button', { name: 'Plans' }));
 }
@@ -60,7 +59,6 @@ function column(status: string): HTMLElement {
 	return document.querySelector(`.workstream-column[data-status="${status}"]`) as HTMLElement;
 }
 
-// The board remembers its view in the browser's storage; each test starts on the status columns.
 afterEach(() => { vi.unstubAllGlobals(); window.localStorage.clear(); });
 
 describe('WorkstreamPage with the harness', () => {
@@ -76,7 +74,6 @@ describe('WorkstreamPage with the harness', () => {
 		expect(screen.getByText('Found by the Finder')).toBeInTheDocument();
 		expect(screen.getByText('no plan yet')).toBeInTheDocument();
 		expect(screen.getByText('Needs a decision').closest('.plan-card')).toHaveClass('needs-you-card');
-		// The Tasks board holds tasks only: the plan nobody handed to the harness is not on it.
 		expect(screen.queryByText('Quiet card')).not.toBeInTheDocument();
 		expect(screen.queryByText('By hand')).not.toBeInTheDocument();
 		await showPlans();
@@ -90,16 +87,13 @@ describe('WorkstreamPage with the harness', () => {
 		await screen.findByText('Found by the Finder');
 		expect(within(column('unsorted')).getByRole('heading', { name: 'To do' })).toBeInTheDocument();
 		expect(within(column('unsorted')).getByText('Found by the Finder')).toBeInTheDocument();
-		// Started, its plan waiting for approval: Draft. Its plan approved and being built: In Progress.
 		expect(within(column('draft')).getByText('Needs a decision')).toBeInTheDocument();
 		expect(within(column('in_progress')).getByText('Built by the harness')).toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: 'Move item status' })).not.toBeInTheDocument();
 		expect(screen.queryByRole('button', { name: '+ New item' })).not.toBeInTheDocument();
 		expect(screen.queryByTitle('Configure source items')).not.toBeInTheDocument();
-		// Only the task nobody started may be dragged, and only to start it.
 		expect([...document.querySelectorAll('.plan-card.draggable')].map((card) => card.textContent)).toEqual([expect.stringContaining('Found by the Finder')]);
 		await showPlans();
-		// On the Plans board a plan keeps the status a person gave it.
 		expect(within(column('in_progress')).getByText('Needs a decision')).toBeInTheDocument();
 		expect(screen.getAllByRole('button', { name: 'Move item status' }).length).toBeGreaterThan(0);
 	});
@@ -129,7 +123,7 @@ describe('WorkstreamPage with the harness', () => {
 		renderBoard();
 		await screen.findByText('Found by the Finder');
 		expect(screen.queryByTitle('Configure source items')).not.toBeInTheDocument();
-		// The configure column takes a narrow track of its own, so the five status columns stay in one row.
+		// The configure column takes a narrow track of its own.
 		expect((document.querySelector('.task-board') as HTMLElement).style.gridTemplateColumns.split(' 44px')).toHaveLength(2);
 		fireEvent.click(screen.getByTitle('Configure AI and harness'));
 		const dialog = screen.getByRole('dialog', { name: 'AI and harness' });
@@ -197,7 +191,6 @@ describe('WorkstreamPage board views', () => {
 		const layouts = screen.getByRole('group', { name: 'Board view' });
 		expect(within(layouts).getAllByRole('button').map((button) => button.getAttribute('aria-label'))).toEqual(['Board', 'List']);
 		expect(within(layouts).getByRole('button', { name: 'List' })).toHaveTextContent('');
-		// The view switcher sits beside Save view, not in the title row.
 		expect(layouts.closest('.saved-filter-bar')).not.toBeNull();
 		expect(within(layouts).getByRole('button', { name: 'Board' })).toHaveAttribute('aria-pressed', 'true');
 	});
@@ -215,7 +208,6 @@ describe('WorkstreamPage board views', () => {
 		fireEvent.click(within(quietRow).getByRole('button', { name: 'Move Quiet card' }));
 		fireEvent.click(screen.getByRole('menuitemradio', { name: 'Review' }));
 		await waitFor(() => expect(fetchMock.mock.calls.some(([url, init]) => String(url).includes('/api/items/p2') && init?.method && init.method !== 'GET')).toBe(true));
-		// Each toggle keeps its own view: Tasks is still a board.
 		fireEvent.click(screen.getByRole('button', { name: 'Tasks' }));
 		expect(await screen.findByText('Found by the Finder')).toBeInTheDocument();
 		expect(within(screen.getByRole('group', { name: 'Board view' })).getByRole('button', { name: 'Board' })).toHaveAttribute('aria-pressed', 'true');
@@ -263,7 +255,6 @@ describe('WorkstreamPage ticket cards', () => {
 		const ticket = (await screen.findByText('Found by the Finder')).closest('.plan-card') as HTMLElement;
 		expect(ticket).toHaveClass('ticket-card');
 		expect(within(ticket).getByText('Jira ticket')).toBeInTheDocument();
-		// A task a plan holds keeps the plan card's look on the Tasks board.
 		const held = screen.getByText('Built by the harness').closest('.plan-card') as HTMLElement;
 		expect(held).toHaveClass('plan-kind-card');
 		expect(within(held).getByText('Plan')).toBeInTheDocument();

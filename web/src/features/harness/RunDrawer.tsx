@@ -31,25 +31,16 @@ const tabs: { id: HarnessRunTab; label: string }[] = [
 	{ id: 'links', label: 'Links' }
 ];
 
-/**
- * Everything about one task beside the board, so approving or re-ordering
- * never means leaving it. The waiting gate sits at the top; the tabs hold
- * the stages, the findings, the changed files, the live agent and the links.
- */
 export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTabChange, onClose, onOpenDetails, onCancel, onOpenAgentSpace, loadRun, onApprove, onReject, onPin, onMove, onStart, onReset, onRemove, onSetQuestions, askDefault = true }: {
 	state: HarnessState;
 	client: HarnessClient;
 	taskId: string;
 	tab: HarnessRunTab;
-	/** The conversation the Live tab opens on; otherwise the working or latest agent. */
 	agentRunId?: string;
-	/** The workspace's Task Queue in order, for Move up and Move down. */
 	queue: HarnessTask[];
 	onTabChange: (tab: HarnessRunTab) => void;
 	onClose: () => void;
-	/** Opens the run whole, full width: its stepper, plan, findings and conversations. */
 	onOpenDetails?: (runId: string) => void;
-	/** Stops the task's run, after a confirmation. */
 	onCancel?: (run: HarnessRun) => Promise<void>;
 	onOpenAgentSpace?: (workspaceId: string, view?: 'sessions') => void;
 	loadRun: (runId: string) => Promise<void>;
@@ -57,15 +48,10 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 	onReject: (approval: HarnessApproval, reason: string) => void;
 	onPin: (task: HarnessTask, pinned: boolean) => void;
 	onMove: (task: HarnessTask, before?: HarnessTask) => void;
-	/** Starts a task that is up next; absent when nothing can be started here. */
 	onStart?: (task: HarnessTask) => void;
-	/** Throws away the task's runs and working copies; offered once the task has a run. */
 	onReset?: (task: HarnessTask) => Promise<void>;
-	/** Removes the task in any state; the caller closes the drawer after. */
 	onRemove?: (task: HarnessTask) => Promise<void>;
-	/** Sets this task's own answer to "may an agent stop and ask"; null follows the workspace and the settings. */
 	onSetQuestions?: (task: HarnessTask, askQuestions: boolean | null) => void;
-	/** What the settings say when the task does not. */
 	askDefault?: boolean;
 }) {
 	const task = state.tasks[taskId];
@@ -93,7 +79,7 @@ export function RunDrawer({ state, client, taskId, tab, agentRunId, queue, onTab
 			window.removeEventListener('keydown', onKey);
 			previous?.focus();
 		};
-		// The drawer opens once per task, so focus moves only then; `onClose` is read when Escape is pressed.
+		// Only a new task moves focus. `onClose` is read when Escape is pressed.
 	}, [taskId]);
 
 	if (!task) return null;

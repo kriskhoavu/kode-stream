@@ -48,9 +48,6 @@ export function KnowledgeBrowser({ pages, selectedSlug, warnings, onSelect, chil
 		const startingWidth = sidePanelWidth;
 		startDrag(event, { move: (deltaX) => setSidePanelWidth(Math.max(260, Math.min(640, startingWidth - deltaX))) });
 	};
-	// The index is the wiki's folder tree, drawn like the Workstream explorer:
-	// the wiki root, its folders, then the pages in each, indented by depth. A
-	// folder holding an index.md or README.md opens it from its name.
 	const renderFolder = (node: FolderNode, level = 0): ReactNode => {
 		const label = node.path || node.name;
 		const collapsible = node.folders.length > 0 || node.pages.length > 0;
@@ -142,9 +139,7 @@ function findLandingPage(pages: KnowledgePage[]): KnowledgePage | undefined {
 	return pages.find((page) => /(?:^|\/)index\.md$/i.test(page.path)) ?? pages.find((page) => /(?:^|\/)readme\.md$/i.test(page.path));
 }
 
-// Folders come from each page's path relative to the wiki root, so the tree is
-// the wiki as it sits on disk. Only folders holding a visible page appear, which
-// is what lets the filter prune the tree.
+// Only folders holding a visible page appear, so the filter prunes the tree.
 function buildFolderTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[], rootName: string): FolderNode {
 	const root: FolderNode = { name: rootName, path: rootFolderPath, folders: [], pages: [] };
 	const folders = new Map<string, FolderNode>([[rootFolderPath, root]]);
@@ -165,8 +160,7 @@ function buildFolderTree(visiblePages: KnowledgePage[], allPages: KnowledgePage[
 	return root;
 }
 
-// A tier folder carries the colour the graph gives its tier. Any tier beyond
-// the two the corpus uses stays muted rather than taking a colour nobody chose.
+// Any other tier stays muted instead of taking a colour nobody chose.
 const markedTiers: Record<string, string> = { concepts: 'tier-concepts', reference: 'tier-reference' };
 
 function tierClass(folderName: string): string {

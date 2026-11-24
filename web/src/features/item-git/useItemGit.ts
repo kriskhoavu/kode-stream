@@ -5,19 +5,11 @@ import { notifyReliabilityChanged } from '../reliability/hooks';
 
 export type GitOperation = 'fetch' | 'pull' | 'push';
 export type GitBusy = GitOperation | 'commit' | 'branch' | '';
-/** A failed operation: the thrown error, or the server's own refusal. */
 export type GitProblem = { caught: unknown; fallback: string } | { result: { message?: string; recoveryHint?: string } };
 
-/**
- * One item's Git: its workspace's status, the item's recent activity, and the
- * fetch, pull, push, commit and branch actions. A response that returns after
- * the workspace changed or the surface closed is dropped.
- */
 export function useItemGit({ workspaceId, activityPath, onChanged, onProblem }: {
 	workspaceId?: string;
-	/** The path whose history the activity list shows; empty means the whole workspace. */
 	activityPath: string;
-	/** After a pull, a commit or a new branch changed what the item shows. */
 	onChanged: (operation: 'pull' | 'commit' | 'branch') => Promise<void> | void;
 	onProblem: (problem: GitProblem) => void;
 }) {
@@ -79,7 +71,6 @@ export function useItemGit({ workspaceId, activityPath, onChanged, onProblem }: 
 	useEffect(() => { void loadStatus(); }, [loadStatus]);
 	useEffect(() => { void loadActivity(); }, [loadActivity]);
 
-	/** Runs one action: marks it busy, applies the status it returns, and reports a refusal. */
 	const act = async (kind: Exclude<GitBusy, ''>, fallback: string, call: (id: string) => Promise<{ ok: boolean; status: GitStatus; message?: string; recoveryHint?: string }>, after?: () => void) => {
 		if (!workspaceId) return;
 		const started = generation.current;

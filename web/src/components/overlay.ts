@@ -2,7 +2,6 @@ import { useEffect, useId, useRef } from 'react';
 
 const focusable = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** Shared modal behavior: focus starts inside, tab stays inside, Escape closes, and focus returns to the opener. */
 export function useModalDialog(onClose: () => void, canDismiss = true, open = true) {
   const ref = useRef<HTMLElement | null>(null);
   const titleId = useId();

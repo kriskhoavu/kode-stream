@@ -3,12 +3,7 @@ import { api } from '../../shared/api';
 import type { ItemSummary, WorkspaceConfig, WorkstreamBranchLoadResult } from '../../lib/types';
 import { useWorkspaceGuard } from './useWorkspaceGuard';
 
-/**
- * The board's checkout: the branch it shows and that branch's items, loaded for the workspace and
- * reloaded silently on each refreshKey bump. One load runs at a time; a newer one aborts it, and a
- * workspace change discards its answer. A just-created item stays on the board until a load reports
- * it, so a rescan that has not caught up cannot make the new card flash and vanish.
- */
+// A just-created item stays until a load reports it, so a lagging rescan cannot make it vanish.
 export function useWorkstreamCheckout(workspace: WorkspaceConfig | undefined, refreshKey: unknown) {
 	const [items, setItems] = useState<ItemSummary[]>([]);
 	const [loading, setLoading] = useState(true);
@@ -31,7 +26,6 @@ export function useWorkstreamCheckout(workspace: WorkspaceConfig | undefined, re
 		return [pending, ...loaded];
 	};
 
-	/** Starts a load for the current workspace, aborting the one in flight. */
 	const begin = () => {
 		abortRef.current?.abort();
 		const controller = new AbortController();
@@ -41,15 +35,12 @@ export function useWorkstreamCheckout(workspace: WorkspaceConfig | undefined, re
 		return { controller, active, finish };
 	};
 
-	/** Shows a loaded checkout. */
 	const apply = (result: WorkstreamBranchLoadResult) => {
 		setBranchContext(result);
 		setSelectedBranch(result.branch);
 		setItems(withPendingCreated(result.items));
 	};
 
-	// silent keeps the board on screen while it refreshes, so a background reload
-	// never blanks the columns the user is already looking at.
 	const loadCheckout = async (force = false, { silent = false }: { silent?: boolean } = {}) => {
 		if (!workspace) return;
 		const { controller, active, finish } = begin();
@@ -79,7 +70,6 @@ export function useWorkstreamCheckout(workspace: WorkspaceConfig | undefined, re
 		}
 	};
 
-	/** Puts a just-created item on the board at once and keeps it there until a load reports it. */
 	const rememberCreated = (item: ItemSummary) => {
 		pendingCreatedRef.current = item;
 		setItems((current) => current.some((candidate) => candidate.id === item.id)
@@ -95,8 +85,7 @@ export function useWorkstreamCheckout(workspace: WorkspaceConfig | undefined, re
 			setLoading(false);
 			return;
 		}
-		// A refreshKey bump is the app refreshing (on window focus, among others),
-		// not a new board: reload the same workspace silently so the cards stay.
+		// A refreshKey bump reloads the same workspace silently so the cards stay.
 		const sameWorkspace = loadedWorkspaceRef.current === workspace.id;
 		loadedWorkspaceRef.current = workspace.id;
 		void loadCheckout(false, { silent: sameWorkspace });

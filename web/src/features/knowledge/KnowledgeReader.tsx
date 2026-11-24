@@ -6,8 +6,7 @@ import { normalizeKnowledgeTarget, prepareKnowledgeMarkdown } from './knowledgeM
 
 export { prepareKnowledgeMarkdown };
 
-// The page's front matter (roles, topics, sources, links) is index data, not
-// reading matter, so the reader shows only the page body and any warnings.
+// Front matter is index data, so the reader shows only the body and warnings.
 export function KnowledgeReader({ detail, onNavigate }: { detail: KnowledgePageDetail; onNavigate: (slug: string) => void }) {
 	const resolvedTargets = new Map(detail.links.filter((link) => link.resolution === 'resolved' && link.targetSlug).map((link) => [normalizeKnowledgeTarget(link.rawTarget), link.targetSlug!]));
 	const interceptLink = (event: MouseEvent<HTMLDivElement>) => {

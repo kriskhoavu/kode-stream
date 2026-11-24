@@ -23,22 +23,14 @@ describe('HeaderBackdrop', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  /*
-   * The band class strips the topbar's fill, blur and border, so it must never
-   * be applied where nothing will paint. Both ways of getting there — an
-   * off-band route and the none variant — have to answer the same.
-   */
+  // The band class strips the topbar's fill, so it must never apply where nothing paints.
   it('claims no band class where nothing will paint', () => {
     expect(bandClasses('workstream', 'none')).toBe('');
     expect(bandClasses('settings', 'neon')).toBe('');
     expect(bandClasses('settings', 'none')).toBe('');
   });
 
-  /*
-   * The variant class is what lets the page beneath react to the treatment
-   * above it — `.main-content` drops its corner glows under the lattice. The
-   * route does not appear: every band is the same height.
-   */
+  // `.main-content` reads the variant class to drop its glows under the lattice.
   it('names the variant on the band class, and not the route', () => {
     expect(bandClasses('workstream', 'lattice')).toBe('header-band backdrop-lattice');
     expect(bandClasses('canvas', 'neon')).toBe('header-band backdrop-neon');

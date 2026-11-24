@@ -11,11 +11,7 @@ import { applySourceItemsProposal, clearSourceItemsProposal, SourceStructurePrev
 import { type WorkspaceNotice, scanNotice, sourceSettingsNotice } from './workspaceNotice';
 import { errorMessage, settingsEditorFromResult, type SettingsEditorState } from './workspaceDraft';
 
-/**
- * The Source Items dialog for one source of a workspace: pick a proposal or edit the preview, then
- * save the rules and scan, keep the source unsorted, or reset its rules. `busy` is the page's, so
- * the page stays locked while the dialog saves.
- */
+// `busy` belongs to the page, so the page stays locked while the dialog saves.
 export function SourceSettingsDialog({ editor, setEditor, busy, setBusy, onNotice, onChanged }: {
 	editor: SettingsEditorState;
 	setEditor: Dispatch<SetStateAction<SettingsEditorState | null>>;

@@ -33,7 +33,6 @@ export function runTone(state: HarnessRunDetail['run']['state']) {
 	}
 }
 
-/** The questions an agent stopped to ask, each with the answer a person gave. */
 export function Answers({ detail }: { detail: HarnessRunDetail }) {
 	const answered = detail.approvals.filter((approval) => approval.gate === 'question' && approval.context?.questions?.length);
 	if (answered.length === 0) return null;
@@ -77,7 +76,6 @@ export function CheckerList({ agentRuns, onOpen, onOpenRun }: { agentRuns: Harne
 	);
 }
 
-/** Each stage of the run in order, with its status, rounds, time and cost; a stage with conversations opens them. */
 export function StepList({ detail, onOpen }: { detail: HarnessRunDetail; onOpen: (key: WorkbenchKey) => void }) {
 	const stages = [...detail.stages].sort((a, b) => a.ordinal - b.ordinal || Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? ''));
 	if (stages.length === 0) return <p className="hx-workbench-empty">No step has started yet.</p>;

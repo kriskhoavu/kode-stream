@@ -65,6 +65,5 @@ export interface RecentItem {
 
 export type SourceSurface = 'workstream' | 'knowledge';
 export interface WorkspaceSource { path: string; shownIn: SourceSurface[]; }
-// The server accepts a bare path and answers the object form; readers go
-// through lib/sources.ts, which applies the same defaults.
+// The server accepts a bare path. Read sources through lib/sources.ts.
 export type WorkspaceSourceLike = string | WorkspaceSource;

@@ -16,16 +16,8 @@ export function CanvasSearchViewport({ query }: { query: string }) {
 	return null;
 }
 
-/** Saves the viewport that was current when Focus is switched on and restores
- * it when Focus is switched off; the prior viewport is kept only in a ref
- * hoisted into CanvasBoard, so it survives the `<ReactFlow key={layoutId}>`
- * remount that would otherwise drop a ref living inside it. Focus never
- * writes to the saved layout.
- *
- * Fitting the view is handled separately, keyed on the rendered node list:
- * it re-runs (mount included) whenever that list changes while Focus is on,
- * after a double requestAnimationFrame so the forced-expanded session nodes
- * have been measured before the fit reads their size. */
+// The saved viewport lives in a ref in CanvasBoard so it survives the `<ReactFlow key>` remount.
+// The fit waits two animation frames so the expanded nodes are measured first.
 export function CanvasFocusViewport({ focusOn, nodeIdsKey, savedViewportRef, previousFocusOnRef }: { focusOn: boolean; nodeIdsKey: string; savedViewportRef: RefObject<CanvasViewport | undefined>; previousFocusOnRef: RefObject<boolean> }) {
 	const { fitView, getViewport, setViewport } = useReactFlow();
 	useEffect(() => {

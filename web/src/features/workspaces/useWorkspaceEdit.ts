@@ -33,10 +33,6 @@ function draftFromWorkspace(repo: WorkspaceConfig): WorkspaceEditDraft {
 	};
 }
 
-/**
- * Editing one section of one workspace: which workspace and section are open, the draft, and saving
- * it. The runtime section saves through its own endpoint; every other section updates the workspace.
- */
 export function useWorkspaceEdit({ setBusy, onNotice, onChanged }: {
 	setBusy: (pending: boolean) => void;
 	onNotice: (notice: WorkspaceNotice | null) => void;

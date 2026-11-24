@@ -9,7 +9,6 @@ export type FileMenuOption = {
   label: string;
 };
 
-/** With `tree`, the dropdown shows the files as a folder tree instead of a flat list of paths. */
 export function FileMenu({ value, options, onChange, tree }: { value: string; options: FileMenuOption[]; onChange: (id: string) => void | Promise<void>; tree?: FileNode[] }) {
   const [open, setOpen] = useState(false);
   const menuRef = useMenuPopover(open, () => setOpen(false));

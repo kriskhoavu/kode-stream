@@ -8,10 +8,6 @@ import { readAISessionPreference, saveAISessionPreference } from './preferences'
 import { openEmbeddedSession } from './terminalSessions';
 import { toolLabel as label } from './providerDisplay';
 
-/**
- * `onEmbeddedLaunched` takes an embedded session that would otherwise open in
- * the terminal dock, for a caller that shows the terminal itself.
- */
 export function AISessionLaunchControl({ itemId, disabled, onLaunched, onError, onEmbeddedLaunched, buttonLabel = 'Open AI session', allowEmbedded = true }: { itemId: string; disabled?: boolean; onLaunched: (message: string) => void; onError: (error: unknown) => void; onEmbeddedLaunched?: (result: EmbeddedAISessionResult) => void; buttonLabel?: string; allowEmbedded?: boolean }) {
   const showEmbedded = onEmbeddedLaunched ?? openEmbeddedSession;
   const [preference, setPreference] = useState<AISessionLaunchInput | null>(readAISessionPreference);

@@ -203,14 +203,7 @@ describe('ItemWorkspacePage', () => {
   });
 
   it('keeps a right-panel tab selected when it is clicked as the panel first appears', async () => {
-    /*
-     * If `plan` landed one render before `workspaceConfig`, the layout gate
-     * would flip from the pre-explorer fallback to the explorer, replacing
-     * every node in the Info/Jira/Quality bar, and a click arriving in that
-     * window would hit a detached button and be dropped. Clicking the tab the
-     * instant it appears — without first waiting for the explorer — pins that
-     * the panel mounts once and keeps the selection.
-     */
+    // Click the tab the instant it appears: a layout swap would drop the click.
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url === '/api/items/item-1') {

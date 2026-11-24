@@ -28,7 +28,6 @@ describe('router', () => {
 
 	it('parses and builds Knowledge selections', () => {
 		window.history.pushState(null, '', '/knowledge?workspaceId=ws&root=docs%2Fwiki&slug=overview&view=read');
-		// An old link naming the wiki's folder still opens the page; Knowledge shows the workspace's one Wiki.
 		expect(routeFromLocation()).toEqual({ name: 'knowledge', location: { workspaceId: 'ws', slug: 'overview', view: 'read' } });
 		expect(knowledgeLocationFromSearch('?view=invalid&slug=page')).toEqual({ slug: 'page' });
 		expect(knowledgePath()).toBe('/knowledge');
@@ -49,7 +48,6 @@ describe('router', () => {
 		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&view=canvas');
 		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', view: 'canvas' } });
 		expect(pathForRoute({ name: 'canvas', location: { workspaceId: 'ws one', view: 'canvas' } })).toBe('/canvas?workspaceId=ws+one&view=canvas');
-		// An old link to the Sessions view still opens it.
 		window.history.pushState(null, '', '/canvas?workspaceId=ws+one&view=sessions');
 		expect(routeFromLocation()).toEqual({ name: 'canvas', location: { workspaceId: 'ws one', view: 'sessions' } });
 	});

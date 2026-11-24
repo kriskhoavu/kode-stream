@@ -29,7 +29,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 	const workspace = workspaces.find((candidate) => candidate.id === location?.workspaceId) ?? workspaces[0];
 	const workspaceRef = useRef(workspace);
 	workspaceRef.current = workspace;
-	const wiki = theWiki(wikis);
+	const wiki = preferredWiki(wikis);
 	const page = pages.find((candidate) => candidate.slug === location?.slug);
 
 	const updateLocation = useCallback((patch: Partial<KnowledgeLocation>) => {
@@ -49,7 +49,7 @@ export function useKnowledgeController(workspaces: WorkspaceConfig[], location: 
 			const loadedWikis = await api.knowledgeWikis(selectedWorkspace.id, abort.signal);
 			if (version !== requestVersion.current) return;
 			setWikis(loadedWikis);
-			const selectedWiki = theWiki(loadedWikis);
+			const selectedWiki = preferredWiki(loadedWikis);
 			if (!selectedWiki) { setPages([]); setWarnings([]); setLoading(false); if (currentLocation?.workspaceId !== selectedWorkspace.id) onLocationChangeRef.current({ workspaceId: selectedWorkspace.id, view: 'browse' }); return; }
 			const response = await api.knowledgePages(selectedWorkspace.id, selectedWiki.root, abort.signal);
 			if (version !== requestVersion.current) return;
@@ -120,7 +120,6 @@ function sameLocation(left: KnowledgeLocation | undefined, right: KnowledgeLocat
 	return left?.workspaceId === right.workspaceId && left?.slug === right.slug && left?.view === right.view;
 }
 
-/** Knowledge shows a workspace's Wiki: the one at `wiki/` when the workspace has it, else the one it found. */
-function theWiki(wikis: KnowledgeWiki[]): KnowledgeWiki | undefined {
+function preferredWiki(wikis: KnowledgeWiki[]): KnowledgeWiki | undefined {
 	return wikis.find((candidate) => candidate.root === 'wiki') ?? wikis[0];
 }

@@ -1,7 +1,6 @@
 import { useModalDialog } from '../../components/overlay';
 import type { SafeSessionRecord } from '../../lib/types';
 
-/** A session record counted as live: launched and still active. */
 export function isSessionLive(record: SafeSessionRecord): boolean {
 	return Boolean(record.live) && (record.state === 'starting' || record.state === 'running');
 }
@@ -12,7 +11,6 @@ export function formatSessionDate(value?: string): string {
 	return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-/** hh:mm:ss (or mm:ss) elapsed since start, frozen at the end timestamp once a session has finished. */
 export function formatDuration(record: SafeSessionRecord): string {
 	const started = Date.parse(record.startedAt);
 	if (Number.isNaN(started)) return '—';
@@ -26,7 +24,6 @@ export function formatDuration(record: SafeSessionRecord): string {
 	return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
 }
 
-/** Relative "age" since a session started, for the browser's compact card ("5m ago", "2h ago"). */
 export function formatAge(startedAt: string): string {
 	const started = Date.parse(startedAt);
 	if (Number.isNaN(started)) return '—';
@@ -40,10 +37,6 @@ export function formatAge(startedAt: string): string {
 	return `${days}d ago`;
 }
 
-/**
- * A Cancel-default confirmation dialog with a focus trap, shared by destructive
- * session actions across the Canvas Workbench and the Session Browser.
- */
 export function SessionConfirmDialog({ title, message, confirmLabel, busyLabel, busy, error, onCancel, onConfirm }: { title: string; message: string; confirmLabel: string; busyLabel: string; busy: boolean; error?: string; onCancel: () => void; onConfirm: () => void }) {
 	const dialog = useModalDialog(onCancel, !busy);
 	return <div className="confirm-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel(); }}>

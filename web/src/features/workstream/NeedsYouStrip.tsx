@@ -6,16 +6,10 @@ import type { HarnessState } from '../harness/harnessState';
 import { decisionLine, waitingApprovals } from '../harness/harnessState';
 import { gateTitles } from '../harness/vocabulary';
 
-/**
- * What waits on you, above the board: one row per approval, with the gate's
- * own words. A plan asks for Approve or Ask for changes; a stuck task asks
- * for Retry; a question wants an answer before the task goes on.
- */
 export function NeedsYouStrip({ state, onApprove, onReject, onOpenTask }: {
 	state: HarnessState;
 	onApprove: (approval: HarnessApproval, reason?: string) => void;
 	onReject: (approval: HarnessApproval, reason: string) => void;
-	/** Opens the card that holds the task, when the board has one. */
 	onOpenTask?: (task: HarnessTask) => void;
 }) {
 	const waiting = waitingApprovals(state);

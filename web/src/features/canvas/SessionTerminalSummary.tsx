@@ -3,7 +3,7 @@ import { api } from '../../shared/api';
 import type { SafeSessionRecord } from '../../lib/types';
 import { formatSessionDate, isSessionLive, SessionConfirmDialog } from '../sessions/sessionDisplay';
 
-/** Session node Terminal tab: the durable session summary and Stop; the live terminal itself stays in the Canvas node, never duplicated here. */
+// The live terminal stays in the Canvas node, so this tab shows only the summary.
 export function SessionTerminalSummary({ record, onReload }: { record: SafeSessionRecord; onReload: () => Promise<unknown> | void }) {
 	const [confirming, setConfirming] = useState(false);
 	const [stopping, setStopping] = useState(false);

@@ -8,7 +8,6 @@ import { E2EQualityPanel } from '../e2e-testing/E2EQualityPanel';
 import { verificationTriggerDescription, verificationTriggerLabel, verificationTriggerTone, formatArtifactKind, formatAt, formatBytes } from './itemFormat';
 import { parentPath } from './itemPaths';
 
-/** The Quality tab: verification, automation specs, E2E coverage, and the dialogs they open. */
 export function ItemQualityPanel({ quality, plan, workspaceConfig }: { quality: ItemQuality; plan: ItemDetail | null; workspaceConfig: WorkspaceConfig | null }) {
   const { verificationJob, verificationBusy, verificationError, verificationTests, e2eRunbooks, verificationTestsBusy, manualSpec, setManualSpec, specPickerOpen, setSpecPickerOpen, specPickerPath, setSpecPickerPath, specPickerEntries, specPickerSelected, specPickerLoading, specPickerError, artifactPreview, setArtifactPreview, loadE2ERunbooks, runVerification, selectedSpecs, automationEnvironment, automationDisplayMode, automationRunBusy, automationWorkspace, addSelectedSpec, removeSelectedSpec, saveAutomationEnvironment, saveAutomationDisplayMode, addManualSpec, openSpecPicker, togglePickerSpec, addPickedSpecs, runAutomationVerification, rerunVerification, openArtifactPath, previewArtifact } = quality;
   const artifactDialog = useModalDialog(() => setArtifactPreview(null), true, Boolean(artifactPreview));

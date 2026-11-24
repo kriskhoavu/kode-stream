@@ -55,9 +55,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		}
 	}, [location?.selectedNodeId, location?.view, location?.workspaceId, onLocationChange, workspaceId]);
 
-	// A session link can hand off a node id through the route; honour it
-	// exactly once against the loaded projection, then clear it so it never
-	// re-selects on a later refresh, checkout switch, or back navigation.
+	// Consume a route node id once, so a later refresh or back navigation never reselects it.
 	const consumedSelectionRef = useRef<string | undefined>(undefined);
 	useEffect(() => {
 		const target = location?.selectedNodeId;
@@ -70,7 +68,6 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	const title = useMemo(() => canvas.projection?.nodes.find((node) => node.kind === 'workspace')?.workspace?.name ?? workspace?.name ?? 'Canvas', [canvas.projection, workspace?.name]);
 	const selectedNode = canvas.projection?.nodes.find((node) => node.id === selectedId);
 	const workspaceNode = canvas.projection?.nodes.find((node) => node.kind === 'workspace');
-	// Sessions is the first view; a node handed off through the route is shown on the canvas.
 	const view = location?.view ?? (location?.selectedNodeId ? 'canvas' : 'sessions');
 	const terminalLaunch = selectedNode?.plan?.actions['terminal.launch'] ?? workspaceNode?.workspace?.actions['terminal.launch'];
 	const canOpenAISession = terminalLaunch?.state === 'available';
@@ -100,8 +97,7 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 		setSelectedId(undefined);
 		if (focusID) requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-canvas-node-id="${focusID.replaceAll('"', '\\"')}"]`)?.focus());
 	};
-	// Escape closes the Workbench, unless a dialog owns the key or the user is
-	// typing in a field or the embedded terminal, where Escape means something else.
+	// Escape belongs first to an open dialog, a text field or the terminal.
 	useEffect(() => {
 		if (!workbenchNode) return;
 		const onKeyDown = (event: KeyboardEvent) => {
@@ -153,7 +149,6 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 	}, [canvas.moveNode, canvas.projection, sections]);
 	const onRemoveSection = useCallback((id: string) => setSections((current) => current.filter((section) => section.id !== id)), []);
 	const onOpenAISession = useCallback(() => setAISessionDialogOpen(true), []);
-	// The checkout Sessions lists: the canvas's once it has loaded, else the branch list's, which arrives first.
 	const sessionBranch = workspaceNode?.workspace?.branch ?? canvas.projection?.layout.branchKey ?? branches?.current;
 	const liveSessionCount = canvas.projection?.nodes.filter((node) => node.session?.record.live && (node.session.record.state === 'starting' || node.session.record.state === 'running')).length ?? 0;
 	if (!workspaceId) return <section className="empty-state"><h1>Agent Space</h1><p>Select a workspace to arrange plans and terminal sessions.</p></section>;
@@ -165,7 +160,6 @@ export function CanvasPage({ workspace, location, onLocationChange, onOpenItem, 
 				<ViewSwitcher label="Agent Space view" options={[{ id: 'sessions', label: 'Sessions', icon: ListChecks, suffix: liveSessionCount ? `(${liveSessionCount})` : undefined }, { id: 'canvas', label: 'Canvas', icon: Workflow }]} value={view} onChange={changeView} />
 				{workspace && <BranchCheckoutPicker workspaceId={workspace.id} currentCheckoutBranch={branches?.current ?? canvas.projection?.layout.branchKey ?? workspace.baselineBranch} branches={branches?.branches ?? []} gitStatus={workspaceNode?.workspace?.git} ariaLabel="Select checkout branch" listboxLabel="Checkout branches" disabled={canvas.loading} onSwitched={async () => { setSelectedId(undefined); await canvas.reload(); }} />}
 			</header>
-			{/* The canvas loads behind Sessions, which never waits for it: only the Canvas view says it is loading. */}
 			{canvas.loading && view === 'canvas' && <div className="canvas-state" role="status">Loading Canvas…</div>}
 			{canvas.error && view === 'canvas' && <div className="canvas-state error" role="alert">{canvas.error}<button type="button" onClick={() => void canvas.reload()}>Retry</button></div>}
 			{canvas.projection && <span className="sr-only" role="status" aria-live="polite">{canvas.saveStatus === 'saving' ? `Saving ${canvas.dirtyCount} Canvas change${canvas.dirtyCount === 1 ? '' : 's'}…` : canvas.saveStatus === 'saved' ? 'Saved' : ''}</span>}

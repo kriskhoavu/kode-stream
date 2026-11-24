@@ -5,12 +5,10 @@ import { isSessionLive } from '../sessions/sessionDisplay';
 import { embeddedSessionEndedEvent, embeddedSessionStartedEvent } from '../ai-session/terminalSessions';
 
 const POLL_MS = 10_000;
-/** A transcript written to this recently is taken to be a conversation still open in the user's terminal. */
 export const TRANSCRIPT_ACTIVE_MS = 10 * 60_000;
 
-/** Everything the board knows about the agents working on one card. */
 export interface ItemAgents {
-	/** Stable across polls while nothing changed, so memoised cards do not re-render. */
+	// Stable across unchanged polls, so memoised cards do not re-render.
 	key: string;
 	live: SafeSessionRecord[];
 	ended: SafeSessionRecord[];
@@ -21,20 +19,12 @@ export function transcriptActive(transcript: ClaudeTranscript, now = Date.now())
 	return now - Date.parse(transcript.lastActiveAt) <= TRANSCRIPT_ACTIVE_MS;
 }
 
-/**
- * Loads the branch's session records and the workspace's Claude transcripts,
- * grouped by item, and keeps them current: it polls while the page is visible
- * and reloads when a session starts anywhere in the app. A session reported as
- * ended leaves the live list at once, before the reload confirms it. Transcripts exist only
- * in Local mode; a refusal is remembered and transcripts are not asked for again.
- */
 export function useItemSessions(workspaceId: string | undefined, branch: string) {
 	const [byItem, setByItem] = useState<Map<string, ItemAgents>>(() => new Map());
 	const previousRef = useRef<Map<string, ItemAgents>>(new Map());
 	const transcriptsAvailableRef = useRef(true);
 	const generationRef = useRef(0);
-	// Sessions reported ended, kept not-live until a reload agrees, so a poll that
-	// races the cancellation cannot bring the chip back.
+	// Ended sessions stay not-live until a reload agrees, so a racing poll cannot bring the chip back.
 	const endedRef = useRef<Map<string, number>>(new Map());
 
 	const load = useCallback(async () => {
@@ -72,7 +62,7 @@ export function useItemSessions(workspaceId: string | undefined, branch: string)
 				setByItem(next);
 			}
 			window.clearTimeout(settle);
-			// The record turns final once the process has exited; read it again then.
+			// The record is final only after the process exits, so read it again then.
 			settle = window.setTimeout(() => { void load(); }, 1_000);
 		};
 		window.addEventListener(embeddedSessionStartedEvent, reload);
@@ -91,7 +81,6 @@ export function useItemSessions(workspaceId: string | undefined, branch: string)
 	return { byItem, reload: load };
 }
 
-/** The map with sessionId moved from live to ended; the same map when no item holds it live. */
 function withoutLive(byItem: Map<string, ItemAgents>, sessionId: string): Map<string, ItemAgents> {
 	for (const [itemId, agents] of byItem) {
 		const record = agents.live.find((candidate) => candidate.id === sessionId);

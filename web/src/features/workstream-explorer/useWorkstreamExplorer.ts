@@ -213,8 +213,6 @@ export function useWorkstreamExplorer(workspaces: WorkspaceConfig[], location?: 
 
   useEffect(() => () => abortDirectoryRequests(), [abortDirectoryRequests]);
 
-  // Opens every folder leading to path, and path itself when it is a folder,
-  // without changing the selection.
   const expandPath = useCallback(async (workspaceId: string, path: string, type: 'file' | 'directory' = 'file') => {
     const ancestors = ancestorDirectoryPaths(path, type);
     setExpandedNodeIds((current) => {

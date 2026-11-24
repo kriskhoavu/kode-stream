@@ -63,7 +63,7 @@ describe('SessionBrowser', () => {
 			row({ id: 'b', provider: 'claude', live: false, state: 'exited', exitCode: 0 }, { planTitle: 'Fix the bug' })
 		];
 		render(<SessionBrowser rows={rows} grouping="plan" persistKey="test" onStop={vi.fn()} onReload={vi.fn()} />);
-		fireEvent.click(screen.getByRole('button', { name: 'Live only' })); // turn Live only off so both are candidates
+		fireEvent.click(screen.getByRole('button', { name: 'Live only' }));
 		fireEvent.change(screen.getByRole('searchbox', { name: 'Filter sessions' }), { target: { value: 'bug' } });
 		expect(screen.queryByRole('button', { name: 'Ship the thing, Running' })).not.toBeInTheDocument();
 		expect(screen.getByRole('button', { name: 'Fix the bug, Exited' })).toBeInTheDocument();
@@ -205,7 +205,6 @@ describe('SessionBrowser', () => {
 		expect(screen.getByRole('button', { name: 'Finished plan, Exited' })).toHaveAttribute('aria-current', 'true');
 		expect(screen.getByRole('button', { name: 'Finished plan, Exited' })).toHaveAttribute('tabIndex', '0');
 
-		// Turning Live only on afterwards is the person's choice: it stays on, and the live session is selected.
 		fireEvent.click(screen.getByRole('button', { name: 'Live only' }));
 		expect(screen.getByRole('button', { name: 'Live only' })).toHaveAttribute('aria-pressed', 'true');
 		expect(screen.queryByRole('button', { name: 'Finished plan, Exited' })).not.toBeInTheDocument();
@@ -237,7 +236,6 @@ describe('SessionBrowser', () => {
 			const groups = [...document.querySelectorAll('.session-browser-group')];
 			expect(groups).toHaveLength(1);
 			expect(groups[0].querySelector('.session-browser-group-title')).toHaveTextContent('DI-7 · Fix the price');
-			// Two started rounds and a queued one make one card, naming the agent at work.
 			const card = screen.getByRole('button', { name: 'DI-7 harness run, Working' });
 			expect(card).toHaveTextContent('Planner · round 2');
 			expect(card).toHaveTextContent('2 rounds');

@@ -99,7 +99,6 @@ describe('CanvasPage', () => {
 		const onLocationChange = vi.fn();
 		const view = render(<CanvasPage workspace={workspace} location={{ workspaceId: workspace.id }} onLocationChange={onLocationChange} />);
 		expect(screen.getByLabelText('Sessions view')).toBeInTheDocument();
-		// The switcher sits in the title row, Sessions first, as on every page with views.
 		const switcher = screen.getByRole('group', { name: 'Agent Space view' });
 		expect(switcher.closest('.page-title')).not.toBeNull();
 		expect(within(switcher).getAllByRole('button').map((button) => button.textContent?.trim())).toEqual(['Sessions (1)', 'Canvas']);
@@ -110,9 +109,6 @@ describe('CanvasPage', () => {
 		await waitFor(() => expect(onLocationChange).toHaveBeenLastCalledWith({ workspaceId: workspace.id, view: undefined }));
 	});
 
-	// A session link hands off a node id through the route so Open can select
-	// the session there; it must apply once and then clear so a later refresh or
-	// checkout switch never re-selects it.
 	it('honours a selectedNodeId handed off through the route, once, then clears it', async () => {
 		canvasState.projection = sessionProjection();
 		const onLocationChange = vi.fn();

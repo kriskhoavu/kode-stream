@@ -3,11 +3,6 @@ import type { E2ERunbook, ItemDetail, ItemVerificationTests, VerificationJob, Ve
 import { api } from '../../shared/api';
 import { isAutomationSpecPath, normalizeLocalPath } from './itemPaths';
 
-/**
- * An item's Quality: its verification job and the polling that follows it,
- * the automation specs it runs, the E2E runbooks that cover it, and the spec
- * browser and artifact preview the Quality panel opens.
- */
 export function useItemQuality({ plan, workspaceConfig, workspaces }: { plan: ItemDetail | null; workspaceConfig: WorkspaceConfig | null; workspaces: WorkspaceConfig[] }) {
   const verificationTestsAbortRef = useRef<AbortController | undefined>(undefined);
   const e2eRunbooksAbortRef = useRef<AbortController | undefined>(undefined);
@@ -242,8 +237,7 @@ export function useItemQuality({ plan, workspaceConfig, workspaces }: { plan: It
   };
 
   const artifactAbsolutePath = (artifact: { root?: string; path: string }) => {
-    // Older job payloads do not carry the automation root. The workspace runtime
-    // configuration remains the authoritative compatible fallback for their locators.
+    // Older job payloads lack the automation root, so fall back to the workspace configuration.
     const root = artifact.root === 'automation' ? verificationJob?.automationRepoPath || automationRepoPath : workspaceConfig?.path;
     if (!root || artifact.path.startsWith('/') || artifact.path.includes('..')) return '';
     return `${root.replace(/\/$/, '')}/${artifact.path}`;

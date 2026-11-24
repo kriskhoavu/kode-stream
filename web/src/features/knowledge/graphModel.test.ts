@@ -18,8 +18,6 @@ const atOrigin = (nodes: { position: { x: number; y: number } }[]) =>
 	nodes.filter((node) => node.position.x === 0 && node.position.y === 0);
 
 describe('graph grouping by taxonomy', () => {
-	// The reported defect: a wiki more than two directories deep left most
-	// nodes without a position, stacking them at the origin.
 	it('positions every node in a four-level wiki', () => {
 		const model = adaptKnowledgeGraph(graphOf([
 			{ id: 'index', title: 'Index', domain: 'root', bucket: '', area: '', tier: '' },
@@ -33,8 +31,6 @@ describe('graph grouping by taxonomy', () => {
 		expect(atOrigin(model.nodes)).toHaveLength(0);
 	});
 
-	// A tier is a partition of an area's pages, not a container, so it must not
-	// become a grouping node.
 	it('never creates a group node for a tier', () => {
 		const model = adaptKnowledgeGraph(graphOf([
 			{ id: 'offer-approval', domain: 'domains/offer/concepts', bucket: 'domains', area: 'offer', tier: 'concepts' },
@@ -55,7 +51,6 @@ describe('graph grouping by taxonomy', () => {
 		expect((page?.data.node as KnowledgeGraphNode).tier).toBe('concepts');
 	});
 
-	// A nested area stays one row; wiki depth must not add view depth.
 	it('renders a nested area as a single group', () => {
 		const model = adaptKnowledgeGraph(graphOf([
 			{ id: 'article-spec', domain: 'domains/master-data/article/reference', bucket: 'domains', area: 'master-data/article', tier: 'reference' }
@@ -89,8 +84,6 @@ describe('graph grouping by taxonomy', () => {
 		expect(atOrigin(model.nodes)).toHaveLength(0);
 	});
 
-	// An index written before the taxonomy existed carries only domain. Grouping
-	// must derive bucket and area from it rather than collapsing everything.
 	it('derives grouping from domain when the taxonomy is absent', () => {
 		const model = adaptKnowledgeGraph(graphOf([
 			{ id: 'offer-approval', domain: 'offer' },
@@ -129,7 +122,6 @@ describe('focus layout', () => {
 		expect(positionOf(model, 'in-a').y).toBeLessThan(0);
 		expect(positionOf(model, 'in-b').y).toBeLessThan(0);
 		expect(positionOf(model, 'out-a').y).toBeGreaterThan(0);
-		// Linked both ways: below, so its outgoing link to the page is the loop, not the crossing.
 		expect(positionOf(model, 'both').y).toBeGreaterThan(0);
 	});
 

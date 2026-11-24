@@ -225,7 +225,7 @@ describe('CanvasBoard', () => {
 		expect(screen.queryByLabelText('Session: codex main exited')).not.toBeInTheDocument();
 		expect(screen.getByLabelText('Plan: PM-037 Focused Canvas main')).toBeInTheDocument();
 		expect(screen.getByLabelText('Session: codex main running')).toBeInTheDocument();
-		// No sections are rendered while Focus is on; one plan and one session left.
+		// Focus hides sections: one plan and one session remain.
 		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-nodes', '2');
 		expect(screen.getByTestId('react-flow')).toHaveAttribute('data-edges', '1');
 	});
@@ -348,7 +348,6 @@ function baseProjection(): CanvasProjection {
 	};
 }
 
-/** Adds a second plan and a non-live, non-running session launched from it, so Focus mode has both an active pair (item-1/session-1) and an inactive one (item-2/session-2) to distinguish. */
 function focusProjection(): CanvasProjection {
 	const base = baseProjection();
 	const plan = base.nodes[1];
@@ -362,8 +361,6 @@ function focusProjection(): CanvasProjection {
 	};
 }
 
-/** Two active plans: item-1 with one active session, item-2 with two, so the
- * column-and-row Focus layout rule can be asserted against exact positions. */
 function focusLayoutProjection(): CanvasProjection {
 	const base = baseProjection();
 	const plan1 = base.nodes[1];

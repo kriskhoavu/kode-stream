@@ -38,7 +38,6 @@ describe('KnowledgePage layout', () => {
 		expect(screen.getByRole('button', { name: 'Sync' })).toHaveClass('secondary');
 		expect(screen.getByRole('button', { name: 'Pull' })).toHaveClass('secondary');
 		expect(screen.getByRole('button', { name: 'Pages' })).toHaveClass('active');
-		// Knowledge shows the workspace's one Wiki: no picker, and the view switch sits in the title row.
 		expect(screen.queryByRole('combobox', { name: 'Knowledge Wiki' })).not.toBeInTheDocument();
 		expect(screen.getByRole('group', { name: 'Knowledge view' }).closest('.page-title')).not.toBeNull();
 		expect(container.querySelector('.knowledge-status')).not.toBeInTheDocument();

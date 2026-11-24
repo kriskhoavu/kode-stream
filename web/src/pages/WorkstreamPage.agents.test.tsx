@@ -109,8 +109,7 @@ describe('WorkstreamPage card agents', () => {
 		expect(readStringPreference('workstream.drawer.workItemCollapsed')).toBe('0');
 	});
 
-	// The app bumps refreshKey whenever the window regains focus. Treating that
-	// as a new board swapped every card for a skeleton and back: a flicker.
+	// The app bumps refreshKey whenever the window regains focus.
 	it('keeps the cards and an open drawer on screen when the app refreshes', async () => {
 		const fetchMock = stubBoard([record('live-1', 'claude', true)]);
 		const view = renderBoard();

@@ -20,7 +20,6 @@ export const gateWords: Record<HarnessApprovalGate, GateWords> = {
 	question: { approve: 'Answer and continue', reject: 'Stop this task', askTitle: 'Why stop it?', askLabel: 'Reason', askPlaceholder: 'Say why. The task stays in the Task Queue as Stopped, and Start again begins a new run.', answerOnApprove: true, answerLabel: 'Your answers', answerPlaceholder: 'Answer each question in a line or two. The agent continues from your answers and does not ask again.', answerSubmit: 'Send and continue' }
 };
 
-/** Who a clarify gate waits for. */
 export function reporterLabel(approval: HarnessApproval): string {
 	return approval.context?.reporter || 'the reporter';
 }
@@ -29,7 +28,6 @@ function askerLabel(approval: HarnessApproval): string {
 	return approval.context?.role ? agentRoleLabels[approval.context.role] : 'Planner';
 }
 
-/** The plain sentence that says what approving does, with the usual time and cost when the harness knows them. */
 export function consequence(approval: HarnessApproval): string {
 	const estimate = approval.estimate;
 	const minutes = estimate?.minMinutes && estimate.maxMinutes ? `about ${estimate.minMinutes}–${estimate.maxMinutes} minutes` : estimate?.maxMinutes ? `about ${estimate.maxMinutes} minutes` : '';
@@ -60,11 +58,9 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 	attention?: boolean;
 	autoFocus?: boolean;
 	onApprove: (reason?: string) => void;
-	/** `replan` comes from Review's Back to Plan; every other refusal is `reject`. */
 	onReject: (reason: string, decision?: 'reject' | 'replan') => void;
 	onOpen?: () => void;
 	openLabel?: string;
-	/** Opens a person's session in the run's worktree, for Review. */
 	onSession?: () => void;
 	sessionLabel?: string;
 }) {
@@ -157,15 +153,12 @@ export function GateCard({ approval, task, sent, attention = false, autoFocus = 
 	);
 }
 
-/** Asks for the reason a decision needs. The reason box comes first; Cmd/Ctrl+Enter sends. */
 export function GateDecisionDialog({ title, label, placeholder, submitLabel, questions, optional, onCancel, onSubmit }: {
 	title: string;
 	label: string;
 	placeholder: string;
 	submitLabel: string;
-	/** The questions being answered, repeated above the box so nobody has to scroll back. */
 	questions?: string[];
-	/** The box may stay empty; the decision goes without text. */
 	optional?: boolean;
 	onCancel: () => void;
 	onSubmit: (reason: string) => void;
@@ -217,7 +210,6 @@ export function GateDecisionDialog({ title, label, placeholder, submitLabel, que
 	);
 }
 
-/** The comment a person may post on the ticket to ask its reporter. Kode Stream never posts it. */
 function ClarifyDraft({ draft, url }: { draft: string; url?: string }) {
 	const [copied, setCopied] = useState<'yes' | 'no' | undefined>();
 	const copy = async () => {

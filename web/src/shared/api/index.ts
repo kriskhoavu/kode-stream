@@ -14,7 +14,6 @@ import { workspaceFilesApi } from './workspaceFilesApi';
 export { ApiError, ApiResponseError, apiURL, isExtensionSurface, localAPIOrigin } from './http';
 export { editableStatusOrder, statusLabels, statusOrder } from './statusLabels';
 
-/** Every call the app makes to its server, grouped by domain and composed here. */
 export const api = {
 	...canvasApi,
 	...knowledgeApi,

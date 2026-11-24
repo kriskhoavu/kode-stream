@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 
-/** Stops the page behind a dialog from scrolling while `locked` holds. */
 export function useBodyScrollLock(locked = true) {
 	useEffect(() => {
 		if (!locked) return;

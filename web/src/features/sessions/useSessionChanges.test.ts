@@ -71,8 +71,6 @@ describe('useSessionChanges', () => {
 		await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
 		expect(api.sessionChanges).toHaveBeenCalledTimes(2);
 		expect(result.current.error).toBe('transient');
-		// Even though the previous poll failed, the interval must still be
-		// running for the next tick.
 		await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
 		expect(api.sessionChanges).toHaveBeenCalledTimes(3);
 		expect(result.current.changes?.headMoved).toBe(2);

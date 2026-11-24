@@ -18,17 +18,11 @@ export const PlanCard = memo(function PlanCard({ item: plan, workspace, pending,
   active: boolean;
   created: boolean;
   agents?: ItemAgents;
-  /** What the harness holds for this card, when it works on it. */
   work?: CardWork;
-  /** True once the board knows the harness is on, so a card the harness does not hold can say "By hand". */
   harnessOn?: boolean;
-  /** True on the Tasks board, where a card's column follows its run and a person never moves it. */
   autoStatus?: boolean;
-  /** A task not yet started: it may be dragged to the next column, which starts it. */
   startable?: boolean;
-  /** Hands the card to the harness; offered on a card it does not hold. */
   onRunWithHarness?: () => void;
-  /** Opens the harness's task behind a ticket card that no plan holds yet. */
   onOpenTask?: () => void;
   onDragStart: (event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
@@ -41,12 +35,9 @@ export const PlanCard = memo(function PlanCard({ item: plan, workspace, pending,
   const docs = isDocumentationMetadataSource(plan.metadataSource);
   const showItem = plan.identifier.toLowerCase() !== plan.title.toLowerCase();
   const description = plan.description;
-  // A tag equal to the source badge is redundant on any card, not just a docs one:
-  // the default source-structure card tags every item with its own source name, so
-  // wiki items arrived as metadataSource "workspace-settings" and printed it twice.
+  // A tag equal to the source badge is redundant on any card.
   const tags = (docs ? plan.tags.filter((tag) => tag !== plan.scope && tag !== plan.identifier) : plan.tags).filter((tag) => tag !== source);
   const synthetic = isSyntheticItem(plan);
-  // The card's key opens it where the card shows one; else its title does.
   const keyOpens = !docs && (synthetic || showItem);
   const draggable = startable || (isItemDraggable(plan) && !pending && !synthetic && !autoStatus);
   const navigate = (event: MouseEvent<HTMLButtonElement>) => {

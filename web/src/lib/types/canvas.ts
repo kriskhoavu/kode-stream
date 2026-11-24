@@ -24,9 +24,8 @@ export interface SessionFile { path: string; status: SessionFileStatus; oldPath?
 export type SessionChangesAvailability = 'available' | 'unavailable' | 'unsupported';
 export type SessionChangesReason = 'launch_commit_unknown' | 'launch_commit_missing' | 'workspace_missing' | 'content_provider_unsupported';
 export interface SessionChanges { sessionId: string; launchCommit: string; headCommit: string; headMoved: number; files: SessionFile[]; additions: number; deletions: number; truncated: boolean; availability: SessionChangesAvailability; reason?: SessionChangesReason; /** A harness run's changes: where they were read, its own copy or its branch. */ from?: 'worktree' | 'branch'; branch?: string; }
-/** A Claude Code conversation held in the workspace root, outside kode-stream; metadata only. */
 export interface ClaudeTranscript { sessionId: string; branch?: string; startedAt: string; lastActiveAt: string; messages: number; itemIds: string[]; }
-/** `tool` is a call the model made (its name and main argument); `thinking` is its reasoning. Both appear only where the reader asked for the model's work, not just its words. */
+/** `tool` and `thinking` turns appear only when the reader asks for the model's work. */
 export interface ClaudeTurn { role: 'user' | 'assistant' | 'tool' | 'thinking'; text: string; at?: string; }
 export type SessionScope = 'active' | 'all';
 export interface GlobalSessionRow { record: SafeSessionRecord; workspaceName: string; checkoutBranch: string; planTitle?: string; /** The plan's key (its identifier), which joins it to a harness task on the same ticket. */ planKey?: string; changesCount?: number; }
@@ -34,7 +33,7 @@ export interface GlobalSessionsResponse { rows: GlobalSessionRow[]; truncated: b
 export interface CanvasWorkspaceNode { id: string; name?: string; branch?: string; commit?: string; git?: GitStatus; providerAxes: WorkspaceProviderAxes; actions: Partial<Record<WorkspaceAction, ActionCapability>>; verification?: VerificationJob; }
 export interface CanvasPlanNode { itemId: string; identifier?: string; title?: string; service?: string; status: ItemStatus; branch?: string; commit?: string; editable: boolean; actions: Partial<Record<WorkspaceAction, ActionCapability>>; }
 export interface CanvasSessionNode { record: SafeSessionRecord; }
-/** `ephemeral` marks a live session drawn beside its plan without a placement; it leaves the Canvas when the session stops unless pinned. */
+/** An `ephemeral` node leaves the Canvas when its session stops, unless pinned. */
 export interface CanvasNode { id: string; kind: CanvasEntityKind; state: 'resolved' | 'stale' | 'forbidden'; entityRef: CanvasEntityRef; position: CanvasPosition; size?: CanvasSize; collapsed: boolean; revision: number; workspace?: CanvasWorkspaceNode; plan?: CanvasPlanNode; session?: CanvasSessionNode; ephemeral?: boolean; }
 export interface CanvasSection { id: string; title: string; position: CanvasPosition; width: number; height: number; nodeIds: string[]; }
 export interface CanvasConnection { id: string; source: string; target: string; kind: 'repository_contains' | 'session_launched_from' | string; sourceOfTruth: 'derived'; }

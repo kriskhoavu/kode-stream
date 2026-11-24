@@ -133,8 +133,7 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 	const [isFullscreen, setIsFullscreen] = useState(false);
 	const [layoutRevision, setLayoutRevision] = useState(0);
 	const [overviewPositions, setOverviewPositions] = useState<Record<string, { x: number; y: number }>>({});
-	// Positions dragged in focus mode belong to that focus only: an overview
-	// position would drop a neighbour back into its far-off section.
+	// Focus-mode drags apply to that focus only. An overview position would drop a neighbour into a far section.
 	const [focusPositions, setFocusPositions] = useState<{ slug?: string; positions: Record<string, { x: number; y: number }> }>({ positions: {} });
 	const focusSlug = focusRelationships && selectedSlug ? selectedSlug : undefined;
 	const nodePositions = focusSlug ? (focusPositions.slug === focusSlug ? focusPositions.positions : {}) : overviewPositions;
@@ -157,9 +156,7 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 		document.addEventListener('fullscreenchange', onFullscreenChange);
 		return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
 	}, []);
-	// A click shows a page's links; a second click on the same page hides them
-	// again. A double click opens the review panel, and leaves the links shown
-	// even though its two clicks toggled them off and on.
+	// A double click opens the review panel and leaves the links shown, although its two clicks toggled them.
 	const handleSelect = (slug: string) => {
 		setIsPanelOpen(false);
 		if (slug === selectedSlug && showConnections && !isSelectionDismissed) {
@@ -187,7 +184,7 @@ export function KnowledgeGraph({ graph, pages, selectedSlug, selectedDetail, onS
 		setLayoutRevision((revision) => revision + 1);
 	};
 	const autoArrangeLayout = () => {
-		// The focus layout is already arranged around the page; restore it.
+		// The focus layout is already arranged around the page.
 		setNodePositions(focusSlug ? {} : autoArrangeNodes(model.nodes, model.edges));
 		setLayoutRevision((revision) => revision + 1);
 	};

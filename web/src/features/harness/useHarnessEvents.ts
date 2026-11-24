@@ -3,20 +3,10 @@ import type { HarnessEvent } from '../../lib/types';
 import type { HarnessFeedHandlers } from './harnessClient';
 import type { HarnessController } from './useHarness';
 
-/** How long a broken feed may try to reconnect before the page falls back to polling. */
 export const reconnectGraceMs = 10_000;
-/** How often the page polls a snapshot while the feed is down (only while the tab is visible). */
 export const pollMs = 10_000;
-/** How often the page tries the feed again while it polls. */
 export const retryFeedMs = 30_000;
 
-/**
- * Opens the server's event feed in the browser (`EventSource`, cookie auth),
- * resuming after the last event the page holds. Each event is folded into the
- * reducer. When the feed opens, a fresh snapshot covers anything missed; when
- * it breaks, the page shows "Reconnecting…", then polls every 10 s while
- * visible and tries the feed again every 30 s.
- */
 export function openEventSourceFeed(url: string, handlers: HarnessFeedHandlers): () => void {
 	const source = new EventSource(url, { withCredentials: true });
 	source.onopen = () => handlers.onOpen();
@@ -25,7 +15,7 @@ export function openEventSourceFeed(url: string, handlers: HarnessFeedHandlers):
 			const event = JSON.parse(message.data) as HarnessEvent;
 			if (event && typeof event.seq === 'number' && typeof event.type === 'string') handlers.onEvent(event);
 		} catch {
-			// A malformed frame is skipped; the next snapshot corrects anything it carried.
+			// Skip a malformed frame. The next snapshot corrects it.
 		}
 	};
 	source.addEventListener('reset', () => handlers.onReset());
@@ -39,10 +29,8 @@ export function useHarnessEvents(harness: HarnessController, active = true): voi
 	lastSeq.current = harness.state.lastSeq;
 
 	useEffect(() => {
-		// The board reads the harness beside its items; while the harness is off there is nothing to follow.
 		if (!active) return;
 		if (!client.subscribe) {
-			// No feed at all: poll for good.
 			dispatch({ type: 'connection', connection: 'polling' });
 			const timer = window.setInterval(() => { if (document.visibilityState !== 'hidden') void refresh(); }, pollMs);
 			return () => window.clearInterval(timer);
@@ -97,7 +85,7 @@ export function useHarnessEvents(harness: HarnessController, active = true): voi
 				}, retryFeedMs);
 			};
 			again();
-			// One immediate attempt, as a dropped connection often comes straight back.
+			// Retry once at once, because a dropped connection often comes straight back.
 			window.setTimeout(() => { if (!stopped && !close) open(); }, 1000);
 		};
 

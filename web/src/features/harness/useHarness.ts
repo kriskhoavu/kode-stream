@@ -13,16 +13,12 @@ export interface HarnessController {
 	refresh: () => Promise<void>;
 	loadRun: (runId: string) => Promise<void>;
 	approve: (approval: HarnessApproval, reason?: string) => Promise<void>;
-	/** `replan` answers Review only: back to Plan instead of Build. */
 	reject: (approval: HarnessApproval, reason: string, decision?: 'reject' | 'replan') => Promise<void>;
 	pin: (task: HarnessTask, pinned: boolean) => Promise<void>;
 	setPriority: (task: HarnessTask, input: { priorityOverride?: number; before?: string }) => Promise<void>;
 	start: (task: HarnessTask) => Promise<void>;
-	/** Puts a card's ticket in the queue and hands the task back; throws when the harness refuses. */
 	createTask: (input: Omit<HarnessCreateTaskInput, 'idempotencyKey'>) => Promise<HarnessTask>;
-	/** Deletes a finished task with its runs; throws when the harness refuses. */
 	removeTask: (task: HarnessTask) => Promise<void>;
-	/** Stops the task's run, deletes its runs and working copies, and puts it back in the queue. */
 	resetTask: (task: HarnessTask) => Promise<void>;
 	setQuestions: (task: HarnessTask, askQuestions: boolean | null) => Promise<void>;
 	cancelRun: (run: HarnessRun, reason?: string) => Promise<void>;
@@ -30,12 +26,6 @@ export interface HarnessController {
 	resumeRole: (role: HarnessRoleId) => Promise<void>;
 }
 
-/**
- * Owned once per page that shows the harness, the board, a card and the
- * settings, with every view reading from it through props. A
- * snapshot is fetched on mount and on every `refresh`; `useHarnessEvents`
- * keeps it current between snapshots, and polls when the feed is down.
- */
 export function useHarness(client: HarnessClient): HarnessController {
 	const [state, dispatch] = useReducer(harnessReducer, initialHarnessState);
 	const controller = useRef<AbortController | undefined>(undefined);
@@ -75,7 +65,7 @@ export function useHarness(client: HarnessClient): HarnessController {
 	}, [client]);
 
 	const decide = useCallback(async (approval: HarnessApproval, decision: HarnessDecision, reason?: string) => {
-		// One key per approval and decision, so a retry after a dropped reply is a replay, not a second decision.
+		// One key per approval and decision, so a retry replays instead of deciding twice.
 		const keyName = `${approval.id}:${decision}:${approval.revision}`;
 		const key = keys.current.get(keyName) ?? newIdempotencyKey('harness');
 		keys.current.set(keyName, key);
@@ -107,7 +97,7 @@ export function useHarness(client: HarnessClient): HarnessController {
 	const setQuestions = useCallback((task: HarnessTask, askQuestions: boolean | null) => saveTask(() => client.setQuestions(task, askQuestions)), [client, saveTask]);
 	const createTask = useCallback(async (input: Omit<HarnessCreateTaskInput, 'idempotencyKey'>) => {
 		if (!client.createTask) throw new Error('The harness cannot take a card here.');
-		// One key per card, so a retry after a dropped reply is a replay, not a second task.
+		// One key per card, so a retry replays instead of creating a second task.
 		const keyName = `create:${input.workspaceId}:${input.key}`;
 		const key = keys.current.get(keyName) ?? newIdempotencyKey('harness');
 		keys.current.set(keyName, key);

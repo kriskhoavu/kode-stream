@@ -2,8 +2,6 @@ import type { SourceSurface, WorkspaceConfig, WorkspaceSource, WorkspaceSourceLi
 
 export const sourceSurfaces: SourceSurface[] = ['workstream', 'knowledge'];
 
-// A source named `plans` is Workstream only, one named `wiki` is Knowledge
-// only, anything else is both. The server applies the same defaults.
 export function defaultShownIn(path: string): SourceSurface[] {
   const name = path.trim().replace(/\\/g, '/').replace(/\/+$/, '').split('/').filter(Boolean).pop() ?? '';
   if (name === 'plans') return ['workstream'];

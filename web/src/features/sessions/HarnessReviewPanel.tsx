@@ -11,7 +11,6 @@ import { SessionChangesPanel } from './SessionChangesPanel';
 import type { ChangesSource } from './SessionChangesPanel';
 import { formatSessionDate, isSessionLive } from './sessionDisplay';
 
-/** The intent the server gives a session opened at a run's Review. */
 export const reviewIntent = 'harness_review';
 
 export type ReviewDecide = {
@@ -20,13 +19,7 @@ export type ReviewDecide = {
 	decisions: Record<string, SentDecision>;
 };
 
-/**
- * A run's Review step in Agent Space. While the run waits there, a person
- * opens a session of their own in the run's worktree, tries the change and
- * edits it, then hands it off or sends it back to Build or Plan. The session
- * runs on the run's branch, so the Session Browser's own list, which shows
- * the checkout's branch, does not hold it: it lives here, with its run.
- */
+// The session runs on the run's branch, so the Session Browser's own list does not hold it.
 export function HarnessReviewPanel({ detail, task, changes, decide }: {
 	detail: HarnessRunDetail;
 	task?: HarnessTask;

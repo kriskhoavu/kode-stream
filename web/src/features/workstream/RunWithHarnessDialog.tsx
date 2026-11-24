@@ -13,19 +13,13 @@ const roleRows: { role: HarnessAgentRole; does: string }[] = [
 	{ role: 'code_reviewer', does: 'checks the code' }
 ];
 
-/** The branch the harness works on, as the backend names it: `harness/<key>-<six of the run id>`. */
+// Matches the backend's branch name: `harness/<key>-<six of the run id>`.
 export function harnessBranchFor(key: string): string {
 	let slug = key.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^[-.]+|[-.]+$/g, '');
 	if (slug.length > 40) slug = slug.slice(0, 40);
 	return `harness/${slug || 'task'}-…`;
 }
 
-/**
- * Hands a card to the harness. The branch and the models are what the harness
- * uses for every task, shown so nobody is surprised; the approvals are the
- * gates it always asks for, plus whether its agents may stop and ask; and the
- * card starts now or waits its turn in the Task Queue.
- */
 export function RunWithHarnessDialog({ item, workspace, harness, onClose, onStarted }: {
 	item: ItemSummary;
 	workspace?: WorkspaceConfig;

@@ -5,7 +5,6 @@ import { engineLabel, modelLabel } from './vocabulary';
 
 export const modelSuggestions = ['opus', 'sonnet', 'haiku'];
 
-/** A workspace's on or off as two small cards. Until a person picks one, the default's value is chosen. */
 export function Override({ label, hint, value, fallback, onChange }: { label: string; hint: string; value?: boolean | null; fallback: boolean; onChange: (value: boolean) => void }) {
 	const name = useId();
 	const on = value === undefined || value === null ? fallback : value;

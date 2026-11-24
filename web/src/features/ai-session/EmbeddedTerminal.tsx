@@ -45,12 +45,10 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 		setConnection('connecting');
 		setMessage('');
 		let disposed = false; let retry: number | undefined; let terminal: Terminal | undefined; let observer: ResizeObserver | undefined; let dataDisposable: { dispose(): void } | undefined; let resizeDisposable: { dispose(): void } | undefined;
-		// The reconnect window starts at each disconnect, not at mount: a session
-		// watched for minutes must survive a drop as well as one just opened.
+		// The reconnect window restarts at each disconnect, so a long-watched session survives a drop.
 		let deadline = 0; let token = grantToken;
 		const send = (value: unknown) => { if (socketRef.current?.readyState === WebSocket.OPEN) socketRef.current.send(JSON.stringify(value)); };
-		// The server accepts 20-500 columns and 5-200 rows; a host caught mid-layout
-		// at a sliver must not send a size it refuses.
+		// The server refuses sizes outside 20-500 columns and 5-200 rows.
 		const sendResize = (columns: number, rows: number) => send({ type: 'resize', columns: Math.min(500, Math.max(20, columns)), rows: Math.min(200, Math.max(5, rows)) });
 		const connect = (activeTerminal: Terminal) => {
 			if (disposed) return;
@@ -69,8 +67,7 @@ export function EmbeddedTerminal({ initial, visible, mode, title, subtitle, onSt
 				if (deadline === 0) deadline = Date.now() + 15_000;
 				if (Date.now() < deadline && (stateRef.current === 'starting' || stateRef.current === 'running')) {
 					setConnection('reconnecting');
-					// A grant lasts a minute and a newer one replaces it, so each
-					// attempt asks for a fresh one rather than replaying the first.
+					// A grant expires after a minute and a newer one replaces it, so each retry asks for a fresh grant.
 					retry = window.setTimeout(() => {
 						void api.embeddedAISessionGrant(sessionId).then((grant) => { token = grant.token; }).catch(() => undefined).finally(() => connect(activeTerminal));
 					}, 500);

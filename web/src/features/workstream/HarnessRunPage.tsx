@@ -12,10 +12,6 @@ import { queueOrder } from './harnessJoin';
 import { useBoardHarness } from './useBoardHarness';
 import { useTaskActions } from './useTaskActions';
 
-/**
- * A harness run shown whole, full width, for a task no plan card holds yet:
- * a Jira ticket's run has no item page to open it on, so it opens here.
- */
 export function HarnessRunPage({ runId, task, onBack }: { runId: string; task: HarnessTask; onBack: () => void }) {
 	const harness = useBoardHarness();
 	const actions = useTaskActions(harness);

@@ -1,4 +1,3 @@
-// The app's shared types, one module per domain.
 export * from './common';
 export * from './workspace';
 export * from './runtime';

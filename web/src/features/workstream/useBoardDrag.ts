@@ -4,14 +4,8 @@ import type { HarnessTask, ItemStatus } from '../../lib/types';
 import { isDropStatus } from './dragAndDrop';
 import { taskStartColumn } from './boardPreferences';
 
-/** How long after a drag a click on the dragged card is not read as a click. */
 const DRAG_CLICK_SUPPRESSION_MS = 350;
 
-/**
- * Drag and drop on the board. On the Plans board a card moves to the column it
- * is dropped on; on the Tasks board a task that has not started may only be
- * dropped on the start column, which starts it.
- */
 export function useBoardDrag({ tasksShown, canDragPlan, startableTask, onStartTask, onMovePlan }: {
 	tasksShown: boolean;
 	canDragPlan: (itemId: string) => boolean;
@@ -65,7 +59,6 @@ export function useBoardDrag({ tasksShown, canDragPlan, startableTask, onStartTa
 		onMovePlan(itemId, status);
 	};
 
-	/** Whether a click on a card opens its preview: not the click that ends a drag. */
 	const previewAllowed = (itemId: string) => {
 		const suppressed = suppressPreviewRef.current;
 		if (suppressed?.itemId === itemId && window.performance.now() <= suppressed.until) return false;

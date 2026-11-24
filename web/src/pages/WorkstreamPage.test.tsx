@@ -121,7 +121,6 @@ describe('WorkstreamPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Create Item' }));
 
-    // The new item lands on the board, highlighted; it does not navigate away.
     await waitFor(() => expect(screen.queryByLabelText('Item name')).not.toBeInTheDocument());
     const card = await screen.findByText('Jira First Workspace');
     expect(card.closest('.plan-card')).toHaveClass('just-created');
@@ -221,9 +220,6 @@ describe('WorkstreamPage', () => {
     expect(within(card as HTMLElement).queryByText('No date')).not.toBeInTheDocument();
   });
 
-  // Wiki folders are indexed through source-structure settings, whose default card
-  // tags every item with its own source name. The card already shows that name as
-  // the source badge, so rendering the tag too printed "wiki" twice.
   it('does not repeat the source badge as a tag on settings-derived cards', async () => {
     const wikiItem: ItemSummary = {
       id: 'wiki-master-data',
@@ -251,15 +247,12 @@ describe('WorkstreamPage', () => {
 
     render(<WorkstreamPage workspace={{ ...workspace, sources: ['items', 'wiki'] }} refreshKey={0} onOpenPlan={() => undefined} onWorkspacesChanged={() => undefined} />);
 
-    // A card that shows its key opens from the key; its title is plain text.
     await screen.findByRole('button', { name: 'master-data' });
     expect(screen.queryByRole('button', { name: 'Master Data' })).not.toBeInTheDocument();
     const card = document.querySelector('.plan-card');
     expect(card).toBeInstanceOf(HTMLElement);
-    // A work item's card names its kind, not its source: the Source filter carries that, and the tag that repeats it is dropped.
     expect(within(card as HTMLElement).queryByText('wiki')).not.toBeInTheDocument();
     expect(within(card as HTMLElement).getByText('Plan')).toBeInTheDocument();
-    // Tags that say something the card does not already show must survive.
     expect(within(card as HTMLElement).getByText('reference')).toBeInTheDocument();
   });
 
@@ -574,8 +567,6 @@ describe('Jira description formatting', () => {
     fireEvent.click(screen.getByRole('button', { name: /Fetch Jira/i }));
 
     const preview = await screen.findByLabelText('Jira issue preview');
-    // Headings, list items and inline code survive as real elements rather
-    // than being run together into one paragraph.
     await waitFor(() => expect(within(preview).getByRole('heading', { name: 'User Story' })).toBeInTheDocument());
     expect(within(preview).getByRole('heading', { name: 'Acceptance Criteria' })).toBeInTheDocument();
     expect(within(preview).getAllByRole('listitem')).toHaveLength(2);

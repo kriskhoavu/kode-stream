@@ -2,17 +2,11 @@ import type { CanvasNode as DomainNode } from '../../lib/types';
 
 export const focusPreferenceKey = 'canvas-focus';
 
-/** Session nodes counted as active by Focus mode: launched and still live. */
 export function isFocusActiveSession(node: DomainNode): boolean {
 	const record = node.session?.record;
 	return Boolean(record?.live) && (record?.state === 'starting' || record?.state === 'running');
 }
 
-/* Virtual focus layout constants. Plans stack in a left column at x = 0; each
- * plan's sessions sit in a row to its right, expanded so the terminal shows.
- * The session pitch is sized off the same node dimensions used elsewhere on
- * the board (245x116 collapsed, 660x500 expanded); row height is derived per
- * row from the tallest node it contains (see focusNodeSize). */
 export const FOCUS_GUTTER = 40;
 export const FOCUS_PLAN_WIDTH = 245;
 export const DEFAULT_SESSION_SIZE = { width: 660, height: 500 };

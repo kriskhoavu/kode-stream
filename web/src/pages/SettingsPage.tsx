@@ -12,10 +12,7 @@ import '../features/harness/harness.css';
 import '../features/settings/settings.css';
 import type { BackdropVariant } from '../components/HeaderBackdrop';
 
-/*
- * Settings is not a backdrop route, so choosing a variant shows no immediate
- * change here. The copy has to do the work a preview would.
- */
+// Settings shows no backdrop, so each description stands in for a preview.
 const backdropLabels: Record<BackdropVariant, { name: string; description: string }> = {
   lattice: { name: 'Lattice', description: 'A blueprint grid with a node network drawn along it.' },
   neon: { name: 'Neon', description: 'A scattered field of glowing tool icons.' },
@@ -31,12 +28,7 @@ const areas: { id: SettingsArea; label: string; hint: string; icon: typeof Palet
   { id: 'storage', label: 'Storage', hint: 'Where app state lives', icon: Database }
 ];
 
-/**
- * Settings, one area at a time: a menu of areas beside the chosen one, so
- * each area fits a screen and its Save saves only what it shows. On a phone
- * the menu is a select above the area.
- */
-export function SettingsPage({ settings, onChange, showHarness = true }: { settings: AppSettings; onChange: (settings: AppSettings) => void; /** The harness has no page of its own; its settings live here, except on the extension surface. */ showHarness?: boolean }) {
+export function SettingsPage({ settings, onChange, showHarness = true }: { settings: AppSettings; onChange: (settings: AppSettings) => void; showHarness?: boolean }) {
   const visible = new Set(settings.visibleWorkstreamStatuses);
   const ai = useAISettings();
   const shownAreas = areas.filter((area) => showHarness || area.id !== 'harness');

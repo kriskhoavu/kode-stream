@@ -1,5 +1,4 @@
-// Shared grouping rules for both Knowledge views. Keeping them in one place is
-// what guarantees the tree and the graph describe the same hierarchy.
+// Both Knowledge views share these rules, so the tree and the graph show one hierarchy.
 
 export interface TaxonomyCarrier {
 	domain: string;
@@ -16,10 +15,7 @@ export interface Grouping {
 
 export const rootGroupKey = 'root';
 
-// Grouping comes from the taxonomy when the index carries it. An index written
-// before the taxonomy existed has only `domain`, so bucket and area are derived
-// from its first segment and remainder. Either way grouping is two levels deep,
-// which is the shape both views can lay out.
+// An index without the taxonomy has only `domain`, so bucket and area derive from it.
 export function groupingOf(node: TaxonomyCarrier): Grouping {
 	if (node.bucket !== undefined || node.area !== undefined || node.tier !== undefined) {
 		return { bucket: node.bucket ?? '', area: node.area ?? '', tier: node.tier ?? '' };

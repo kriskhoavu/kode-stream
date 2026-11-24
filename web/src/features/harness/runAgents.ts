@@ -8,12 +8,6 @@ export const transcriptEvery = 5_000;
 
 export type LiveStep = { id: string; title: string; agentRuns: HarnessAgentRun[] };
 
-/**
- * The run's conversations grouped by the stage that ran them, in the order the
- * stages ran and, within a stage, the order the agents started. A stage of a
- * kind that ran more than once (a retry after a stop) is numbered, so "Plan 2"
- * is the second Plan stage. An agent whose stage is unknown goes last.
- */
 export function liveSteps(stages: HarnessStage[], agentRuns: HarnessAgentRun[]): LiveStep[] {
 	const byStart = (a: HarnessAgentRun, b: HarnessAgentRun) => Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? '');
 	const live = agentRuns.filter((agentRun) => agentRun.state !== 'queued').sort(byStart);
@@ -44,7 +38,6 @@ export function agentStatus(agentRun: HarnessAgentRun): HxStatus {
 	}
 }
 
-/** The transcript of one agent run, read once when it is finished and every few seconds while it runs. */
 export function useAgentTranscript(client: HarnessClient, agentRun?: HarnessAgentRun): { turns?: ClaudeTurn[]; error: string } {
 	const [turns, setTurns] = useState<ClaudeTurn[] | undefined>();
 	const [error, setError] = useState('');

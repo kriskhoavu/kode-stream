@@ -15,29 +15,18 @@ import type { CardWork } from './harnessJoin';
 import type { ItemAgents } from './useItemSessions';
 import './planList.css';
 
-/**
- * The plans on the branch as rows in the Task Queue's style, one group per
- * status in board order. Each row carries what its board card carries: the
- * ID and service, the title, description and tags, the owner and age, the
- * agents on it, the harness's line, and the status menu. A row opens the
- * plan's drawer, its ID the plan's page, or its title where the ID repeats it.
- */
 export function PlanListView({ items, workspace, loading, pendingIds, workOf, agentsOf, harnessOn = false, onPreview, onOpen, onMove, onOpenAgent, onRunWithHarness }: {
 	items: ItemSummary[];
 	workspace?: WorkspaceConfig;
 	loading: boolean;
 	pendingIds: Set<string>;
-	/** What the harness holds for a plan, when it works on it. */
 	workOf: (id: string) => CardWork | undefined;
-	/** The agent sessions on a plan, as its card shows them. */
 	agentsOf?: (id: string) => ItemAgents | undefined;
-	/** True once the board knows the harness is on, so a plan it does not hold says "By hand". */
 	harnessOn?: boolean;
 	onPreview: (item: ItemSummary) => void;
 	onOpen: (item: ItemSummary) => void;
 	onMove: (item: ItemSummary, status: ItemStatus) => void;
 	onOpenAgent?: (item: ItemSummary, focus: AgentFocus) => void;
-	/** Hands a plan to the harness; offered where it does not hold one. */
 	onRunWithHarness?: (item: ItemSummary) => void;
 }) {
 	const now = useNow(60_000);

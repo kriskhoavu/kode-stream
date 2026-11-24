@@ -20,32 +20,20 @@ import { SessionChangesPanel } from './SessionChangesPanel';
 import type { ChangesSource } from './SessionChangesPanel';
 import { formatSessionDate } from './sessionDisplay';
 
-/** The step of the run page's stepper each agent works in. */
 const roleSteps: Record<HarnessAgentRole, HxStep> = { planner: 'plan', plan_reviewer: 'plan_check', coder: 'build', code_reviewer: 'code_check', qa_fixer: 'fix' };
 
-/** What the person picked: a step, and the round in it. Unset, the detail follows the agent in play. */
-type Pick = { step: HxStep; agentRunId?: string };
+type StepChoice = { step: HxStep; agentRunId?: string };
 
-/**
- * A ticket's harness sessions in the Session Browser. The run's stepper picks
- * a step, its round chips pick one agent of that step, and the agent's
- * conversation shows below; so a ticket with many rounds stays one card in
- * the list. Agents run headless, so there is no terminal: steering happens on
- * the run page, through the run's questions and approvals. Review is the
- * exception: there a person opens a session of their own in the run's
- * worktree, and decides from here.
- */
 export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun, decide }: {
 	row: HarnessSessionRow;
 	client: HarnessClient;
 	onOpenRun?: (runId: string) => void;
 	onStopRun?: (run: HarnessRun) => Promise<void>;
-	/** Sends Review's decisions; without it Review only shows what was decided. */
 	decide?: ReviewDecide;
 }) {
 	const { task } = row;
 	const [runId, setRunId] = useState<string>();
-	const [pick, setPick] = useState<Pick>();
+	const [pick, setPick] = useState<StepChoice>();
 	const [tab, setTab] = useState<'conversation' | 'changes'>('conversation');
 	useEffect(() => { setRunId(undefined); setPick(undefined); setTab('conversation'); }, [row.key]);
 
@@ -54,7 +42,6 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun, decide
 	const agents = useMemo(() => startedAgents(detail), [detail]);
 	const model = useMemo(() => pipelineModel(detail), [detail]);
 	const picked = pick?.agentRunId ? agents.find((agentRun) => agentRun.id === pick.agentRunId) : undefined;
-	// A run waiting at Review opens there: the person's own session is what is in play.
 	const atReview = run.state === 'running' && run.currentStage?.kind === 'review';
 	const agent: HarnessAgentRun | undefined = pick ? picked : atReview ? undefined : focusAgent(detail);
 	const step: HxStep | undefined = pick?.step ?? (atReview ? 'review' : agent ? roleSteps[agent.role] : undefined);
@@ -62,9 +49,8 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun, decide
 	const transcript = useAgentTranscript(client, agent);
 	const readable = useMemo(() => readableTurns(transcript.turns), [transcript.turns]);
 	const steps = useRef<HTMLElement>(null);
-	// Keep the chosen step in sight where the stepper scrolls sideways.
 	useEffect(() => {
-		// Scroll the stepper alone: scrolling the step into view would move the panes around it too.
+		// Scroll only the stepper. scrollIntoView would also move the panes around it.
 		const list = steps.current?.querySelector<HTMLElement>('.hx-stepper');
 		const chosen = list?.querySelector<HTMLElement>('.hx-stage.selected');
 		if (!list || !chosen) return;
@@ -148,7 +134,7 @@ export function HarnessSessionDetail({ row, client, onOpenRun, onStopRun, decide
 			{tab === 'conversation' && <div className="session-harness-conversation">
 				{transcript.error
 					? <p className="error" role="alert">{transcript.error}</p>
-					: <TranscriptTurns className="hx-transcript session-transcript" turns={readable} label={`${agentRoleLabels[agent.role]} conversation`} placeholder="Reading the conversation…" names={{ user: 'Harness', assistant: agentRoleLabels[agent.role] }} foldUser="The brief the harness gave it" />}
+					: <TranscriptTurns className="hx-transcript session-transcript" turns={readable} label={`${agentRoleLabels[agent.role]} conversation`} placeholder="Reading the conversation…" names={{ user: 'Harness', assistant: agentRoleLabels[agent.role] }} userFoldLabel="The brief the harness gave it" />}
 			</div>}
 			{tab === 'changes' && <SessionChangesPanel source={changes} />}
 		</>}

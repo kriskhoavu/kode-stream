@@ -23,11 +23,6 @@ describe('app settings', () => {
     }
   });
 
-  /*
-   * Every install whose stored settings lack this field reaches this code with it
-   * missing, so the fallback is the part worth pinning: silently yielding
-   * undefined would blank the band with no error anyone would notice.
-   */
   it('falls back to the default when the stored variant is absent, unknown or not a string', () => {
     for (const stored of [undefined, 'aurora', 42, null, { name: 'neon' }, ['neon']]) {
       store({ headerBackdrop: stored });

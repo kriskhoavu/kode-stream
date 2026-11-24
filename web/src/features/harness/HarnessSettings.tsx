@@ -9,7 +9,7 @@ import { Override, Toggle, EngineSelect, ModelInput } from './settingsFields';
 import { SourceRow, defaultSourceQuery } from './settingsSources';
 import { effectiveRoleModel, ownSettings, withOwnSettings, withRoleSkill } from './settingsDraft';
 
-/** The kinds a person can add. Bitbucket Server has no issue tracker, so its work comes in through Jira. A local folder is for trying the pipeline. */
+// Bitbucket Server has no issue tracker, so its work comes in through Jira.
 const addableKinds: HarnessSourceKind[] = ['jira', 'github', 'local'];
 
 const policyRows: { role: HarnessAgentRole; name: string; does: string }[] = [
@@ -29,25 +29,13 @@ const pauseConsequence: Record<HarnessRoleId, string> = {
 	qa: 'Paused: finished work waits before its tests run.'
 };
 
-/** A workspace with no choices of its own yet: it follows the defaults everywhere. */
-/**
- * The harness's settings. Without a workspace they are the defaults every
- * workspace starts from: what runs on its own and which roles are paused.
- * With one, they are that workspace's own: its choices over those defaults,
- * its models and role skills, or, as part "sources", where its Finder looks,
- * which sits beside the workspace's Jira connection.
- */
-/** One half of a workspace's own harness settings. */
 export type HarnessSettingsView = 'choices' | 'models';
 
 export function HarnessSettings({ client, status, workspaceId, part = 'workspace', view, onPause, onResume, onSaved }: {
 	client: HarnessClient;
 	status?: HarnessStatus;
-	/** Shows this workspace's own choices; absent shows the defaults. */
 	workspaceId?: string;
-	/** With a workspace: its own choices, or only its sources. */
 	part?: 'workspace' | 'sources';
-	/** Of part "workspace": its choices alone, or its models and role skills alone; absent shows both. The draft and Save cover all of it. */
 	view?: HarnessSettingsView;
 	onPause: (role: HarnessRoleId) => Promise<void>;
 	onResume: (role: HarnessRoleId) => Promise<void>;

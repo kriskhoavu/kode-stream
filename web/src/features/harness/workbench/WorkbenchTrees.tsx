@@ -8,7 +8,6 @@ import { commonFolder } from '../RunPlanPanel';
 import { agentRoleLabels, hxStatuses, plural } from '../vocabulary';
 import { type WorkbenchKey, statusLetter, statusClass, type Loaded, type TreeDir } from './workbenchTypes';
 
-/** Folders and files from paths, a folder with one folder and no file merged into one row, as the item page's tree does. */
 export function buildTree(paths: string[], root = ''): TreeDir {
 	const top: TreeDir = { name: '', dirs: [], files: [] };
 	for (const path of paths) {
@@ -67,7 +66,6 @@ export function FileRow({ path, depth, selected, additions, deletions, status, o
 	);
 }
 
-/** Lines added and removed; a zero side is left out. */
 export function Delta({ additions, deletions }: { additions: number; deletions: number }) {
 	return (
 		<span className="hx-workbench-delta">
@@ -163,4 +161,3 @@ export function agentTitle(agentRun: HarnessAgentRun): string {
 	return `Round ${agentRun.round}${verdict}`;
 }
 
-/* ---------- reader ---------- */

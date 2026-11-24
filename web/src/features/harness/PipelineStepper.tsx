@@ -6,25 +6,13 @@ import { groupStatus } from './pipeline';
 import type { PipelineModel, StepCard } from './pipeline';
 import { LiveTimer } from './LiveTimer';
 
-/**
- * The run as a row of plain steps. One tab stop: arrow keys move between
- * steps (roving tabindex). Hovering a step names what it does; where the page
- * passes `onSelect`, a click or Enter opens what that step made.
- * `orientation="vertical"` is the drawer's compact form. Laid out sideways,
- * Start is a small circle, as a flow chart opens, to leave the room to the
- * steps that do the work.
- */
 export function PipelineStepper({ model, label, orientation = 'horizontal', onSelect, selectedId, hint = 'Click a step to open what it made.', legend = true }: {
 	model: PipelineModel;
 	label: string;
 	orientation?: 'horizontal' | 'vertical';
-	/** Also called when a step is clicked, so a page can show what that step made. */
 	onSelect?: (card: StepCard) => void;
-	/** The step shown as selected, where the page decides it; else the last one clicked. */
 	selectedId?: string;
-	/** The legend's line on what a click does. */
 	hint?: string;
-	/** Shows the colour legend under the steps; a page that says each step's state in words may leave it out. */
 	legend?: boolean;
 }) {
 	const cards = model.groups.flatMap((group) => group.cards);
@@ -36,8 +24,7 @@ const refs = useRef<(HTMLButtonElement | null)[]>([]);
 	const currentId = model.current?.id;
 
 	useEffect(() => {
-		// Follow the run: when the current step moves, the tab stop moves with it.
-		// `cards` comes from the same model as `currentId`, so only the id is watched.
+		// `cards` comes from the same model as `currentId`, so only the id is a dependency.
 		const index = cards.findIndex((card) => card.id === currentId);
 		if (index >= 0) setFocusIndex(index);
 	}, [currentId]);
@@ -95,7 +82,6 @@ onSelect={onSelect ? () => { setFocusIndex(position); setSelected(card.id); onSe
 
 function StageCard({ card, dot = false, refCallback, tabIndex, selected, onSelect, onKeyDown }: {
 	card: StepCard;
-	/** Drawn as a small circle holding only its status icon; its words move to the hover text and the name. */
 	dot?: boolean;
 	refCallback: (element: HTMLButtonElement | null) => void;
 	tabIndex: number;
@@ -105,7 +91,7 @@ function StageCard({ card, dot = false, refCallback, tabIndex, selected, onSelec
 }) {
 	const meta = hxStatuses[card.status];
 	const Icon = meta.icon;
-// Draw the check and glow only when a step finishes while someone watches, not on every page load.
+// Animate only a step that finishes while someone watches, not every page load.
 	const [justDone, setJustDone] = useState(false);
 	const previous = useRef(card.status);
 	useEffect(() => {
@@ -142,7 +128,6 @@ onClick={onSelect}
 	);
 }
 
-/** Two plain sentences, shown on hover: what the step does, and where it stands. */
 export function stepHint(card: StepCard): string {
 	return `${hxSteps[card.step].explain} ${statusSentence(card.status)}`;
 }

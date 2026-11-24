@@ -126,13 +126,10 @@ export function shownInByPath(repo: WorkspaceConfig): Record<string, SourceSurfa
   return Object.fromEntries(workspaceSources(repo).map((source) => [source.path, source.shownIn]));
 }
 
-// A path kept from the saved workspace keeps its surfaces; a new one gets the defaults for its name.
 export function sourcesFromDraft(paths: string[], shownIn: Record<string, SourceSurface[]>): WorkspaceSource[] {
   return paths.map((path) => ({ path, shownIn: shownIn[path]?.length ? shownIn[path] : defaultShownIn(path) }));
 }
 
-// Returns the sources with the surface toggled on the named path, or null when
-// the toggle would leave the source shown nowhere.
 export function toggleSourceSurface(sources: WorkspaceSource[], path: string, surface: SourceSurface): WorkspaceSource[] | null {
   const current = sources.find((source) => source.path === path);
   if (!current) return null;

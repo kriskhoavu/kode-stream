@@ -8,12 +8,10 @@ function finishedReviews(agentRuns: HarnessAgentRun[]): HarnessAgentRun[] {
 		.sort((a, b) => Date.parse(a.startedAt ?? '') - Date.parse(b.startedAt ?? ''));
 }
 
-/** The review that stands now: the latest one the Checker finished. An earlier round it replaced no longer applies. */
 export function featuredReview(agentRuns: HarnessAgentRun[]): HarnessAgentRun | undefined {
 	return finishedReviews(agentRuns).at(-1);
 }
 
-/** For a review that approved, what the earlier rounds of the same stage asked to fix, said in one line. */
 export function earlierFixes(agentRuns: HarnessAgentRun[], review: HarnessAgentRun): string {
 	if (review.blocking > 0) return '';
 	const earlier = finishedReviews(agentRuns).filter((other) => other.role === review.role && other.stageId === review.stageId && other.round < review.round && other.blocking > 0);
@@ -23,7 +21,6 @@ export function earlierFixes(agentRuns: HarnessAgentRun[], review: HarnessAgentR
 	return `Round${earlier.length > 1 ? 's' : ''} ${rounds} asked for ${count} must-fix item${count === 1 ? '' : 's'}. Round ${review.round} found them fixed.`;
 }
 
-/** Must fix, then suggestions, each with its place in the code. Never animated. */
 export function FindingsList({ findings }: { findings: HarnessFinding[] }) {
 	const blocking = findings.filter((finding) => finding.severity === 'blocking');
 	const advisory = findings.filter((finding) => finding.severity === 'advisory');
@@ -46,7 +43,6 @@ export function FindingsList({ findings }: { findings: HarnessFinding[] }) {
 	);
 }
 
-/** The title and place always show; the Checker's reasoning folds under them. Must-fix items start open. */
 function FindingItem({ finding, open = false }: { finding: HarnessFinding; open?: boolean }) {
 	const head = (
 		<>

@@ -1,7 +1,6 @@
 import { hxStatuses } from './vocabulary';
 import type { HxStatus } from './vocabulary';
 
-/** Every status is an icon, a word and a colour together, never colour alone. */
 export function HxStatusBadge({ status, label, size = 'md', className }: { status: HxStatus; label?: string; size?: 'sm' | 'md'; className?: string }) {
 	const meta = hxStatuses[status];
 	const Icon = meta.icon;

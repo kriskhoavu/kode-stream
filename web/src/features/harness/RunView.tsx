@@ -18,7 +18,6 @@ import { pipelineModel, runStatus } from './pipeline';
 import { useNow } from './useNow';
 import { agentRoleLabels, formatMinutes, hxStatuses, plural, sourceLabels, stageKindLabels } from './vocabulary';
 
-/** The pipeline for one run: where it stands, what waits on a person, and what each step took. */
 export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onApprove, onReject, onCancel, onOpenTab, workbench }: {
 	state: HarnessState;
 	runId?: string;
@@ -27,18 +26,15 @@ export function RunView({ state, runId, onSelectRun, onRefresh, loadRun, onAppro
 	loadRun: (runId: string) => Promise<void>;
 	onApprove: (approval: HarnessApproval, reason?: string) => void;
 	onReject: (approval: HarnessApproval, reason: string) => void;
-	/** Stops the run: kills the working agent and cancels the task. */
 	onCancel?: (run: HarnessRun) => Promise<void>;
-	/** Opens the run's drawer on a tab: changed files, the live agent, every finding. */
 	onOpenTab?: (tab: HarnessRunTab, agentRunId?: string) => void;
-	/** Shown below the pipeline instead of the ledger and findings: the run page's workbench, told which step was clicked. */
 	workbench?: (detail: HarnessRunDetail, request?: WorkbenchRequest) => ReactNode;
 }) {
 	const [request, setRequest] = useState<WorkbenchRequest | undefined>();
 	const now = useNow(30_000);
 	const summary = runId ? state.runs[runId] : undefined;
 	const detail = runId ? state.details[runId] : undefined;
-	// Reload the detail whenever the run's summary moves, so polling and events both keep it current.
+	// Reload the detail when the summary changes, so polling and events both keep it current.
 	const version = summary ? `${summary.revision}:${summary.state}:${summary.currentStageId}:${summary.totals.costUsd}` : '';
 
 	useEffect(() => {

@@ -8,7 +8,6 @@ import { RunPagePath, RunWorkbench } from '../harness/RunWorkbench';
 import { queueOrder, type CardWork } from '../workstream/harnessJoin';
 import type { HarnessController } from '../harness/useHarness';
 
-/** An item's harness run shown whole, full width, with the run drawer for one of its tabs. */
 export function ItemRunView({ plan, work, harness, onBack }: {
 	plan: ItemDetail;
 	work: CardWork & { run: NonNullable<CardWork['run']> };

@@ -82,8 +82,7 @@ export function recordField(value: Record<string, unknown>, key: string): Record
 }
 
 export async function readJSONResponse(res: Response): Promise<Record<string, unknown>> {
-  // Lightweight test doubles and intentional legacy adapters may expose json()
-  // without a stream. Browser Responses always provide headers/body.
+  // Test doubles may expose json() without a body stream.
   if (!res.body) {
     const json = (res as unknown as { json?: () => Promise<unknown> }).json;
     if (!json) return {};

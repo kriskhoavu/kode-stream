@@ -6,10 +6,6 @@ const HEADER_HEIGHT = 68;
 
 export type DrawerStyle = CSSProperties & Record<'--drawer-width' | '--drawer-top', string>;
 
-/**
- * The right-hand drawer's geometry: a width the grip on its left edge drags between `min` and `max`,
- * and a top that follows the page header out of view as the page scrolls.
- */
 export function useResizableDrawer({ initial, min = 460, max = 1120 }: { initial: number; min?: number; max?: number }) {
 	const [width, setWidth] = useState(initial);
 	const [topOffset, setTopOffset] = useState(() => Math.max(0, HEADER_HEIGHT - window.scrollY));

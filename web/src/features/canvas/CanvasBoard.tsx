@@ -88,9 +88,7 @@ export function CanvasBoard({ projection, sections = [], conflicts, selectedId, 
 	}, [canvasNodes, focusActiveSet, focusOn, nodeTypeFilters, normalizedSearchQuery, projection.connections, serviceFilters, statusFilters]);
 	const visibleIDs = useMemo(() => new Set(visibleDomainNodes.map((node) => node.id)), [visibleDomainNodes]);
 	const hiddenCount = canvasNodes.length - visibleDomainNodes.length;
-	/** Positions for the active set while Focus is on: plans in a left column,
-	 * each plan's sessions in a row to its right. Virtual only — never written
-	 * back to the projection. */
+	// Virtual positions only: they are never written back to the projection.
 	const focusLayout = useMemo(() => {
 		if (!focusOn) return undefined;
 		const visibleIdSet = new Set(visibleDomainNodes.map((node) => node.id));

@@ -23,7 +23,6 @@ function decidedNote(approval: HarnessApproval | undefined): string | undefined 
 	return `${who} ${verb}${approval.channel && approval.channel !== 'dashboard' ? ` ${channelLabels[approval.channel]}` : ''}`;
 }
 
-/** One table of every step the run took, grouped by stage, with a total. Numbers only: nothing here moves. */
 export function ledgerGroups(detail: HarnessRunDetail): LedgerGroup[] {
 	const approvalOf = (gate: HarnessApproval['gate']) => detail.approvals.filter((approval) => approval.gate === gate).at(-1);
 	const groups: LedgerGroup[] = [];
@@ -45,7 +44,6 @@ export function ledgerGroups(detail: HarnessRunDetail): LedgerGroup[] {
 		if (stage.kind === 'draft_pr' && stage.state !== 'pending') groups.push({ id: stage.id, title: 'Draft pull request', rows: [{ id: stage.id, step: 'Push and open', stage }], open });
 	}
 	const kept = groups.filter((group) => group.rows.length > 0);
-	// A stage kind that ran more than once (a retry after a stop) is numbered: "Plan 2" is the second Plan stage.
 	const counts = new Map<string, number>();
 	for (const group of kept) counts.set(group.title, (counts.get(group.title) ?? 0) + 1);
 	const seen = new Map<string, number>();
@@ -55,7 +53,6 @@ export function ledgerGroups(detail: HarnessRunDetail): LedgerGroup[] {
 		seen.set(group.title, nth);
 		group.title = `${group.title} ${nth}`;
 	}
-	// Only the latest stage starts open; everything before it is history and folds.
 	const last = kept.at(-1);
 	if (last) last.open = true;
 	return kept;
@@ -72,7 +69,6 @@ export function RunLedger({ detail, onOpenAgentRun }: { detail: HarnessRunDetail
 	const groups = ledgerGroups(detail);
 	const rows = groups.flatMap((group) => group.rows);
 	const total = sumRows(rows);
-	// Which groups the person folded or unfolded by hand; the rest follow the stage's state.
 	const [folded, setFolded] = useState<Record<string, boolean>>({});
 	const isOpen = (group: LedgerGroup) => folded[group.id] ?? group.open;
 	return (

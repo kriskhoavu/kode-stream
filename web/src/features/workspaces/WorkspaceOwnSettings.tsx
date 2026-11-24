@@ -9,16 +9,8 @@ import '../harness/harness.css';
 type OwnSettingsTab = 'tools' | 'models';
 const tabs: { id: OwnSettingsTab; label: string }[] = [{ id: 'tools', label: 'Tools and harness' }, { id: 'models', label: 'Models and skills' }];
 
-/**
- * One workspace's own settings, on its page under Workspaces: the provider a
- * new session starts with, and the harness's choices and models for it. Its
- * sources sit with its Jira connection under Integrations, and the settings
- * file opens from the page's header. App-wide settings stay under Settings.
- * Two tabs hold them: the provider and the harness's choices, then the
- * models and role skills. One harness form spans both, so an edit on one tab
- * survives a switch to the other and one Save keeps both.
- */
-export function WorkspaceOwnSettings({ workspace, showHarness = true }: { workspace: WorkspaceConfig; /** The harness is absent on the extension surface. */ showHarness?: boolean }) {
+// One harness form spans both tabs, so an edit survives a tab switch and one Save keeps both.
+export function WorkspaceOwnSettings({ workspace, showHarness = true }: { workspace: WorkspaceConfig; showHarness?: boolean }) {
 	const ai = useAISettings();
 	const [tab, setTab] = useState<OwnSettingsTab>('tools');
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);

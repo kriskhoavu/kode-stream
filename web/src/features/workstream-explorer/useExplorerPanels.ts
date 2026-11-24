@@ -7,11 +7,6 @@ import { boundedLeftPanelWidth, boundedNumber, boundedRightPanelWidth } from './
 const widthPreference = { left: 'workstreamExplorer.leftWidth', right: 'workstreamExplorer.rightWidth' } as const;
 const widthProperty = { left: '--explorer-left-width', right: '--explorer-right-width' } as const;
 
-/**
- * The Explorer's side panels: the tree panel's collapse, and both panels' widths, which a grip drags
- * within their bounds and which are remembered when the drag ends. `gridRef` goes on the grid whose
- * width properties a drag updates directly.
- */
 export function useExplorerPanels() {
 	const gridRef = useRef<HTMLDivElement | null>(null);
 	const [leftCollapsed, setLeftCollapsed] = useState(false);

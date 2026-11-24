@@ -4,10 +4,6 @@ import { api } from '../../shared/api';
 import { errorMessage } from './workspaceDraft';
 import { defaultWorkspaceImportSelection, type WorkspaceImportState } from './workspaceImportReview';
 
-/**
- * Importing workspaces from another app's settings file: pick the file,
- * preview the workspaces it holds, choose some and import them.
- */
 export function useWorkspaceImport({ onChanged }: { onChanged: () => void | Promise<void> }) {
 	const [importSourcePath, setImportSourcePath] = useState('');
 	const [importState, setImportState] = useState<WorkspaceImportState>('selecting');

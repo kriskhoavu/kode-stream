@@ -5,14 +5,7 @@ import type { EmbeddedAISessionResult, EmbeddedAISessionState, SafeSessionRecord
 import { EmbeddedTerminal } from './EmbeddedTerminal';
 import { notifyEmbeddedSessionEnded } from './terminalSessions';
 
-/**
- * Reattaches to a session's live terminal. Shared by the Canvas session
- * node (a draggable graph node, hence the `nodrag nopan nowheel` classes and
- * the click/pointerdown guards below), the Session Browser's detail pane (via
- * `SessionBrowserTerminal`) and the Workstream card drawer's agent pane, each
- * supplying its own `classPrefix`; `visible` follows the same shape in all of
- * them so only the selected/expanded session ever attaches.
- */
+// Canvas nodes use this too, hence the `nodrag nopan nowheel` classes and the pointer guards.
 export function SessionTerminal({ record, visible, onClose = () => {}, onReload, classPrefix = 'canvas-session-terminal', ariaLabel }: { record: SafeSessionRecord; visible: boolean; onClose?: () => void; onReload: () => Promise<unknown> | void; classPrefix?: string; ariaLabel?: string }) {
 	const [result, setResult] = useState<EmbeddedAISessionResult>();
 	const [attaching, setAttaching] = useState(false);
@@ -29,9 +22,7 @@ export function SessionTerminal({ record, visible, onClose = () => {}, onReload,
 		return () => { mounted.current = false; };
 	}, []);
 
-	// A different record (e.g. the Session Browser's selection changing to
-	// another session) re-attaches from scratch instead of carrying over the
-	// previous session's terminal state.
+	// A new record attaches from scratch instead of keeping the old terminal state.
 	useEffect(() => {
 		setResult(undefined);
 		setError('');

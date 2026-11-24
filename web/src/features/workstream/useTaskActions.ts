@@ -3,7 +3,6 @@ import type { HarnessTask } from '../../lib/types';
 import type { HarnessController } from '../harness/useHarness';
 import { retryApproval } from './harnessJoin';
 
-/** The queue's actions on a task, each marking the task busy until the harness answers. */
 export function useTaskActions(harness: HarnessController) {
 	const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
 	const track = useCallback(async (task: HarnessTask, change: () => Promise<void>) => {

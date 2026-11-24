@@ -14,8 +14,7 @@ const SourceCodeView = lazy(() => import('./renderers/SourceCodeView').then((mod
 
 export const ContentViewer = memo(function ContentViewer({ file, content, compact = false, selection, modeSwitch = true }: ContentViewerProps) {
   const adapter = viewerAdapter(file.kind);
-  // A search match in this file is highlighted only in the source, so the
-  // viewer opens on the source while one points here.
+  // A search match is highlighted only in the source, so open the source view.
   const matchHere = selection?.path === file.path && file.kind !== 'image' && file.kind !== 'unsupported';
   const [mode, setMode] = useState<ViewerMode>(matchHere ? 'source' : adapter.defaultMode);
   const large = file.kind !== 'image' && file.sizeBytes > richPreviewThresholdBytes;

@@ -3,12 +3,10 @@ import { StatusMenu } from '../../components/StatusMenu';
 import type { ItemDetail, ItemMetadataUpdateInput, ItemStatus } from '../../lib/types';
 import { isDocumentationMetadataSource, labels } from '../../lib/vocabulary';
 
-/** The editable metadata of an item, as the form starts from it. */
 export function metadataDraftFrom(plan: ItemDetail): ItemMetadataUpdateInput {
 	return { title: plan.title, scope: plan.scope, identifier: plan.identifier, status: plan.status, owner: plan.owner ?? '', tags: plan.tags };
 }
 
-/** Whether the draft differs from the item it was made from. */
 export function isMetadataDirty(draft: ItemMetadataUpdateInput, plan: ItemDetail | null): boolean {
 	if (!plan) return false;
 	return (draft.title ?? '') !== (plan.title ?? '')
@@ -19,13 +17,11 @@ export function isMetadataDirty(draft: ItemMetadataUpdateInput, plan: ItemDetail
 		|| (draft.tags ?? []).join('\n') !== (plan.tags ?? []).join('\n');
 }
 
-/** The item metadata form. The drawer leaves out the scope field; the item page shows it. */
 export function ItemMetadataFields({ draft, onChange, showScope = true, className = 'metadata-form', children }: {
 	draft: ItemMetadataUpdateInput;
 	onChange: Dispatch<SetStateAction<ItemMetadataUpdateInput>>;
 	showScope?: boolean;
 	className?: string;
-	/** Drawn after the fields, inside the form, where a layout keeps its own actions. */
 	children?: ReactNode;
 }) {
 	const set = (patch: ItemMetadataUpdateInput) => onChange((current) => ({ ...current, ...patch }));
@@ -42,10 +38,6 @@ export function ItemMetadataFields({ draft, onChange, showScope = true, classNam
 	);
 }
 
-/**
- * The editable part of an item's Info tab: the form, its Save button and the item's tags. A
- * documentation folder has no structured metadata, so it shows no form and cannot save.
- */
 export function ItemMetadataEditor({ plan, draft, onChange, dirty, saving, onSave, showScope = true, formClassName }: {
 	plan: ItemDetail | null;
 	draft: ItemMetadataUpdateInput;

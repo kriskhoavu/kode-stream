@@ -6,11 +6,6 @@ import { useHarness } from '../harness/useHarness';
 import type { HarnessController } from '../harness/useHarness';
 import { useHarnessEvents } from '../harness/useHarnessEvents';
 
-/**
- * The harness as the Workstream board reads it: one controller for the page,
- * fed by the live event feed while the harness is on. The development fixture
- * is honoured the way the Harness page honours it.
- */
 export function useBoardHarness(): HarnessController {
 	const [client, setClient] = useState<HarnessClient>(() => apiHarnessClient);
 	useEffect(() => {

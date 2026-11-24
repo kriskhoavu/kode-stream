@@ -7,7 +7,6 @@ import type { JiraIssueSource } from './useJiraIssue';
 
 type JiraItemPanelProps = { itemId: string; workspaceId?: undefined; issueKey?: undefined } | { itemId?: undefined; workspaceId: string; issueKey: string };
 
-/** A Jira ticket, read through a Kode Stream item or by key in a workspace. */
 export function JiraItemPanel(props: JiraItemPanelProps) {
   const source: JiraIssueSource = props.itemId !== undefined ? { itemId: props.itemId } : { workspaceId: props.workspaceId, issueKey: props.issueKey };
   const attachmentURL = (attachmentId: string) => 'itemId' in source ? api.jiraAttachmentURL(source.itemId, attachmentId) : api.workspaceJiraAttachmentURL(source.workspaceId, source.issueKey, attachmentId);
@@ -53,8 +52,7 @@ export function JiraItemPanel(props: JiraItemPanelProps) {
   </div>;
 }
 
-// Workflow status names are project-specific ("Test Done", "QA", "Ready"), so
-// the colour comes from Jira's own status category instead of the name.
+// Status names vary by project, so the colour comes from Jira's status category.
 function statusTone(category?: string) {
   switch (category) {
     case 'done': return 'done';

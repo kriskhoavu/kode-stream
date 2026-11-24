@@ -5,17 +5,11 @@ import { isSessionLive } from './sessionDisplay';
 import { useSessionChanges } from './useSessionChanges';
 import type { ChangesLoader } from './useSessionChanges';
 
-/**
- * Where a Changes tab reads from. An interactive session reads its checkout
- * since launch; a harness agent reads its run, from the run's own worktree
- * while it lives and its branch after.
- */
 export interface ChangesSource {
 	id: string;
 	live: boolean;
 	loadChanges: ChangesLoader;
 	loadDiff: (id: string, path: string, signal: AbortSignal) => Promise<{ diff: string; truncated: boolean }>;
-	/** The line under the totals, saying what the changes are measured against. */
 	note: string;
 }
 
@@ -51,7 +45,6 @@ function availabilityMessage(changes: SessionChanges): string {
 	}
 }
 
-/** A path shown as its file name first and its folder after, so a long path never breaks mid-word. */
 function splitPath(path: string): { name: string; folder: string } {
 	const index = path.lastIndexOf('/');
 	return index < 0 ? { name: path, folder: '' } : { name: path.slice(index + 1), folder: path.slice(0, index) };
@@ -69,11 +62,6 @@ function groupFiles(files: SessionFile[]) {
 	return STATUS_ORDER.map((status) => ({ status, label: STATUS_LABEL[status], files: files.filter((file) => file.status === status) })).filter((group) => group.files.length > 0);
 }
 
-/**
- * The session node's Changes tab: header stats, availability/reason text
- * when changes cannot be computed, a truncation note, and a file list
- * grouped by status whose selection loads a unified diff.
- */
 export function SessionChangesPanel({ session, source: given }: { session?: SafeSessionRecord; source?: ChangesSource }) {
 	const source = given ?? sessionChangesSource(session!);
 	const { changes, loading, error } = useSessionChanges(source.id, source.live, source.loadChanges);

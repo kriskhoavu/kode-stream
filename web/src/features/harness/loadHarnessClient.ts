@@ -6,12 +6,7 @@ import type { HarnessClient } from './harnessClient';
 const fixturePreference = 'harnessFixture';
 let fixtureClient: Promise<HarnessClient> | undefined;
 
-/**
- * Development only: `VITE_HARNESS_FIXTURE=1 npm run dev`, or open any harness
- * page with `?fixture=1` (remembered; `?fixture=0` forgets it). In a
- * production build `import.meta.env.DEV` is false, so the fixture module is
- * never bundled.
- */
+// `import.meta.env.DEV` is false in production, so the fixture is never bundled.
 export function wantsHarnessFixture(search = globalThis.location?.search ?? ''): boolean {
 	if (!import.meta.env.DEV || import.meta.env.MODE === 'test') return false;
 	const flag = new URLSearchParams(search).get('fixture');
@@ -22,7 +17,7 @@ export function wantsHarnessFixture(search = globalThis.location?.search ?? ''):
 
 export function loadHarnessClient(): Promise<HarnessClient> {
 	if (import.meta.env.DEV && wantsHarnessFixture()) {
-		// One fixture per page load, so decisions survive leaving and returning to the harness.
+		// One fixture per page load, so decisions survive leaving and returning.
 		fixtureClient ??= import('./fixture').then((module) => module.createFixtureClient());
 		return fixtureClient;
 	}

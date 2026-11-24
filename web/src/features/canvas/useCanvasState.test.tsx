@@ -56,9 +56,6 @@ describe('useCanvasState', () => {
 		expect(api.patchCanvasPlacements).toHaveBeenCalledWith('layout-1', [expect.objectContaining({ nodeId: 'session:one', size: { width: 840, height: 620 }, expectedRevision: 1 })], expect.any(AbortSignal));
 	});
 
-	// A conflict means the layout moved under us, not that the move was unwanted.
-	// Discarding it silently dropped the position and left Canvas sections drawn
-	// for an arrangement the nodes never reached.
 	it('rebases a conflicting position onto the fresh revision instead of discarding it', async () => {
 		vi.mocked(api.patchCanvasPlacements)
 			.mockRejectedValueOnce(new ApiError('conflict', undefined, undefined, { code: 'placement_conflict', nodeIds: ['plan:item-1'], status: 409 }))
@@ -66,13 +63,10 @@ describe('useCanvasState', () => {
 		const { result } = renderHook(() => useCanvasState('workspace-1'));
 		await act(async () => { await vi.runAllTimersAsync(); });
 		act(() => result.current.moveNode('plan:item-1', { x: 50, y: 60 }));
-		// Each settle covers one flush: the conflict, then the rebased retry it schedules.
 		await act(async () => { await vi.runAllTimersAsync(); });
 		await act(async () => { await vi.runAllTimersAsync(); });
 		expect(api.patchCanvasPlacements).toHaveBeenNthCalledWith(1, 'layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 50, y: 60 }, expectedRevision: 1 })], expect.any(AbortSignal));
 		expect(api.canvasLayout).toHaveBeenCalledWith('layout-1', expect.any(AbortSignal));
-		// Retried against the revision the refetched layout reports, carrying the
-		// position the user actually asked for.
 		expect(api.patchCanvasPlacements).toHaveBeenNthCalledWith(2, 'layout-1', [expect.objectContaining({ nodeId: 'plan:item-1', position: { x: 50, y: 60 }, expectedRevision: 2 })], expect.any(AbortSignal));
 		expect(result.current.projection?.nodes[0].position).toEqual({ x: 50, y: 60 });
 		expect(result.current.dirtyCount).toBe(0);
@@ -80,8 +74,6 @@ describe('useCanvasState', () => {
 		expect(result.current.error).toBe('');
 	});
 
-	// Without a fresh layout there is no revision to rebase onto, but discarding
-	// the position is the very loss this retry exists to prevent.
 	it('keeps a conflicting position pending when the layout refetch fails', async () => {
 		vi.mocked(api.patchCanvasPlacements).mockRejectedValue(new ApiError('conflict', undefined, undefined, { code: 'placement_conflict', nodeIds: ['plan:item-1'], status: 409 }));
 		vi.mocked(api.canvasLayout).mockRejectedValue(new Error('offline'));

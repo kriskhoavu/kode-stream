@@ -21,11 +21,6 @@ describe('LatticeBackdrop', () => {
     expect(container.querySelectorAll('.lattice-node').length).toBeGreaterThan(20);
   });
 
-  /*
-   * These four are what make the grid and the network read as one field rather
-   * than a scatter laid over a grid. Each is a way the generator can still
-   * render something plausible while no longer rendering a lattice.
-   */
   it('places every node on the fine grid', () => {
     for (const node of buildLattice().nodes) {
       expect(node.x % 24).toBe(0);
@@ -56,10 +51,6 @@ describe('LatticeBackdrop', () => {
     expect(edges(second.container)).toEqual(before);
   });
 
-  /*
-   * A highlight has to mean something. Marking coarse-grid coincidences alone
-   * lit three nodes across the whole field, most of them where no edges met.
-   */
   it('highlights nodes where edges converge, or coarse-grid landmarks', () => {
     const { nodes } = buildLattice();
     const junctions = nodes.filter((node) => node.junction);
@@ -69,7 +60,6 @@ describe('LatticeBackdrop', () => {
       const onCoarse = node.x % 96 === 0 && node.y % 96 === 0;
       expect(node.degree >= 3 || onCoarse).toBe(true);
     }
-    // At least some are real convergences rather than grid coincidences.
     expect(junctions.some((node) => node.degree >= 3)).toBe(true);
   });
 
@@ -93,11 +83,7 @@ describe('LatticeBackdrop', () => {
     expect(Math.max(...xs)).toBeGreaterThan(1000);
   });
 
-  /*
-   * `slice` crops the field to a band shorter than itself, so anything near the
-   * top or bottom must already be faint or it ends on a hard cut — which is
-   * exactly how this looked before the fades.
-   */
+  // `slice` crops the field, so marks near its edges must already be faint.
   it('fades marks toward the top and bottom of the field', () => {
     const { nodes } = buildLattice();
     const edgeBand = nodes.filter((n) => Math.min(n.y, 240 - n.y) <= 24);
@@ -118,8 +104,7 @@ describe('LatticeBackdrop', () => {
   });
 
   it('varies walk length, so the field does not read as a repeated pattern', () => {
-    // Walks are the only source of edges, so a spread of per-walk counts shows
-    // up as a spread of distinct edge opacities along each trail.
+    // Walks are the only source of edges, so walk counts show up as edge opacities.
     const opacities = new Set(buildLattice().edges.map((e) => e.opacity.toFixed(3)));
     expect(opacities.size).toBeGreaterThan(20);
   });

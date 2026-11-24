@@ -4,7 +4,6 @@ import type { HarnessSourceKind, HarnessSourceSettings } from '../../lib/types';
 import type { HarnessWorkspaceOption } from './harnessClient';
 import { formatAgo, sourceLabels } from './vocabulary';
 
-/** A sensible first query: the workspace's own Jira project, open issues, newest change first. */
 export function defaultSourceQuery(kind: HarnessSourceKind, workspace?: HarnessWorkspaceOption): string {
 	if (kind === 'jira' && workspace?.jiraProjectKey) {
 		return `project = ${workspace.jiraProjectKey} AND sprint in openSprints() AND statusCategory != Done ORDER BY updated DESC`;
@@ -40,10 +39,6 @@ export function SourceRow({ source, workspaceName, now, onChange, onRemove, onCl
 	);
 }
 
-/**
- * A Jira source's readiness check: a ticket in a ready status starts on its
- * own, and its Planner first judges whether the ticket says enough.
- */
 export function ReadyCheckFields({ source, onChange }: { source: HarnessSourceSettings; onChange: (patch: Partial<HarnessSourceSettings>) => void }) {
 	const on = source.checkReady === true;
 	const [text, setText] = useState((source.readyStatuses ?? []).join(', '));

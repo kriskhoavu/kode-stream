@@ -47,9 +47,7 @@ describe('CanvasSessionsView', () => {
 		};
 		render(<CanvasSessionsView workspaceId="workspace-1" checkoutBranch="main" projection={projection()} onOpenOnBoard={vi.fn()} onOpenHarnessRun={vi.fn()} onReload={vi.fn()} />);
 		expect(await screen.findByTestId('session-browser')).toHaveAttribute('data-harness', 'on');
-		// Both runs of DI-1 share one row, newest first; every round stays inside it.
 		expect(screen.getAllByTestId('harness-row').map((row) => row.textContent)).toEqual(['DI-1 run-d:1 run-a:2']);
-		// The other workspace's run is not read; this workspace's run without a detail is.
 		expect(loadRun).toHaveBeenCalledWith('run-c');
 		expect(loadRun).not.toHaveBeenCalledWith('run-b');
 		expect(loadRun).not.toHaveBeenCalledWith('run-a');

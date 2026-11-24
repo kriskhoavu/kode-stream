@@ -13,14 +13,8 @@ import { useNow } from '../harness/useNow';
 import { formatAgo, hxStatuses, plural, taskStatus } from '../harness/vocabulary';
 import { useTaskActions } from './useTaskActions';
 
-/**
- * The queue as a view of the board: the ranked rows, and beside them why the
- * chosen row sits where it does, what starts next, and when the Finder last
- * looked.
- */
 export function QueueView({ tasks, finished = [], harness, onOpenTask }: {
 	tasks: HarnessTask[];
-	/** Finished tasks, newest first, listed apart under Show finished. */
 	finished?: HarnessTask[];
 	harness: HarnessController;
 	onOpenTask: (task: HarnessTask) => void;
@@ -122,11 +116,9 @@ function QueueSidePanel({ selected, tasks, harness }: { selected?: HarnessTask; 
 	);
 }
 
-/** What the Task Queue lists: the tasks still in play (the default), the finished ones, or both. */
 type QueueShown = 'active' | 'finished' | 'all';
 const queueShownOptions: { id: QueueShown; label: string }[] = [{ id: 'active', label: 'Active' }, { id: 'finished', label: 'Finished' }, { id: 'all', label: 'All' }];
 
-/** Every task that is done, stopped, dismissed or closed at its source, with Remove. */
 function FinishedList({ tasks, harness, onOpenTask }: { tasks: HarnessTask[]; harness: HarnessController; onOpenTask: (task: HarnessTask) => void }) {
 	const { state } = harness;
 	const now = useNow(60_000);

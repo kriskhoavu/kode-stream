@@ -1,7 +1,6 @@
 import { HarnessSettings, type HarnessSettingsView } from '../harness/HarnessSettings';
 import { useBoardHarness } from './useBoardHarness';
 
-/** The harness's settings: its defaults, one workspace's own choices over them, or that workspace's sources. */
 export function HarnessSettingsSection({ workspaceId, part, view }: { workspaceId?: string; part?: 'workspace' | 'sources'; view?: HarnessSettingsView }) {
 	const harness = useBoardHarness();
 	return (

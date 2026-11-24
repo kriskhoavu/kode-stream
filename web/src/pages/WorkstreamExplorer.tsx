@@ -36,11 +36,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   embeddedHeaderContent?: ReactNode;
   leftPanelContent?: ReactNode;
   mainContent?: ReactNode;
-  /**
-   * Agent sessions shown in the main pane. Kept mounted while inactive, so a
-   * held terminal stays connected; while active it hides the file editor,
-   * which stays mounted too and keeps its open tabs.
-   */
+  /** Kept mounted while inactive, so a held terminal stays connected. */
   agentArea?: { content: ReactNode; active: boolean };
   rightPanel?: ExplorerRightPanelProps;
 }) {
@@ -67,9 +63,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const rightPanelCollapsedLabel = rightPanel?.collapsedLabel ?? 'Expand inspector';
   const normalizedTreeRootPath = normalizeExplorerPath(treeRootPath ?? '');
   const visibleRows = useMemo(() => restrictRowsToRoot(explorer.rows, location?.workspaceId, normalizedTreeRootPath), [explorer.rows, location?.workspaceId, normalizedTreeRootPath]);
-  // A tree restricted to a root (the item's Plan view) always opens on that
-  // root expanded: the expanded set is shared and remembered, so a root
-  // collapsed once elsewhere would otherwise greet every visit closed.
+  // The expanded set is shared, so open the root again on every visit.
   const { expandPath } = explorer;
   useEffect(() => {
     if (!location?.workspaceId || !normalizedTreeRootPath) return;
@@ -171,10 +165,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     explorer.select(row.workspaceId, row.node.path);
   };
 
-  // A tree restricted to a root (the item's Plan view) opens on the last file
-  // directly in that root, as the tree sorts it: a plan's README.md. Once per
-  // root, and only while nothing else is open, so it never replaces a file
-  // the user opened or one the URL names.
+  // Open the root's last file once per root, and only while no other file is open.
   const openedRootRef = useRef('');
   useEffect(() => {
     const workspaceId = location?.workspaceId;
@@ -293,8 +284,7 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
   const activateTab = async (tab: OpenWorkspaceFileTab) => {
     if (editor.dirty && !(await editor.saveNow())) return;
     setMatchContext(null);
-    // The location effect loads the tab and makes it active. Setting the active tab here first
-    // would make that effect reload the file still at the location.
+    // The location effect activates the tab. Setting it here first would reload the old file.
     await explorer.expandToPath(tab.workspaceId, tab.path, 'file');
   };
 
@@ -303,7 +293,6 @@ export function WorkstreamExplorer({ workspaces, location, onLocationChange, emb
     if (key === activeTabKey && editor.dirty && !(await editor.saveNow())) return;
     const { next: nextTab } = fileTabs.close(tab);
     if (nextTab) {
-      // As in activateTab: the location effect loads the next tab and makes it active.
       await explorer.expandToPath(nextTab.workspaceId, nextTab.path, 'file');
       return;
     }

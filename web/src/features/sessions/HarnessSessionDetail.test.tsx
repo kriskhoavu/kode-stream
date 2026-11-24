@@ -45,7 +45,6 @@ describe('HarnessSessionDetail', () => {
 		expect(client.agentRunTranscript).toHaveBeenLastCalledWith('builder-1', 50, expect.anything());
 		expect(screen.queryByRole('group', { name: /Rounds of/ })).not.toBeInTheDocument();
 
-		// A step with two rounds opens on its last, and its round chips pick the earlier one.
 		fireEvent.click(stepButton('Plan'));
 		expect(screen.getByText('Planner · round 2')).toBeInTheDocument();
 		const rounds = screen.getByRole('group', { name: 'Rounds of Plan' });
@@ -53,7 +52,6 @@ describe('HarnessSessionDetail', () => {
 		expect(screen.getByText('Planner · round 1')).toBeInTheDocument();
 		expect(client.agentRunTranscript).toHaveBeenLastCalledWith('planner-1', 50, expect.anything());
 
-		// A step no agent worked in says so instead of showing an empty conversation.
 		fireEvent.click(stepButton('Test'));
 		expect(screen.getByText(/Test has no agent conversation in this run/)).toBeInTheDocument();
 		expect(screen.queryByRole('tab', { name: 'Conversation' })).not.toBeInTheDocument();

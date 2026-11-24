@@ -11,8 +11,7 @@ describe('JiraItemPanel', () => {
     vi.mocked(api.jiraIssue).mockResolvedValue({ state:'available', issue:{ key:'DI-170', summary:'Search', status:'Open', description:'Remote <script>alert(1)</script>', issueType:'Story', priority:'High', labels:['backend'], browserUrl:'https://jira/browse/DI-170', attachments:[{id:'9',filename:'spec.pdf',mediaType:'application/pdf',sizeBytes:2048,author:{displayName:'Kim'}}] } });
     render(<JiraItemPanel itemId="item-1" />);
     expect(await screen.findByText('DI-170')).toBeInTheDocument();
-    // The description is rendered Markdown, so the sanitizer strips the script
-    // element and leaves its content as inert text.
+    // The sanitizer strips the script element and leaves its text inert.
     expect(await screen.findByText('Remote alert(1)')).toBeInTheDocument();
     expect(document.querySelector('script')).toBeNull();
     expect(screen.queryByRole('link',{name:'Open spec.pdf'})).not.toBeInTheDocument();
@@ -71,7 +70,6 @@ describe('JiraItemPanel status badge', () => {
     expect(await tone('done', 'Test Done')).toContain('done');
     expect(await tone('indeterminate', 'QA')).toContain('in-progress');
     expect(await tone('new', 'Backlog')).toContain('todo');
-    // An older payload without a category must still render a readable badge.
     expect(await tone(undefined, 'Something Custom')).toContain('unknown');
   });
 

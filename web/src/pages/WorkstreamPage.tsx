@@ -49,11 +49,8 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   refreshKey: number;
   visibleStatuses?: ItemStatus[];
   focusedItemId?: string;
-  /** A session to open in the focused card's drawer. */
   focusedSessionId?: string;
-  /** Opens the item page; `run` opens it on the harness run, full width. */
   onOpenPlan: (itemId: string, view?: 'run') => void;
-  /** Opens a harness run whole, full width: a plan card's on its item page, a Jira ticket's on a page of its own. */
   onOpenHarnessRun?: (runId: string) => void;
   onWorkspacesChanged: () => void | Promise<void>;
   onOpenWorkspaces?: () => void;
@@ -68,7 +65,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const { savedFilters, saveFilterOpen, setSaveFilterOpen, saveFilterName, setSaveFilterName, saveCurrentFilter, applySavedFilter, deleteSavedFilter } = useSavedFilters({ workspaceId: workspace?.id, filters, query, setFilters, setQuery });
   const [drawerPlanId, setDrawerPlanId] = useState('');
   const [drawerAgent, setDrawerAgent] = useState<AgentFocus>();
-  /** Open while set: the New Work Item dialog, starting from these values. */
   const [newItemSeed, setNewItemSeed] = useState<Partial<NewWorkItemDraft>>();
   const [pendingItemIds, setPendingItemIds] = useState<Set<string>>(() => new Set());
   const [createdItemId, setCreatedItemId] = useState('');
@@ -77,8 +73,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const harness = useBoardHarness();
   const harnessOn = Boolean(harness.state.loaded && harness.state.status?.enabled && harness.state.status.storageSupported);
   const harnessJoin = useMemo(() => joinHarness(items, harness.state, workspace?.id), [items, harness.state, workspace?.id]);
-  // Tasks and plans never share the board: Tasks shows what the harness holds, Plans what the branch holds.
-  // Without the harness there are no tasks, so the board shows plans.
   const { setBoardKind, shownKind, shownLayout, setLayout } = useBoardView(harnessOn);
   const tasksShown = shownKind === 'tasks';
   const boardTaskCards = useMemo(() => taskCards(items, harness.state, workspace?.id), [items, harness.state, workspace?.id]);
@@ -89,16 +83,13 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   const boardTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id), [harness.state, workspace?.id]);
   const finishedTasks = useMemo(() => tasksForWorkspace(harness.state, workspace?.id, { finished: true }), [harness.state, workspace?.id]);
   const taskActions = useTaskActions(harness);
-  /** A task in the first column that has not started: dragging it to the second starts it. */
   const startableTask = useCallback((id: string) => {
     if (!tasksShown) return undefined;
     const work = taskWorkById.get(id);
     const card = boardTaskCards.find((candidate) => candidate.item.id === id);
     return work && card?.item.status === 'unsorted' && canStartTask(work.task) && !startPending(work.task) && !taskActions.pendingIds.has(work.task.id) ? work.task : undefined;
   }, [tasksShown, taskWorkById, boardTaskCards, taskActions.pendingIds]);
-  // A task with no card of its own opens the harness's own drawer.
   const [taskDrawer, setTaskDrawer] = useState<{ taskId: string; tab: HarnessRunTabId } | undefined>();
-  // The card being handed to the harness.
   const [runDialogItemId, setRunDialogItemId] = useState('');
   const runDialogItem = runDialogItemId ? boardItems.find((item) => item.id === runDialogItemId) : undefined;
   const openTask = useCallback((task: HarnessTask) => {
@@ -111,13 +102,9 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     setTaskDrawer({ taskId: task.id, tab: task.runId ? 'plan' : 'ticket' });
   }, [harnessJoin]);
   const [sourceItemsOpen, setSourceItemsOpen] = useState(false);
-  // The workspace's AI and harness settings, opened from the Tasks board.
   const [harnessSettingsOpen, setHarnessSettingsOpen] = useState(false);
 	const harnessSettingsDialog = useModalDialog(() => { setHarnessSettingsOpen(false); void harness.refresh(); }, true, harnessSettingsOpen);
   const appliedFocusRef = useRef('');
-	// Every asynchronous board workflow is scoped to this generation. A route
-	// change/unmount invalidates outstanding responses before they can paint a
-	// different workspace.
   const text = query;
 
   useEffect(() => {
@@ -132,7 +119,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     setDrawerAgent(focusedSessionId ? { kind: 'session', id: focusedSessionId } : undefined);
   }, [focusedItemId, focusedSessionId, items, loading, selectedBranch, workspace?.id]);
 
-  // Bring the freshly created card into view and let its highlight fade on its own.
   useEffect(() => {
     if (!createdItemId) return;
     const card = Array.from(document.querySelectorAll<HTMLElement>('[data-item-id]'))
@@ -144,7 +130,6 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
 
   const sourceOptions = useMemo(() => sourceFacetOptions(items, workspace), [items, workspace]);
   const filteredPlans = useMemo(() => filterPlans(boardItems, tasksShown ? { ...filters, workedBy: [] } : filters, text, workspace, workedByOf), [boardItems, tasksShown, filters, text, workspace, workedByOf]);
-  // The Tasks list is the Task Queue, narrowed by the same search and filters as the board.
   const shownTaskIds = useMemo(() => new Set(filteredPlans.map((item) => taskWorkById.get(item.id)?.task.id).filter(Boolean)), [filteredPlans, taskWorkById]);
   const services = useMemo(() => unique(items.map((plan) => plan.scope || 'Unknown')), [items]);
   const currentBranch = branchContext?.currentCheckoutBranch || workspaceGitStatus?.branch || workspaceBranchCurrent || workspace?.baselineBranch || 'No branch';
@@ -175,7 +160,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   }, [visibleStatuses]);
   const boardStyle = useMemo(() => ({
     gridTemplateColumns: displayedStatuses
-      // Both boards put a narrow configure column after the first one: source items on Plans, AI and harness on Tasks.
+      // Both boards put a narrow configure column after the first one.
       .flatMap((status) => status === 'unsorted' && (!tasksShown || workspace) ? ['minmax(200px, 1fr)', '44px'] : ['minmax(200px, 1fr)'])
       .join(' ')
   }) as CSSProperties, [displayedStatuses, tasksShown, workspace]);
@@ -211,13 +196,12 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     if (!workspace) return;
 		const { controller, active, finish } = checkout.begin();
 		const workspaceID = workspace.id;
-    // On the Tasks board, Refresh also asks the workspace's sources (Jira) at once, rather than at the next poll.
     const pollScouts = tasksShown && harnessOn ? harness.client.pollScouts : undefined;
     setScanState(pollScouts ? 'Checking Jira' : 'Refreshing');
     try {
       const [result, polled] = await Promise.all([
         api.loadWorkstreamCheckout(workspace.id, { force: true }, controller.signal),
-        pollScouts ? pollScouts(workspaceID).then(async (answer) => { await harness.refresh(); return sourcesChecked(answer.sources ?? []); }, (caught: unknown) => { const message = plainError(caught, 'the check failed'); return message.includes('has no harness sources') ? '' : `Jira: ${message}`; }) : Promise.resolve('')
+        pollScouts ? pollScouts(workspaceID).then(async (answer) => { await harness.refresh(); return sourceCheckSummary(answer.sources ?? []); }, (caught: unknown) => { const message = plainError(caught, 'the check failed'); return message.includes('has no harness sources') ? '' : `Jira: ${message}`; }) : Promise.resolve('')
       ]);
 			if (controller.signal.aborted || !active()) return;
       notifyReliabilityChanged();
@@ -236,12 +220,10 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
     await checkout.loadCheckout(false, options);
   };
 
-  // Show the new card on the board rather than jumping to the detail page.
-  // The refresh is silent so the columns never blank out.
+  // A silent refresh keeps the columns from blanking out.
   const showCreatedItem = (item: ItemSummary) => {
     checkout.rememberCreated(item);
     setCreatedItemId(item.id);
-    // A new work item is a plan: show the board that holds it.
     if (tasksShown) setBoardKind('plans');
     setNewItemSeed(undefined);
     void Promise.resolve(onWorkspacesChanged()).then(() => reloadPlans({ silent: true }));
@@ -516,8 +498,7 @@ export function WorkstreamPage({ workspace, refreshKey, visibleStatuses = status
   );
 }
 
-/** What a Refresh on the Tasks board says the sources returned. */
-export function sourcesChecked(sources: { found: number; added: number; lastError?: string }[]): string {
+export function sourceCheckSummary(sources: { found: number; added: number; lastError?: string }[]): string {
   const failed = sources.find((source) => source.lastError);
   if (failed) return `Jira: ${failed.lastError}`;
   const found = sources.reduce((sum, source) => sum + source.found, 0);

@@ -75,14 +75,12 @@ export function useAppState() {
     setRoute(next);
   }, []);
 
-  /** Replaces the current entry, for a redirect that should not be in the history. */
   const replace = useCallback((next: Route) => {
     history.replaceState(null, '', pathForRoute(next));
     setRoute(next);
   }, []);
 
   useEffect(() => {
-    // An old link to the Harness page lands on the board; the address follows.
     if (route.name === 'workstream' && window.location.pathname.startsWith('/harness')) history.replaceState(null, '', '/');
   }, [route.name]);
 
@@ -102,7 +100,7 @@ export function useAppState() {
       return true;
     } catch (error) {
       if (active.signal.aborted || requestGeneration !== generation.current) return false;
-      // A failure must never masquerade as a trusted Local administrator session or an empty registry.
+      // A failure must never look like a trusted local admin session or an empty registry.
       setRuntimeContext((current) => current.mode === 'local' ? current : unavailableRuntimeContext);
       setDataStatus('unavailable');
       return false;

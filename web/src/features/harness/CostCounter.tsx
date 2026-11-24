@@ -7,11 +7,6 @@ function reducedMotion(): boolean {
 	return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-/**
- * A cost that counts up to its new value over 600 ms, with the increase
- * rising beside it ("+$0.31"). With reduced motion it simply shows the new
- * value. Screen readers read the final value only.
- */
 export function CostCounter({ value, className }: { value: number; className?: string }) {
 	const [shown, setShown] = useState(value);
 	const [ghost, setGhost] = useState<{ id: number; delta: number } | undefined>();

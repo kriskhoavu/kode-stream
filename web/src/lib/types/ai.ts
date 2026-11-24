@@ -40,15 +40,11 @@ export interface AISettings {
   defaultTerminal: string;
   providers: Record<string, AILaunchTemplate>;
   terminals: Record<string, AILaunchTemplate>;
-  /** Each workspace's own default provider, over `defaultProvider`. */
   workspaceProviders?: Record<string, string>;
 }
 
-/** The provider a session in a workspace starts with. */
-/** The provider of a workspace that has not chosen one of its own, while it is enabled on this machine. */
 export const workspaceDefaultProvider = 'claude';
 
-/** The provider a session starts with: its workspace's own, else Claude, else the machine's default. */
 export function providerFor(settings: Pick<AISettings, 'defaultProvider' | 'workspaceProviders'> & { providers?: AISettings['providers'] }, workspaceId?: string): string {
   if (!workspaceId) return settings.defaultProvider;
   return settings.workspaceProviders?.[workspaceId] || (settings.providers?.[workspaceDefaultProvider]?.enabled ? workspaceDefaultProvider : settings.defaultProvider);
@@ -113,7 +109,6 @@ export interface EmbeddedAISessionLaunchInput extends Pick<AISessionLaunchInput,
 	expectedBranch?: string;
 	observedCommit?: string;
 	idempotencyKey?: string;
-	/** Resumes one of the workspace's Claude conversations instead of starting a new one. */
 	resumeClaudeSessionId?: string;
 	columns?: number;
 	rows?: number;

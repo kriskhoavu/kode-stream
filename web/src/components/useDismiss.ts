@@ -1,10 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 
-/**
- * Closes an open menu or popover when the pointer goes down outside `ref`, or Escape is pressed.
- * Listens only while `open`; `onDismiss` may change on every render without resubscribing.
- */
 export function useDismiss(ref: RefObject<HTMLElement | null>, open: boolean, onDismiss: () => void) {
 	const dismissRef = useRef(onDismiss);
 	dismissRef.current = onDismiss;

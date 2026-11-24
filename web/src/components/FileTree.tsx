@@ -3,7 +3,6 @@ import type { CSSProperties } from 'react';
 import { ChevronRight, File, FileText, Folder, FolderOpen } from 'lucide-react';
 import type { FileNode } from '../lib/types';
 
-/** The ids of the folders that lead to fileId, outermost first; empty when it is not in the tree. */
 function foldersLeadingTo(nodes: FileNode[], fileId: string, trail: string[] = []): string[] | undefined {
 	for (const node of nodes) {
 		if (node.type === 'file' && node.id === fileId) return trail;
@@ -19,11 +18,6 @@ function sortedNodes(nodes: FileNode[]): FileNode[] {
 	return [...nodes].sort((a, b) => a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'directory' ? -1 : 1);
 }
 
-/**
- * An item's files as a tree, shown inside the document dropdown. Top-level
- * folders and the folders leading to the open document start expanded;
- * opening a file calls onOpen with its id.
- */
 export function FileTree({ nodes, activeId, onOpen }: { nodes: FileNode[]; activeId?: string; onOpen: (fileId: string) => void }) {
 	const topFolders = useMemo(() => nodes.filter((node) => node.type === 'directory').map((node) => node.id), [nodes]);
 	const [expanded, setExpanded] = useState<Set<string>>(() => new Set(topFolders));

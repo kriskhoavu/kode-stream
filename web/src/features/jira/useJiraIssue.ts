@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../../shared/api';
 import type { JiraIssueState } from '../../lib/types';
 
-/** Where a Jira ticket is looked up: through a Kode Stream item, or by key in a workspace. */
 export type JiraIssueSource = { itemId: string } | { workspaceId: string; issueKey: string };
 
 function load(source: JiraIssueSource, refresh: boolean, signal: AbortSignal): Promise<JiraIssueState> {
@@ -30,7 +29,7 @@ export function useJiraIssue(target: string | JiraIssueSource) {
     try { const next = await load(sourceRef.current, refresh, controller.signal); if (request === requestRef.current) setResult(next); }
     catch (caught) { if (request === requestRef.current && !controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Jira details are unavailable.'); }
     finally { if (request === requestRef.current) { setLoading(false); setRefreshing(false); } }
-    // `key` names the source; the ref holds its current value.
+    // `key` stands for the source that the ref holds.
   }, [key]);
   useEffect(() => { setResult(null); void run(); return () => abortRef.current?.abort(); }, [run]);
   return { result, loading, refreshing, error, refresh: () => run(true) };

@@ -92,10 +92,7 @@ export function PlanCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 export function SessionCanvasNode({ data }: NodeProps<CanvasFlowNode>) {
 	const record = data.node.session?.record;
 	const expanded = Boolean(record && !data.node.collapsed);
-	// While Focus is on, sessions are force-expanded (see CanvasBoard's renderNode); the
-	// disclosure and the terminal's close action would otherwise persist that invented,
-	// virtual collapsed state through onSetCollapsed. Hide the disclosure and make close
-	// a no-op instead.
+	// Focus force-expands sessions, so collapse and close must not persist that state.
 	const disclosure = record && !data.focusOn ? <button className="icon-button canvas-node-action nodrag nopan" type="button" aria-label={expanded ? 'Collapse session terminal' : 'Expand session terminal'} title={expanded ? 'Collapse terminal' : 'Expand terminal'} onClick={(event) => { event.stopPropagation(); data.onSelect(data.node.id); data.onSetCollapsed(data.node.id, expanded); }}>{expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}</button> : undefined;
 	return <NodeFrame data={data} eyebrow={data.node.ephemeral ? 'Live session' : 'Session'} icon={<TerminalSquare size={15} />} action={disclosure} expanded={expanded} resizable={expanded && !data.focusOn} addon={record ? <SessionTerminal record={record} visible={expanded} onClose={() => { if (!data.focusOn) data.onSetCollapsed(data.node.id, true); }} onReload={data.onReload} /> : undefined}>
 		<strong>{record?.provider || 'Unavailable session'}</strong>

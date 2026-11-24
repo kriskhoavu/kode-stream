@@ -12,14 +12,8 @@ import type { ItemSummary, JiraIssueState, WorkspaceConfig } from '../../lib/typ
 import { emptyNewWorkItemDraft, jiraReadme, jiraTags, parseTags, type NewWorkItemDraft } from './newWorkItem';
 import { useWorkspaceGuard } from './useWorkspaceGuard';
 
-/**
- * The New Work Item dialog: a blank item, or one made from a Jira ticket it
- * fetches. It owns its draft and closes itself through `onClose`; the board
- * hears of the new item through `onCreated`.
- */
 export function NewWorkItemDialog({ workspace, seed, onClose, onCreated }: {
   workspace: WorkspaceConfig;
-  /** Values the draft starts from, such as the column it was opened in. */
   seed?: Partial<NewWorkItemDraft>;
   onClose: () => void;
   onCreated: (item: ItemSummary) => void;
@@ -54,9 +48,7 @@ export function NewWorkItemDialog({ workspace, seed, onClose, onCreated }: {
       if (result.state === 'available' && result.issue) {
         const issue = result.issue;
         const nextTags = jiraTags(issue).join(', ');
-        // Fetching is an explicit request for this ticket's values, so they
-        // replace whatever a previous fetch imported. Keeping the old values
-        // left the details panel describing a different ticket than the preview.
+        // A fetch replaces the previous fetch's values, so the details match the preview.
         setDraft((draft) => ({
           ...draft,
           identifier: issue.key,

@@ -13,16 +13,10 @@ import { canonicalSourceSettingsCard } from '../workspaces/sourceSettingsEditor'
 import { applySourceItemsProposal, clearSourceItemsProposal, sourceItemsEditorFromResult, SourceStructurePreviewTable, SourceStructureProposalList, UNSORTED_SELECTION_ID, updateSourceItemsPreviewField, type SourceItemsEditorState } from '../workspaces/sourceStructureEditor';
 import { useWorkspaceGuard } from './useWorkspaceGuard';
 
-/**
- * The Source Items dialog: how one of the workspace's sources splits into
- * board items. It loads, saves and resets the source's rules itself and
- * reports each change through `onSaved`.
- */
 export function SourceItemsDialog({ workspace, initialDirectory, onClose, onSaved }: {
   workspace: WorkspaceConfig;
   initialDirectory: string;
   onClose: () => void;
-  /** After a save or reset: what to say, and whether the dialog is done. */
   onSaved: (message: string, done: boolean) => Promise<void> | void;
 }) {
   const [loading, setLoading] = useState(false);

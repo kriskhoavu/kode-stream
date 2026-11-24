@@ -23,7 +23,7 @@ import { type CardWork } from '../harnessJoin';
 import { clearTimeoutRef, operationErrorMessage, sameJSON } from '../workstreamUtils';
 import { type DrawerTab, type DrawerSideTab, type DrawerFileOption } from './drawerTypes';
 
-export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus, onAgentFocus, onAgentsChanged, work, harness, onRunWithHarness, onClose, onOpenFull, onOpenRun, onChanged }: { itemId: string; refreshKey: number; workspaceId?: string; agents?: ItemAgents; agentFocus?: AgentFocus; onAgentFocus: (focus: AgentFocus | undefined) => void; onAgentsChanged: () => Promise<unknown> | void; work?: CardWork; harness: HarnessController; /** Offered while the harness is on and does not hold this card. */ onRunWithHarness?: () => void; onClose: () => void; onOpenFull: () => void; onOpenRun: () => void; onChanged: () => void | Promise<void> }) {
+export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, agentFocus, onAgentFocus, onAgentsChanged, work, harness, onRunWithHarness, onClose, onOpenFull, onOpenRun, onChanged }: { itemId: string; refreshKey: number; workspaceId?: string; agents?: ItemAgents; agentFocus?: AgentFocus; onAgentFocus: (focus: AgentFocus | undefined) => void; onAgentsChanged: () => Promise<unknown> | void; work?: CardWork; harness: HarnessController; onRunWithHarness?: () => void; onClose: () => void; onOpenFull: () => void; onOpenRun: () => void; onChanged: () => void | Promise<void> }) {
   const [agentsMode, setAgentsMode] = useState<AgentsMode>('run');
   const harnessRun = work?.run ? <HarnessRunTab work={work} harness={harness} onOpenConversation={(id) => onAgentFocus({ kind: 'harness', id })} onOpenPlan={(id) => onAgentFocus({ kind: 'harness-plan', id })} onOpenFull={onOpenRun} onTakeOver={() => void takeOverByHand(work, harness).then(({ agentRunId }) => { if (agentRunId) { onAgentFocus({ kind: 'harness', id: agentRunId }); } else { setAgentsMode('sessions'); onAgentFocus({ kind: 'launch' }); } })} /> : undefined;
   const paneHarness: AgentPaneHarness = { client: harness.client, run: work?.run, detail: work?.run ? harness.state.details[work.run.id] : undefined, reload: () => (work?.run ? harness.loadRun(work.run.id) : Promise.resolve()) };
@@ -34,8 +34,6 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
   const [diff, setDiff] = useState('');
   const [tab, setTab] = useState<DrawerTab>('preview');
   const [sideTab, setSideTab] = useState<DrawerSideTab>(() => agentFocus ? 'agents' : 'info');
-  // Collapsed, the Work Item panel shrinks to a rail of tab icons and the main
-  // pane takes its width; the choice is remembered across drawers.
   const [workItemCollapsed, setWorkItemCollapsed] = useState(() => readTogglePreference('workstream.drawer.workItemCollapsed'));
   const collapseWorkItem = (collapsed: boolean) => {
     setWorkItemCollapsed(collapsed);
@@ -45,13 +43,10 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     setSideTab(tab);
     if (workItemCollapsed) collapseWorkItem(false);
   };
-  // Live sessions opened in this drawer stay connected until it closes or
-  // moves to another card, then go to the terminal dock.
   const { heldLiveSessionIds, release: releaseHeldSession } = useHeldAgentSessions(agents, agentFocus, itemId);
   const [error, setError] = useState('');
   const { width, style: drawerStyle, startResize } = useResizableDrawer({ initial: 1120 });
-  // The Raw editor grows with the document so the whole file shows, as the
-  // preview does, and the drawer scrolls instead of a small box.
+  // The Raw editor grows with the document, so the drawer scrolls instead of a small box.
   const rawEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const autoSaveRefreshTimerRef = useRef<number | null>(null);
   const drawerGenerationRef = useRef(0);
@@ -82,7 +77,6 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
   });
   const { file, content: editorContent, setContent: setEditorContent, dirty: dirtyFile, state: autoSaveState, saveNow: saveDrawerFileNow } = editor;
 
-  // A moment after a save, the diff and the Git status catch up with it.
   const refreshAfterSave = () => {
     const generation = drawerGenerationRef.current;
     const isCurrent = () => drawerGenerationRef.current === generation;
@@ -99,13 +93,12 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     }, 600);
   };
 
-  // One listener for the drawer's life; it calls the latest close, so typing does not re-subscribe it.
+  // The listener calls the latest close, so typing does not re-subscribe it.
   const closeDrawerRef = useRef<() => void>(() => undefined);
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      // Escape typed into an agent's terminal belongs to the agent (it
-      // interrupts Claude, for one); it must not close the drawer.
+      // Escape in an agent's terminal belongs to the agent, so it must not close the drawer.
       if (event.target instanceof Element && event.target.closest('.agent-pane-body')) return;
       closeDrawerRef.current();
     };
@@ -166,9 +159,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     };
   }, [itemId]);
 
-  // A refreshKey bump is the app refreshing (on window focus, among others),
-  // not a new item: refresh the item, its files, diff and git status in place,
-  // and leave the open file and any unsaved edit alone.
+  // A refreshKey bump refreshes in place and keeps the open file and any unsaved edit.
   const refreshKeyLoadedRef = useRef(refreshKey);
   useEffect(() => {
     if (refreshKeyLoadedRef.current === refreshKey) return;
@@ -178,7 +169,7 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
     const isCurrent = () => !controller.signal.aborted && drawerGenerationRef.current === generation;
     api.item(itemId, controller.signal).then((payload) => {
       if (!isCurrent()) return;
-      // An unchanged item keeps its identity, so the Info tab's draft survives.
+      // Keep an unchanged item's identity so the Info tab's draft survives.
       setPlan((current) => sameJSON(current, payload) ? current : payload);
       void git.loadStatus();
     }).catch(() => undefined);
@@ -372,7 +363,6 @@ export function PlanPreviewDrawer({ itemId, refreshKey, workspaceId, agents, age
   );
 }
 
-/** An item's diff as the Diff tab shows it; `failed` when it cannot be read. */
 function itemDiffText<T extends string | null = string>(itemId: string, signal: AbortSignal, failed: T = 'No diff available.' as T): Promise<string | T> {
   return api.diff(itemId, signal).then((payload) => payload.diff || 'No local changes.', () => failed);
 }

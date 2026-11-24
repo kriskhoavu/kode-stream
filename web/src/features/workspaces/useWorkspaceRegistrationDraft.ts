@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import type { JiraConnection, WorkspaceRegistrationMode } from '../../lib/types';
 
-/** What a person has typed into the Add workspace dialog so far. */
 export function useWorkspaceRegistrationDraft() {
   const [name, setName] = useState('');
   const [registrationMode, setRegistrationMode] = useState<WorkspaceRegistrationMode>('local_path');
@@ -14,7 +13,6 @@ export function useWorkspaceRegistrationDraft() {
   const [registrationStep, setRegistrationStep] = useState<1 | 2>(1);
   const [registrationNameEdited, setRegistrationNameEdited] = useState(false);
 
-  /** Empties the draft; the clone folder goes back to the configured one. */
   const reset = (defaultCloneRoot: string) => {
     setName('');
     setRegistrationMode('local_path');

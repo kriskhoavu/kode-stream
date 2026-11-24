@@ -71,7 +71,6 @@ describe('useAppState runtime context', () => {
       pending.push((payload) => resolve({ ok: true, json: async () => payload }));
     })));
     const { result } = renderHook(() => useAppState());
-    // Initial state/workspaces, then the explicit newer refresh pair.
     await act(async () => { pending.shift()?.({ mode: 'cloud', role: 'viewer', capabilities: {} }); pending.shift()?.([]); });
     await waitFor(() => expect(result.current.dataStatus).toBe('ready'));
     let older: Promise<boolean> = Promise.resolve(false);

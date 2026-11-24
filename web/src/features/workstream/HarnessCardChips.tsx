@@ -4,7 +4,6 @@ import { WorkerChip } from '../harness/WorkerChip';
 import { agentRoleLabels, hxStatuses, stageKindWhere } from '../harness/vocabulary';
 import type { CardWork } from './harnessJoin';
 
-/** The harness's line on a card: who works on it, which stage it is in, and how far the run is. */
 export function HarnessCardChips({ work }: { work: CardWork }) {
 	const { run, status } = work;
 	const agent = run?.activeAgentRun;
@@ -32,18 +31,12 @@ export function HarnessCardChips({ work }: { work: CardWork }) {
 	);
 }
 
-/** The chip on a card no harness task holds. Shown only when the board knows the harness is on, so a quiet board stays quiet. */
 export function ByHandChip() {
 	return <span className="hx-chip plan-card-by-hand" title="A person works on this card"><Hand aria-hidden="true" size={12} />By hand</span>;
 }
 
-/**
- * The status badge's words: the stage while it works; where it ended once a run
- * stops or fails ("Stopped while planning"), so a stop never reads as a stage
- * name, which sounds like the plan itself stopped; the status and the stage otherwise.
- */
+// A stop reads as where it ended, so it never sounds like the plan itself stopped.
 export function badgeLabel(work: CardWork): string | undefined {
-	// The reporter's name says more than the stage: the Planner waits for them.
 	if (work.status === 'reporter' && work.task.waitingFor) return `Waiting for ${work.task.waitingFor}`;
 	if (!work.stageLabel) return undefined;
 	if (work.status === 'working') return work.stageLabel;
@@ -52,7 +45,6 @@ export function badgeLabel(work: CardWork): string | undefined {
 	return `${hxStatuses[work.status].label} · ${work.stageLabel}`;
 }
 
-/** What a ticket card says about its plan: none until a run has written one, then that it waits for the merge. */
 export function planNote(work: CardWork): string {
 	const kind = work.run?.currentStage?.kind;
 	return kind && kind !== 'plan' ? 'plan not merged yet' : 'no plan yet';

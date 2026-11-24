@@ -22,16 +22,10 @@ import type {
 export interface HarnessFeedHandlers {
 	onOpen: () => void;
 	onEvent: (event: HarnessEvent) => void;
-	/** The server dropped this subscriber or the connection failed; refetch a snapshot. */
 	onReset: () => void;
 	onError: () => void;
 }
 
-/**
- * Everything the harness screens ask of the server. The real client wraps the
- * shared API; the dev fixture implements the same surface in memory, so every
- * view works in `npm run dev` without a backend.
- */
 export interface HarnessWorkspaceOption {
 	id: string;
 	name: string;
@@ -46,41 +40,28 @@ export interface HarnessClient {
 	cost(groupBy: HarnessCostSummary['groupBy'], range?: { from?: string; to?: string }, signal?: AbortSignal): Promise<HarnessCostSummary>;
 	run(runId: string, signal?: AbortSignal): Promise<HarnessRunDetail>;
 	runChanges(runId: string, signal?: AbortSignal): Promise<SessionChanges>;
-	/** The plan a run wrote, before it is merged. */
 	runPlan?(runId: string, signal?: AbortSignal): Promise<HarnessRunPlan>;
-	/** The diff of one path the run changed. */
 	runFileDiff?(runId: string, path: string, signal?: AbortSignal): Promise<HarnessRunFileDiff>;
 	agentRun(agentRunId: string, signal?: AbortSignal): Promise<{ agentRun: HarnessAgentRun; session?: SafeSessionRecord }>;
-	/** The last turns of an agent run's transcript; polled while the agent works. */
 	agentRunTranscript(agentRunId: string, limit?: number, signal?: AbortSignal): Promise<HarnessTranscript>;
 	approve(approval: HarnessApproval, idempotencyKey: string, reason?: string): Promise<HarnessApproval | undefined>;
 	reject(approval: HarnessApproval, idempotencyKey: string, reason: string, decision?: 'reject' | 'replan'): Promise<HarnessApproval | undefined>;
 	pin(task: HarnessTask, pinned: boolean): Promise<HarnessTask>;
 	setPriority(task: HarnessTask, input: { priorityOverride?: number; before?: string }): Promise<HarnessTask>;
-	/** Sets, for one task, whether its agents may stop and ask; null follows the workspace and the settings again. */
 	setQuestions(task: HarnessTask, askQuestions: boolean | null): Promise<HarnessTask>;
-	/** Asks the harness to start a task now; the next free Planner takes it. */
 	start(task: HarnessTask, idempotencyKey: string): Promise<HarnessTask>;
-	/** Puts a card's ticket in the queue, started at once unless told to queue it. */
 	createTask?(input: HarnessCreateTaskInput): Promise<HarnessTask>;
-	/** Deletes a finished task with its runs; its branch and pull request stay. */
 	removeTask?(task: HarnessTask): Promise<HarnessTask>;
 	resetTask?(task: HarnessTask): Promise<HarnessTask>;
 	pauseRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	resumeRole(role: HarnessRoleId): Promise<HarnessRoleHealth>;
 	settings(signal?: AbortSignal): Promise<HarnessSettings>;
 	saveSettings(settings: HarnessSettings): Promise<HarnessSettings>;
-	/** Deletes every task no run has touched, in one workspace or all; the Finder refills the queue on its next look. */
 	clearQueue(workspaceId?: string): Promise<{ removed: number }>;
-	/** Stops a run: the working agent is killed and the task stays in the Task Queue as Stopped. */
 	cancelRun(run: HarnessRun, reason?: string): Promise<HarnessRun>;
-	/** The workspaces a source can look in, with the Jira project key when the workspace has a Jira connection. */
 	workspaces?(signal?: AbortSignal): Promise<HarnessWorkspaceOption[]>;
-	/** Asks the Finder to look at its sources now rather than on its timer. */
 	pollScouts?(workspaceId?: string): Promise<{ started: boolean; sources?: HarnessSourcePoll[] }>;
-	/** Opens the live event feed after `afterSeq`; returns a function that closes it. */
 	subscribe?(afterSeq: number, handlers: HarnessFeedHandlers): () => void;
-	/** True for the in-memory fixture, so the page can say so. */
 	readonly fixture?: boolean;
 }
 
