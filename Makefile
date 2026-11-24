@@ -1,59 +1,37 @@
-# Front door for local work in kode-stream.
-#
-# Two lanes, the same shape as in agent-plane, context-cellar, and etl-plane:
-#
-#   docker  the default. `make up` starts a stack from deploy/docker/local.
-#   native  `make dev-up` builds the frontend and the Go binary and serves them
-#           from this checkout, backgrounded, with no image rebuild in the
-#           loop. The Makefile is the way in, and run.sh is the
-#           implementation.
-#
-# The stack table below is the only part of the docker lane specific to this
-# repository; the verbs live in the vendored docker-local.mk.
+# Two lanes: `make up` runs a Docker stack, `make dev-up` runs the native server
+# through run.sh. The lane verbs live in the vendored docker-local.mk and dev-local.mk.
 
 GO ?= go
 NPM ?= npm
 
 .DEFAULT_GOAL := help
 
-# --- Docker lane ------------------------------------------------------------
+# Docker lane
 
 STACKS := local cloud
 STACK ?= local
 
-# Local mode: one container, workspace bind-mounted, datadir or database storage.
 DIR_local := deploy/docker/local/local-mode
 FILE_local := compose.yaml
-# Follows KODE_STREAM_LOCAL_PORT, the same variable the compose file publishes on.
 URL_local := http://127.0.0.1:$(or $(KODE_STREAM_LOCAL_PORT),4317)
-# The app root, not /api/health: that endpoint reports database status only, so
-# under the default `datadir` storage option it answers 503 while the server is
-# serving normally. (The image's own HEALTHCHECK probes that endpoint, so a
-# datadir container never reports healthy. That is a product-side limitation.)
+# /api/health reports database status only, so it answers 503 under datadir storage.
 PROBE_local := $(URL_local)/
-# Not a plain `compose up`. The script validates KODE_STREAM_STORAGE_OPTION and
-# the workspace mount before starting, so a typo fails with a sentence instead
-# of a half-started container.
+# The script checks the storage option and the workspace mount before compose up.
 UP_local := deploy/docker/local/local-mode/run.sh
 
-# Cloud mode: Keycloak and oauth2-proxy in front, Postgres behind, and a local
-# agent registered against it.
 DIR_cloud := deploy/docker/local/cloud-mode
 FILE_cloud := compose.yaml
 URL_cloud := $(or $(KODE_STREAM_CLOUD_URL),http://kode-stream.localhost:4318)
-# Cloud mode runs on database storage, where /api/health is meaningful.
 PROBE_cloud := $(URL_cloud)/api/health
-# Start-up mints an agent token and gates on health; compose alone cannot.
+# The script mints an agent token and waits for health.
 UP_cloud := deploy/docker/local/cloud-mode/run.sh
 
-# The two stacks are the same product in its two deployment shapes, not two
-# halves of one system, and each wants port 4317/4318 and its own Postgres.
-# `up-all` therefore starts Local mode only; reach for Cloud mode by name.
+# Both stacks are the same product, so `up-all` starts Local mode only.
 ALL_STACKS := local
 
 include docker-local.mk
 
-# --- Native lane ------------------------------------------------------------
+# Native lane
 
 DEV_START := ./run.sh start
 DEV_STOP := ./run.sh stop
@@ -64,9 +42,9 @@ DEV_BUILD := $(NPM) run build && $(GO) build -o bin/kode-stream ./cmd/kode-strea
 
 include dev-local.mk
 
-# --- Verification -----------------------------------------------------------
+# Verification
 
-.PHONY: build binary typecheck test verify smoke-storage help
+.PHONY: build binary typecheck test race verify smoke-storage help
 
 build:
 	$(NPM) run build
@@ -81,13 +59,9 @@ test:
 	$(NPM) test
 	$(GO) test ./...
 
-# Separate from test so a quick loop stays quick, and in verify because this is
-# a server: every request is its own goroutine, and a race here is a wrong
-# answer served rather than a crash that names itself.
 race:
 	$(GO) test -race ./...
 
-# Starts the native server once per storage option and health-checks each.
 smoke-storage:
 	./run.sh smoke-storage
 
