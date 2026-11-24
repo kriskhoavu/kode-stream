@@ -1,33 +1,9 @@
-# Docker lane — every local stack in this repository runs as containers.
+# Docker lane. Source: ground-plane/make/docker-local.mk, vendored by
+# ground-plane/scripts/sync-lane.sh. Never edit a vendored copy.
 #
-# Vendored copy. The source of truth is ground-plane/make/docker-local.mk; the
-# same bytes sit at the root of every fen repository, and
-# `ground-plane/scripts/sync-lane.sh --check` proves they still do. Change it
-# there and run the sync; never edit a vendored copy in place.
-#
-# The including Makefile declares the stack table:
-#
-#   STACKS          every stack name this repository can run
-#   STACK           the default stack, overridable on the command line
-#   ALL_STACKS      the stacks `up-all` starts, in start order; defaults to
-#                   STACKS. Narrow it where a stack is an alternative to
-#                   another rather than a companion to it, and order it where
-#                   one stack joins a network or volume another one publishes
-#   DIR_<stack>     compose project directory, relative to the repository root
-#   FILE_<stack>    compose file name inside that directory
-#   ENV_<stack>     optional --env-file, relative to DIR_<stack>
-#   URL_<stack>     optional address printed once the stack is up
-#   PROBE_<stack>   optional URL for `health` to GET. Declare it only where an
-#                   unauthenticated GET is meaningful: a mutual-TLS endpoint
-#                   rejects a plain curl by design, and reporting that as a
-#                   failed health check would be a lie about the stack
-#   PRE_UP_<stack>  optional shell command run from the repository root before up
-#   UP_<stack>      optional shell command replacing the whole up recipe, for a
-#                   stack whose start-up needs more than compose (bootstrap,
-#                   token minting, health gating)
-#
-# Compose is always invoked from DIR_<stack>, so a relative build context or
-# bind mount inside the compose file resolves the way its author wrote it.
+# The including Makefile declares STACKS, STACK, ALL_STACKS (up-all order) and,
+# per stack, DIR_ and FILE_, optionally ENV_, URL_, PROBE_, PRE_UP_ and UP_.
+# Declare PROBE_ only where an unauthenticated GET is meaningful (not mTLS).
 
 DOCKER ?= docker
 COMPOSE ?= $(DOCKER) compose
@@ -55,9 +31,6 @@ endif
 
 compose = cd $(stack_dir) && $(COMPOSE) $(if $(stack_env),--env-file $(stack_env),) -f $(stack_file)
 
-# A stack whose env file is missing fails inside compose with a bare path. Say
-# what to do about it instead: the ignored env file always has a committed
-# .example beside it and a README in the same directory.
 ifeq ($(stack_env),)
 env_check := @true
 else
@@ -84,27 +57,20 @@ endif
 down:
 	$(compose) down --remove-orphans
 
-# Sequenced through sub-makes, not as two prerequisites: `make -j restart` would
-# be free to run the down and the up at the same time.
+# Sub-makes, not prerequisites, so `make -j` cannot run down and up at once.
 restart:
 	@$(MAKE) --no-print-directory down STACK=$(STACK)
 	@$(MAKE) --no-print-directory up STACK=$(STACK)
 
-# SVC narrows logs, images, and shell to a single compose service:
-# make logs SVC=query-api. The other verbs act on the whole stack.
 logs:
 	$(compose) logs --follow --tail 200 $(SVC)
 
 ps:
 	$(compose) ps
 
-# Named `images`, not `build`: in every one of these repositories `make build`
-# already means "compile the project".
 images:
 	$(compose) build $(SVC)
 
-# Renders the merged compose file. The first thing to run when a stack fails to
-# start: an unset variable in the env file surfaces here, not in a container log.
 config:
 	$(env_check)
 	$(compose) config
@@ -120,49 +86,38 @@ shell:
 	@test -n '$(SVC)' || { printf 'shell needs a service: make shell STACK=%s SVC=<service>\n' '$(STACK)'; exit 2; }
 	$(compose) exec $(SVC) sh
 
-# Destructive: drops the stack's named volumes with it. Databases, object
-# storage, and vector indexes in this stack are gone afterwards.
 clean:
 	@test '$(FORCE)' = '1' || { printf 'clean deletes the volumes of stack %s. Re-run with FORCE=1.\n' '$(STACK)'; exit 2; }
 	$(compose) down --volumes --remove-orphans
 
-# --- Whole-repository verbs -------------------------------------------------
-#
-# One gesture for every stack this repository runs together. ALL_STACKS is in
-# start order, so teardown walks it backwards: a stack that joined a network
-# another one publishes has to be gone before its owner is.
-#
-# MAKEOVERRIDES is cleared on the way in. Without that, `make up-all STACK=mcp`
-# would propagate STACK=mcp from the outer command line into every sub-make and
-# start the same stack N times.
+# Teardown walks ALL_STACKS backwards. MAKEOVERRIDES is cleared so a STACK= on
+# the command line does not reach every sub-make.
 
 ALL_STACKS ?= $(STACKS)
 
 reverse = $(if $(1),$(call reverse,$(wordlist 2,$(words $(1)),$(1))) $(firstword $(1)),)
 sub = $(MAKE) --no-print-directory MAKEOVERRIDES=
+lane_each = @$(foreach s,$(2),$(sub) $(1) STACK=$(s) &&) true
+lane_report = @$(foreach s,$(ALL_STACKS),printf '\n== %s\n' '$(s)'; $(sub) $(1) STACK=$(s);)
 
 .PHONY: up-all down-all restart-all ps-all health-all clean-all
 
 up-all:
-	@$(foreach s,$(ALL_STACKS),$(sub) up STACK=$(s) &&) true
+	$(call lane_each,up,$(ALL_STACKS))
 
 down-all:
-	@$(foreach s,$(call reverse,$(ALL_STACKS)),$(sub) down STACK=$(s) &&) true
+	$(call lane_each,down,$(call reverse,$(ALL_STACKS)))
 
 restart-all:
 	@$(sub) down-all
 	@$(sub) up-all
 
-ps-all:
-	@$(foreach s,$(ALL_STACKS),printf '\n== %s\n' '$(s)'; $(sub) ps STACK=$(s);)
+ps-all health-all: %-all:
+	$(call lane_report,$*)
 
-health-all:
-	@$(foreach s,$(ALL_STACKS),printf '\n== %s\n' '$(s)'; $(sub) health STACK=$(s);)
-
-# Destructive across every stack at once: all of their volumes go.
 clean-all:
 	@test '$(FORCE)' = '1' || { printf 'clean-all deletes the volumes of every stack (%s). Re-run with FORCE=1.\n' '$(ALL_STACKS)'; exit 2; }
-	@$(foreach s,$(call reverse,$(ALL_STACKS)),$(sub) clean FORCE=1 STACK=$(s) &&) true
+	$(call lane_each,clean FORCE=1,$(call reverse,$(ALL_STACKS)))
 
 stacks:
 	@printf 'Stacks in this repository (default: %s)\n\n' '$(STACK)'

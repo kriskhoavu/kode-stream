@@ -1,31 +1,8 @@
-# Native lane — the project's own binaries and dev servers, no containers.
+# Native lane, for the edit loop. Source: ground-plane/make/dev-local.mk.
 #
-# Vendored copy, byte-identical across every fen repository, for the same
-# reason as docker-local.mk; the source is ground-plane/make/dev-local.mk.
-#
-# Docker is the default way to run a stack; this lane exists for the edit loop,
-# where an image rebuild per keystroke is not affordable. What a native process
-# needs from its neighbours — a database, object storage, a model gateway —
-# still comes from the docker lane, so a native run usually means: bring the
-# stack up, then run the one component being edited from source.
-#
-# The including Makefile declares whichever of these it can honour:
-#
-#   DEV_APPS         optional list of separately runnable components
-#   APP              the default one, overridable on the command line
-#   DEV_RUN_<app>    foreground command for that component
-#   DEV_DEPENDS_ON   optional note: which docker stack must be up first
-#   DEV_START        foreground/daemon start when there is nothing to choose
-#   DEV_STOP         stop a daemonised native run
-#   DEV_RESTART      restart one; falls back to DEV_STOP followed by DEV_START
-#   DEV_PS           report on a daemonised native run
-#   DEV_LOGS         follow a daemonised native run's log
-#   DEV_BUILD        compile what the native lane runs
-#
-# A target whose variable is unset explains itself rather than failing
-# obscurely. Those checks are `ifeq` rather than a shell `test -n`, because a
-# DEV_RUN_ value legitimately contains quotes and a shell test would choke on
-# them before the command ever ran.
+# The including Makefile declares what it can honour: DEV_APPS, APP, DEV_RUN_<app>,
+# DEV_DEPENDS_ON, DEV_START, DEV_STOP, DEV_RESTART, DEV_PS, DEV_LOGS, DEV_BUILD.
+# Unset checks use ifeq, not a shell test, because a DEV_RUN_ value holds quotes.
 
 APP ?= $(firstword $(DEV_APPS))
 
@@ -37,9 +14,6 @@ endif
 
 dev_run := $(if $(DEV_APPS),$(DEV_RUN_$(APP)),$(DEV_START))
 
-# What to say when a verb has nothing behind it, and the two cases are not the
-# same: a repository with no native lane at all is a different answer from one
-# whose native run is a foreground process with nothing backgrounded to act on.
 ifeq ($(strip $(dev_run)),)
 dev_absent := This repository has no native lane$(if $(DEV_APPS), for APP=$(APP)). Use make up instead.
 else
@@ -78,8 +52,6 @@ dev-down:
 	$(DEV_STOP)
 endif
 
-# DEV_RESTART when the launcher has its own restart; otherwise stop then start,
-# which needs both halves — a stop with nothing to start again is not a restart.
 ifeq ($(strip $(DEV_RESTART)),)
 ifeq ($(strip $(DEV_STOP))$(strip $(DEV_START)),)
 dev-restart:
