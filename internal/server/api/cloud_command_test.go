@@ -70,7 +70,7 @@ func TestCloudCommandRejectsRemoteSnapshotExecutionWithoutProviderCall(t *testin
 		ProviderInstanceID: "github",
 		ProviderRepository: "acme/repo",
 		SelectedRef:        "main",
-		Sources: models.SourceList(),
+		Sources:            models.SourceList(),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -114,8 +114,6 @@ func cloudCommandTestAPI(t *testing.T, connected bool) (*API, string) {
 	return apiHandler, workspace.ID
 }
 
-// postAsCloudEditor posts body to path as the Cloud user "editor" with role,
-// carrying that user's CSRF token, and returns the recorded response.
 func postAsCloudEditor(handler http.Handler, path, body, role string) *httptest.ResponseRecorder {
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))

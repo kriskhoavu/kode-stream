@@ -11,16 +11,12 @@ import (
 	appworkspace "kode-stream/internal/workspace"
 )
 
-// Availability values for SessionChanges. "available" means every field below
-// was computed from Git; the other two mean the fields were not computed and
-// Reason explains why.
 const (
 	SessionChangesAvailable   = "available"
 	SessionChangesUnavailable = "unavailable"
 	SessionChangesUnsupported = "unsupported"
 )
 
-// Reason codes paired with the unavailable/unsupported availability values.
 const (
 	ReasonContentProviderUnsupported = "content_provider_unsupported"
 	ReasonWorkspaceMissing           = "workspace_missing"
@@ -28,16 +24,12 @@ const (
 	ReasonLaunchCommitMissing        = "launch_commit_missing"
 )
 
-// SessionFile describes one path changed since a session's launch commit.
 type SessionFile struct {
 	Path    string `json:"path"`
 	Status  string `json:"status"`
 	OldPath string `json:"oldPath,omitempty"`
 }
 
-// SessionChanges is the computed, unstored view of what a checkout has done
-// since a session's launch commit. LaunchCommit is backed by the session
-// record's ObservedCommit; the API calls it launchCommit.
 type SessionChanges struct {
 	SessionID    string        `json:"sessionId"`
 	LaunchCommit string        `json:"launchCommit,omitempty"`
@@ -51,17 +43,12 @@ type SessionChanges struct {
 	Reason       string        `json:"reason,omitempty"`
 }
 
-// SessionFileDiffResult is the diff of one path since a session's launch
-// commit.
 type SessionFileDiffResult struct {
 	Path      string `json:"path"`
 	Diff      string `json:"diff"`
 	Truncated bool   `json:"truncated"`
 }
 
-// SessionChangesError reports that SessionFileDiff could not run because the
-// session's changes are unavailable or unsupported, mirroring the
-// availability/reason pair SessionChanges returns inline.
 type SessionChangesError struct {
 	Availability string
 	Reason       string
@@ -71,9 +58,6 @@ func (e *SessionChangesError) Error() string {
 	return fmt.Sprintf("session changes %s: %s", e.Availability, e.Reason)
 }
 
-// sessionChangeReader is the subset of the Git adapter's since-commit readers
-// SessionChanges and SessionFileDiff need. It is satisfied by *git.GitAdapter;
-// tests supply a fake.
 type sessionChangeReader interface {
 	NameStatusSinceContext(ctx context.Context, workspacePath, commit string) ([]gitadapter.NameStatusEntry, bool, error)
 	ShortStatSinceContext(ctx context.Context, workspacePath, commit string) (additions, deletions, files int, err error)
@@ -82,20 +66,13 @@ type sessionChangeReader interface {
 	CommitExistsContext(ctx context.Context, workspacePath, commit string) error
 }
 
-// sessionChangeContext is what the guard chain resolves before either
-// SessionChanges or SessionFileDiff can compute anything.
 type sessionChangeContext struct {
 	record    SessionRecord
 	workspace models.WorkspaceConfig
 	reader    sessionChangeReader
 }
 
-// resolveSessionChanges runs the shared guard chain: session record lookup,
-// workspace lookup, content-provider support, workspace path presence, launch
-// commit presence, and launch commit existence in the checkout. err is
-// non-nil only for infrastructure failures (including ErrNotFound for a
-// missing session); a guard that simply makes changes unavailable or
-// unsupported is reported through availability/reason instead.
+// err is set only for an infrastructure failure. A guard answers through availability and reason.
 func (s *Service) resolveSessionChanges(ctx context.Context, sessionID string) (sessionChangeContext, string, string, error) {
 	if s.records == nil {
 		return sessionChangeContext{}, "", "", ErrNotFound
@@ -117,12 +94,7 @@ func (s *Service) resolveSessionChanges(ctx context.Context, sessionID string) (
 	if !found {
 		return sessionChangeContext{record: record}, SessionChangesUnavailable, ReasonWorkspaceMissing, nil
 	}
-	// s.runtimeMode is set once by server.go via SetRuntimeMode, from the
-	// same runtime config it resolves at startup; a Service nobody calls
-	// that on defaults to Cloud (see New), the conservative choice -- it
-	// only changes the axis computation for a workspace with
-	// AccessModeAgentBacked, and assuming Cloud can only turn a workspace
-	// unsupported that Local would have allowed through, never the reverse.
+	// Assuming Cloud can only refuse a workspace that Local allows, never the reverse.
 	axes := appworkspace.ProviderAxes(s.runtimeMode, "", workspace)
 	if axes.ContentProvider != models.WorkspaceContentProviderLocalCheckout {
 		return sessionChangeContext{record: record, workspace: workspace}, SessionChangesUnsupported, ReasonContentProviderUnsupported, nil
@@ -140,10 +112,7 @@ func (s *Service) resolveSessionChanges(ctx context.Context, sessionID string) (
 	if err := reader.CommitExistsContext(ctx, workspace.Path, record.ObservedCommit); err != nil {
 		var unknown *gitadapter.ErrUnknownCommit
 		if !errors.As(err, &unknown) {
-			// A corrupt repository, a missing git binary, or any other
-			// infrastructure failure is not "the commit does not exist" --
-			// report it as a 500 instead of misreporting it as
-			// launch_commit_missing.
+			// Any other failure is infrastructure, not a missing commit, so it answers 500.
 			return sessionChangeContext{}, "", "", err
 		}
 		return sessionChangeContext{record: record, workspace: workspace}, SessionChangesUnavailable, ReasonLaunchCommitMissing, nil
@@ -151,10 +120,6 @@ func (s *Service) resolveSessionChanges(ctx context.Context, sessionID string) (
 	return sessionChangeContext{record: record, workspace: workspace, reader: reader}, SessionChangesAvailable, "", nil
 }
 
-// SessionChanges reports what the session's workspace checkout has changed
-// since the session's launch commit. It always returns a value with
-// Availability set; err is reserved for a missing session (ErrNotFound) or an
-// infrastructure failure.
 func (s *Service) SessionChanges(ctx context.Context, sessionID string) (SessionChanges, error) {
 	if err := ctx.Err(); err != nil {
 		return SessionChanges{}, err
@@ -206,10 +171,6 @@ func (s *Service) SessionChanges(ctx context.Context, sessionID string) (Session
 	return result, nil
 }
 
-// SessionFileDiff returns the diff of one path since the session's launch
-// commit, bounded by maxBytes. It runs the same guard chain as SessionChanges
-// and reports a guard failure as *SessionChangesError rather than inline
-// fields, since there is no partial diff to return alongside it.
 func (s *Service) SessionFileDiff(ctx context.Context, sessionID, path string, maxBytes int64) (SessionFileDiffResult, error) {
 	if err := ctx.Err(); err != nil {
 		return SessionFileDiffResult{}, err
@@ -228,9 +189,6 @@ func (s *Service) SessionFileDiff(ctx context.Context, sessionID, path string, m
 	return SessionFileDiffResult{Path: path, Diff: diff, Truncated: truncated}, nil
 }
 
-// SessionRecordWorkspace resolves the workspace ID owning a session record,
-// for callers (the sessions controller) that must authorize a workspace
-// before computing or exposing anything about the session.
 func (s *Service) SessionRecordWorkspace(sessionID string) (string, error) {
 	if s.records == nil {
 		return "", ErrNotFound

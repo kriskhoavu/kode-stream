@@ -15,17 +15,13 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// QAPasses is how many consecutive verification runs QA needs: two, so a
-// flaky pass does not reach a pull request.
+// Two passes, so a flaky pass does not reach a pull request.
 const QAPasses = 2
 
 const janitorInterval = time.Hour
 
-// draftRetryDelay spaces the draft PR stage's retries.
 var draftRetryDelay = time.Minute
 
-// stageLoops run the stages no model works: tests and the draft pull request,
-// plus the worktree janitor.
 func (s *Service) stageLoops(worker func() time.Duration) []scheduler.Loop {
 	if worker == nil {
 		worker = func() time.Duration { return time.Minute }
@@ -36,7 +32,6 @@ func (s *Service) stageLoops(worker func() time.Duration) []scheduler.Loop {
 	}
 }
 
-// stageCycle claims each pending QA and draft PR stage in turn.
 func (s *Service) stageCycle(ctx context.Context) error {
 	settings := s.settingsNow(ctx)
 	if !settings.Enabled {
@@ -64,8 +59,6 @@ func (s *Service) stageCycle(ctx context.Context) error {
 	return errors.Join(errs...)
 }
 
-// qaCommands are the workspace's verification commands and its runtime's
-// smoke verification, when it has one.
 func (s *Service) qaCommands(settings domain.Settings, workspace models.WorkspaceConfig) []string {
 	workspaceSettings, _ := settings.Workspace(workspace.ID)
 	commands := append([]string{}, workspaceSettings.VerificationCommands...)
@@ -77,8 +70,6 @@ func (s *Service) qaCommands(settings domain.Settings, workspace models.Workspac
 	return commands
 }
 
-// runQA runs the verification twice in the worktree. Both must pass; a
-// failure goes to the tester with the log's end, for at most two fix rounds.
 func (s *Service) runQA(ctx context.Context, settings domain.Settings, stage domain.Stage, lease time.Duration) error {
 	run, err := s.repository.GetRun(ctx, stage.RunID)
 	if err != nil {
@@ -103,7 +94,7 @@ func (s *Service) runQA(ctx context.Context, settings domain.Settings, stage dom
 		}
 	}
 	if gate.Passed {
-		gate.Head = s.head(ctx, run)
+		gate.Head = s.worktreeHead(ctx, run)
 	}
 	err = s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
 		st, err := s.loadStep(ctx, tx, record, settings, stage.RunID, stage.ID)
@@ -136,8 +127,6 @@ func (s *Service) runQA(ctx context.Context, settings domain.Settings, stage dom
 	return err
 }
 
-// advanceFix sends a tester's fix back to QA, which runs the verification
-// twice again.
 func (st *step) advanceFix(agentRun domain.AgentRun) {
 	st.round(st.stage.Round).ProducerAgentRunID = agentRun.ID
 	if len(agentRun.OutOfScope) > 0 {
@@ -147,7 +136,6 @@ func (st *step) advanceFix(agentRun domain.AgentRun) {
 	st.stage.State, st.stage.LeaseOwner, st.stage.LeaseUntil = domain.StagePending, "", nil
 }
 
-// decorateFix gives the tester the failing log and the commands it must pass.
 func (s *Service) decorateFix(_ context.Context, input brief.Input, stage domain.Stage, agentRun domain.AgentRun) brief.Input {
 	if agentRun.Role == domain.RoleQAFixer && stage.LastGate != nil {
 		input.LogTail = stage.LastGate.LogTail
@@ -155,8 +143,6 @@ func (s *Service) decorateFix(_ context.Context, input brief.Input, stage domain
 	return input
 }
 
-// runDraftPR pushes the run branch and opens a draft pull request, then
-// finishes the run and removes its worktree.
 func (s *Service) runDraftPR(ctx context.Context, settings domain.Settings, stage domain.Stage) error {
 	run, err := s.repository.GetRun(ctx, stage.RunID)
 	if err != nil {
@@ -256,8 +242,7 @@ func (s *Service) finishDraftPR(ctx context.Context, settings domain.Settings, s
 	return openErr
 }
 
-// removeWorktree deletes a run's worktree; deleteBranch also deletes the
-// local branch, which is safe once it was pushed.
+// Deleting the local branch is safe once it was pushed.
 func (s *Service) removeWorktree(ctx context.Context, run domain.Run, workspace models.WorkspaceConfig, deleteBranch bool) {
 	if s.worktrees == nil || run.WorktreePath == "" {
 		return
@@ -282,9 +267,7 @@ func (s *Service) removeWorktree(ctx context.Context, run domain.Run, workspace 
 	}
 }
 
-// janitorCycle removes the worktrees of finished runs once their retention
-// has passed. A blocked run keeps its worktree until it is resumed or
-// cancelled.
+// A blocked run keeps its worktree until it is resumed or cancelled.
 func (s *Service) janitorCycle(ctx context.Context) error {
 	settings := s.settingsNow(ctx)
 	runs, err := s.repository.ListRuns(ctx, domain.RunFilter{States: []domain.RunState{domain.RunCancelled, domain.RunFailed, domain.RunPassed}, Limit: 1000})
@@ -305,7 +288,6 @@ func (s *Service) janitorCycle(ctx context.Context) error {
 	return nil
 }
 
-// record writes an audit event for what the harness did to a repository.
 func (s *Service) record(_ context.Context, run domain.Run, operation string, status models.AuditStatus, message string, err error) {
 	if s.audit == nil {
 		return

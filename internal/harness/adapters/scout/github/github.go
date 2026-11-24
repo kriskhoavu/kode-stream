@@ -1,5 +1,3 @@
-// Package github lists a repository's open GitHub issues carrying the labels
-// a workspace's harness settings name. It reads only.
 package github
 
 import (
@@ -127,7 +125,6 @@ func (s *Scout) Poll(ctx context.Context, workspace models.WorkspaceConfig, sett
 	return candidates, nil
 }
 
-// priorityLabel reads the common `priority: high` and `P1` label shapes.
 func priorityLabel(label string) string {
 	lower := strings.ToLower(strings.TrimSpace(label))
 	lower = strings.TrimPrefix(lower, "priority:")

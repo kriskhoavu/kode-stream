@@ -1,7 +1,5 @@
 package jira
 
-// Jira repository contract tests.
-
 import (
 	"context"
 	"io"

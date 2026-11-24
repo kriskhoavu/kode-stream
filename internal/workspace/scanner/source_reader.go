@@ -1,7 +1,5 @@
 package scanner
 
-// Package scanner discovers and parses Workspace sources.
-
 import (
 	"io/fs"
 	"os"

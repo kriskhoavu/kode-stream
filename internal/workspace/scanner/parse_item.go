@@ -11,8 +11,6 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-// itemFacts is what an item's plan.yaml and README.md say about it, before
-// Git adds who changed it and when.
 type itemFacts struct {
 	scope, identifier, title, owner, description string
 	status                                       models.ItemStatus
@@ -66,8 +64,6 @@ func (s *Scanner) parseItem(request ScanRequest, reader SourceReader, branch, sc
 	}, facts.warnings, nil
 }
 
-// readPlan takes the item's identity, status and documents from its
-// plan.yaml; a plan.yaml that does not parse is a warning.
 func (f *itemFacts) readPlan(reader SourceReader, itemRoot, relItemPath string) {
 	data, source, err := readPlanYAML(reader, itemRoot)
 	if err != nil {
@@ -102,9 +98,6 @@ func (f *itemFacts) readPlan(reader SourceReader, itemRoot, relItemPath string) 
 	f.metadata["plan"] = parsed.Plan
 }
 
-// readReadme takes a title from the README's heading when the plan gave
-// none, its first paragraph as the description, and, without a plan, the
-// status the folder implies.
 func (f *itemFacts) readReadme(reader SourceReader, itemRoot string) {
 	data, err := reader.ReadFile(filepath.ToSlash(filepath.Join(itemRoot, "README.md")))
 	if err != nil {
@@ -119,8 +112,6 @@ func (f *itemFacts) readReadme(reader SourceReader, itemRoot string) {
 	f.description = firstParagraph(string(data))
 }
 
-// gitFacts says when the item last changed and who changed it, at the
-// scanned ref, falling back to the files' times.
 func (s *Scanner) gitFacts(request ScanRequest, reader SourceReader, relItemPath, itemRoot string) (time.Time, string) {
 	path, rel := request.Workspace.Path, filepath.ToSlash(relItemPath)
 	ref := request.BranchRef

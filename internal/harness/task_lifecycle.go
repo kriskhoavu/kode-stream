@@ -27,12 +27,7 @@ func (s *Service) DismissTask(ctx context.Context, id, reason string, expectedRe
 	})
 }
 
-// RemoveTask deletes a task from the harness in any state, with everything
-// the harness did for it. A run in flight is stopped first. Every run's
-// sessions, working copy and local harness branch are deleted, and so are its
-// runs, stages, agent runs and approvals. A pushed branch and a pull request
-// stay at the remote. If the source still lists the issue, the Finder adds it
-// back on its next look, as a new task.
+// A pushed branch and a pull request stay at the remote.
 func (s *Service) RemoveTask(ctx context.Context, id string, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
 	if err := s.mutable(); err != nil {
 		return domain.Task{}, err
@@ -64,9 +59,6 @@ func (s *Service) RemoveTask(ctx context.Context, id string, expectedRevision in
 	return task, nil
 }
 
-// discardTaskWork stops a task's run in flight, then closes every run's
-// sessions and deletes its working copy and local branch. It returns the
-// task's runs, whose records the caller deletes.
 func (s *Service) discardTaskWork(ctx context.Context, task domain.Task, reason string, actor domain.Actor) ([]domain.Run, error) {
 	if task.RunID != "" {
 		run, err := s.repository.GetRun(ctx, task.RunID)
@@ -74,7 +66,6 @@ func (s *Service) discardTaskWork(ctx context.Context, task domain.Task, reason 
 			return nil, err
 		}
 		if err == nil && !domain.RunTerminal(run.State) {
-			// A run with no stage yet has nothing to cancel; its processes end below.
 			if _, err := s.CancelRun(ctx, run.ID, reason, nil, actor); err != nil && !errors.Is(err, domain.ErrNotFound) {
 				return nil, err
 			}
@@ -104,12 +95,7 @@ func (s *Service) discardTaskWork(ctx context.Context, task domain.Task, reason 
 	return runs, nil
 }
 
-// ResetTask puts a task back as the Finder left it, so its work begins again
-// from nothing. A run in flight is stopped first. Every run's sessions,
-// working copy and local harness branch are deleted, and so are its runs, stages, agent runs
-// and approvals. The task keeps its place in the queue, its pin and its
-// questions setting, and waits for Start. A pushed branch and a pull request
-// stay at the remote; events stay as the log of what happened.
+// A pushed branch and a pull request stay at the remote.
 func (s *Service) ResetTask(ctx context.Context, id string, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
 	if err := s.mutable(); err != nil {
 		return domain.Task{}, err
@@ -152,8 +138,6 @@ func (s *Service) ResetTask(ctx context.Context, id string, expectedRevision int
 	return fresh, nil
 }
 
-// resetTask is the task as it was found, with what a person chose for it:
-// its pin, its priority and its questions setting.
 func resetTask(task domain.Task, now time.Time) domain.Task {
 	return domain.Task{
 		ID:               task.ID,
@@ -174,10 +158,6 @@ func resetTask(task domain.Task, now time.Time) domain.Task {
 	}
 }
 
-// ClearQueue deletes every task that no run has touched: discovered, ranked,
-// stale and dismissed ones, in one workspace or all. The Finder adds back
-// whatever its sources still return on the next poll, so this is the way to
-// drop what an old query found rather than waiting for it to go stale.
 func (s *Service) ClearQueue(ctx context.Context, workspaceID string, actor domain.Actor) (int, error) {
 	if err := s.mutable(); err != nil {
 		return 0, err

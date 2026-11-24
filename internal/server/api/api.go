@@ -1,7 +1,5 @@
 package api
 
-// Package api provides the Server HTTP transport.
-
 import (
 	"context"
 	"net/http"
@@ -72,9 +70,6 @@ type systemRoutes interface {
 	UpdateConfigPaths(http.ResponseWriter, *http.Request)
 }
 
-// Dependencies is the complete, immutable input to the HTTP transport. The
-// production composition root builds this value once; API construction never
-// mutates after routes have been registered.
 type Dependencies struct {
 	WorkspaceRepository registry.Repository
 	ItemRepository      itemindex.Repository
@@ -98,8 +93,7 @@ type Dependencies struct {
 	StorageSync         storageSyncService
 	CloudPersistence    cloudstate.Repository
 	WorkspaceCloner     appworkspace.ClonePort
-	// Harness is the engineering harness; nil answers 503 on its routes.
-	Harness *harness.Service
+	Harness             *harness.Service
 }
 
 type databaseHealthChecker interface {
@@ -114,7 +108,6 @@ type storageSyncService interface {
 	Sync(context.Context, storage.StorageSyncRequest) (storage.StorageSyncResult, error)
 }
 
-// New is the sole API constructor.
 func New(deps Dependencies) *API {
 	var refresher appworkspace.Refresher
 	if deps.ItemWriter != nil {
@@ -185,9 +178,7 @@ func (a *API) Routes() http.Handler {
 	return newTransport(a.runtimeConfig, a.registerGinRoutes)
 }
 
-// initializeControllers keeps deliberately partial API fixtures safe. Each
-// controller owns its unavailable-service response instead of relying on a
-// constructor compatibility path.
+// Each controller owns its unavailable-service response, so partial fixtures stay safe.
 func (a *API) initializeControllers() {
 	if a.cloud == nil {
 		a.cloud = &cloudController{runtimeConfig: a.runtimeConfig, agents: newCloudAgentStore(time.Now), workspaces: newCloudWorkspaceStore(), providers: newCloudProviderStore(nil, "")}

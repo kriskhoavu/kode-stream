@@ -1,7 +1,5 @@
 package scanner
 
-// Package scanner discovers and parses Workspace sources.
-
 import (
 	"context"
 	"crypto/sha256"
@@ -174,10 +172,7 @@ func (s *Scanner) scanItemDirectory(request ScanRequest, reader SourceReader, br
 			warnings = append(warnings, models.ScanWarning{ItemPath: filepath.ToSlash(filepath.Join(source, scopeEntry.Name())), Message: err.Error()})
 			continue
 		}
-		// The writer allows creating an item directly under the source root
-		// (scope == source, see writer.isSourceRootScope). Such a directory is an
-		// item, not a scope, so recognise it before falling through to the
-		// scope/identifier walk.
+		// The writer may create an item directly under the source root. Such a directory is an item, not a scope.
 		if isSourceRootItem(reader, scopeRoot, scopeEntry.Name(), tickets) {
 			detail, itemWarnings, err := s.parseItem(request, reader, branch, filepath.Base(source), scopeEntry.Name(), scopeRoot, scopeRoot)
 			if err != nil {
@@ -280,10 +275,7 @@ func hasStructuredItemChildren(reader SourceReader, root string, entries []DirEn
 	return false
 }
 
-// isSourceRootItem reports whether a directory sitting directly under a source
-// root is an item rather than a scope. It is an item when it looks like one and
-// holds no item directories of its own, so real scopes such as plans/api keep
-// being walked as scopes.
+// An item directory holds no item directories, so a real scope such as plans/api is still walked.
 func isSourceRootItem(reader SourceReader, path, name string, entries []DirEntry) bool {
 	if !isItemFolder(reader, path, name) {
 		return false
@@ -299,10 +291,7 @@ func isItemFolder(reader SourceReader, path, name string) bool {
 }
 
 func stablePlanID(repoID, branch, relItemPath string) string {
-	// The former 32-bit FNV suffix merged valid plans in the same branch.
-	// A versioned SHA-256 identity is deterministic, URL-safe, and keeps the
-	// workspace prefix useful when inspecting logs without relying on it for
-	// uniqueness.  Old persisted indexes are rebuilt on their next scan.
+	// A versioned SHA-256 identity: the 32-bit FNV suffix merged distinct plans on one branch.
 	sum := sha256.Sum256([]byte(repoID + "\x00" + branch + "\x00" + filepath.ToSlash(relItemPath)))
 	return fmt.Sprintf("v2-%s-%s", repoID, hex.EncodeToString(sum[:]))
 }

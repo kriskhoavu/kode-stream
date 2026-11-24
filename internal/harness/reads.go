@@ -31,8 +31,6 @@ func (s *Service) Task(ctx context.Context, id string) (domain.Task, error) {
 	return s.repository.GetTask(ctx, id)
 }
 
-// Queue lists the tasks that can still be worked, stopped ones included, in
-// the order the dispatcher would take them: pinned first, then by score.
 func (s *Service) Queue(ctx context.Context, workspaceID string, limit int) ([]domain.Task, error) {
 	return s.Tasks(ctx, domain.TaskFilter{WorkspaceID: workspaceID, States: []domain.TaskState{domain.TaskRanked, domain.TaskDiscovered, domain.TaskRunning, domain.TaskBlocked, domain.TaskCancelled}, Limit: limit})
 }
@@ -87,10 +85,6 @@ func (s *Service) Run(ctx context.Context, id string) (RunView, error) {
 	return view, nil
 }
 
-// AgentRunTranscript is the last limit text turns of an agent run's own
-// transcript, read from the CLI's file now and kept nowhere. An agent run
-// whose engine writes no readable transcript, or whose file does not exist
-// yet, answers no turns.
 type AgentRunTranscript struct {
 	AgentRunID string                  `json:"agentRunId"`
 	SessionID  string                  `json:"sessionId,omitempty"`

@@ -72,9 +72,6 @@ func contained(root, target string) bool {
 	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && !filepath.IsAbs(rel)
 }
 
-// Contains reports whether target is root or a descendant after both paths
-// have been resolved by the caller. It is exported for consumers that need to
-// prove an item is under one of the validated source roots.
 func Contains(root, target string) bool {
 	return contained(root, target)
 }

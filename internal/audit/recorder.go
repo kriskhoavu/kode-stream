@@ -13,9 +13,6 @@ const (
 	LegacyActor = "unknown"
 )
 
-// Recorder is the single append boundary used by mutation producers. It keeps
-// cache invalidation and non-fatal persistence diagnostics consistent without
-// coupling domain services to HTTP transport.
 type Recorder struct {
 	source       Repository
 	mu           sync.RWMutex

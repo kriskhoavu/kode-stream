@@ -1,7 +1,4 @@
-// Package procedure reads `.kode-stream/harness.yaml`, where a repository
-// once mapped each harness role to the skill, and optionally the track of
-// it, that the role follows. A workspace's role skills now live in its
-// harness settings; the harness reads this file only to move it there once.
+// Package procedure reads `.kode-stream/harness.yaml` only to move its role skills into the workspace's settings.
 package procedure
 
 import (
@@ -16,12 +13,10 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// Path is where a repository kept the file, relative to its root.
 const Path = ".kode-stream/harness.yaml"
 
 const maxFileBytes = 16 << 10
 
-// Map is the procedure of one repository, by role.
 type Map map[domain.Role]domain.ProcedureStep
 
 type file struct {
@@ -29,10 +24,6 @@ type file struct {
 	Roles   map[string]domain.ProcedureStep `yaml:"roles"`
 }
 
-// Load reads the file of the repository checked out at dir. A missing file
-// is no procedure and no error. A file that does not parse, names an unknown
-// version or role, or names a skill or track outside the allowed characters
-// is an error.
 func Load(dir string) (Map, error) {
 	if dir == "" {
 		return nil, nil

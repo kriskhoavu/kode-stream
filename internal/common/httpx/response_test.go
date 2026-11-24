@@ -1,7 +1,5 @@
 package httpx
 
-// Package httpx provides shared HTTP response encoding.
-
 import (
 	"net/http"
 	"net/http/httptest"

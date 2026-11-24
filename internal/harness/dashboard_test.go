@@ -55,14 +55,11 @@ func TestDashboardViewsCarryWhatTheScreensRead(t *testing.T) {
 			}
 		}
 	}
-	// This fixture stores its task directly, so no task event exists here;
-	// the transport test covers task events.
 	for _, key := range []string{"run", "stage", "agentRun", "approval"} {
 		if !shown[key] {
 			t.Fatalf("no event carried a %s; saw %v", key, shown)
 		}
 	}
-	// A run event carries its task, whose state and run change with it.
 	started, ok := fixture.service.DashboardEvent(ctx, domain.Event{Kind: domain.EventRunStarted, TaskID: runs[0].TaskID, RunID: runs[0].ID})
 	if carried, _ := started["task"].(DashboardTask); !ok || carried.ID != runs[0].TaskID {
 		t.Fatalf("run.started = %#v", started)
@@ -143,7 +140,6 @@ func TestDashboardSettingsCarryEachWorkspacesOwnChoices(t *testing.T) {
 	if own.RequireReview == nil || *own.RequireReview || len(own.VerificationCommands) != 1 || own.VerificationCommands[0] != "go test ./..." || own.Models[domain.RoleCoder].Model != "haiku" || own.Procedure[domain.RolePlanner].Skill != "feature-planning" {
 		t.Fatalf("workspace = %#v", own)
 	}
-	// A save that does not list the workspaces keeps them.
 	saved.Workspaces = nil
 	if _, err := service.SaveDashboardSettings(ctx, saved, domain.Actor{}); err != nil {
 		t.Fatal(err)

@@ -11,21 +11,16 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// MaxLineBytes bounds one JSON line a CLI prints.
 const MaxLineBytes = 4 << 20
 
 const stderrBytes = 64 << 10
 
-// Parser turns a CLI's JSON lines into progress events and a result. Line
-// and Result are called from one goroutine.
+// Line and Result are called from one goroutine.
 type Parser interface {
 	Line(raw []byte, emit func(ports.EngineEvent))
-	// Result returns what the stream reported; finished is false when the
-	// CLI never printed its final event.
 	Result() (result ports.Result, finished bool)
 }
 
-// Spec is one CLI process to start.
 type Spec struct {
 	Path    string
 	Args    []string
@@ -33,17 +28,12 @@ type Spec struct {
 	Env     []string
 	Stdin   string
 	Timeout time.Duration
-	// SessionID is the session the harness chose, used until the stream
-	// names one.
-	SessionID string
-	// TranscriptRef returns the path of the CLI's transcript for a session.
+	// SessionID is used until the stream names its own.
+	SessionID     string
 	TranscriptRef func(sessionID string) string
-	// Cleanup runs once the process has exited.
-	Cleanup func()
+	Cleanup       func()
 }
 
-// Start runs spec in its own process group and parses its stdout with
-// parser. Cancel and the timeout stop the whole group.
 func Start(ctx context.Context, spec Spec, parser Parser) (ports.Handle, error) {
 	cmd := exec.Command(spec.Path, spec.Args...)
 	cmd.Dir = spec.Dir
@@ -156,8 +146,7 @@ func (h *handle) setStopReason(reason string) {
 	}
 }
 
-// emit never blocks the parser: a reader that falls behind loses progress
-// events, never the result.
+// A slow reader loses progress events, never the result.
 func (h *handle) emit(event ports.EngineEvent) {
 	select {
 	case h.events <- event:

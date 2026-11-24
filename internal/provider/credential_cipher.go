@@ -10,8 +10,7 @@ import (
 	"io"
 )
 
-// CredentialCipher protects provider credentials before they cross a durable
-// persistence boundary. The deployment secret is reduced to a fixed AES-256 key.
+// The deployment secret is reduced to a fixed AES-256 key.
 type CredentialCipher struct{ key [32]byte }
 
 func NewCredentialCipher(secret string) *CredentialCipher {

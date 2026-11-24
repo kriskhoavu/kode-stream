@@ -51,8 +51,6 @@ func TestPageIsJourneyMatchesTheResolvedBucket(t *testing.T) {
 	}
 }
 
-// An index written before PM-040 carries no bucket. Journey lookup must keep
-// working against it until the next rescan, so it falls back to the path.
 func TestPageIsJourneyFallsBackToPathForPrePM040Index(t *testing.T) {
 	tests := []struct {
 		name    string

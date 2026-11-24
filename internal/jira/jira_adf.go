@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// adfNodeText returns the readable text an ADF leaf node contributes, if any.
 func adfNodeText(node map[string]any) (string, bool) {
 	attrString := func(names ...string) (string, bool) {
 		attrs, ok := node["attrs"].(map[string]any)
@@ -36,8 +35,7 @@ func adfNodeText(node map[string]any) (string, bool) {
 	return "", false
 }
 
-// adfBudget accumulates converted Markdown while enforcing the description
-// byte ceiling, clipping on rune boundaries so output stays valid UTF-8.
+// Clips on rune boundaries, so the output stays valid UTF-8.
 type adfBudget struct {
 	used      int
 	truncated bool
@@ -60,8 +58,6 @@ func (b *adfBudget) take(text string) string {
 	return part
 }
 
-// adfInline converts a run of inline nodes, applying the marks Jira records
-// alongside each text node.
 func adfInline(nodes []any, depth int, budget *adfBudget) string {
 	var out strings.Builder
 	for _, raw := range nodes {
@@ -116,9 +112,7 @@ func adfApplyMarks(text string, node map[string]any) string {
 	return text
 }
 
-// adfBlocks converts block-level nodes into Markdown blocks. Keeping blocks
-// separate is what preserves headings and lists: the previous flat walk ran
-// every text node together, gluing a heading onto the paragraph before it.
+// Blocks stay separate, so a heading never glues onto the paragraph before it.
 func adfBlocks(nodes []any, depth int, budget *adfBudget) []string {
 	var blocks []string
 	for _, raw := range nodes {
@@ -254,8 +248,7 @@ func adfTable(rows []any, depth int, budget *adfBudget) string {
 	return strings.Join(lines, "\n")
 }
 
-// normalizeDescription converts a Jira description into Markdown. Cloud sends
-// ADF; Server sends plain text, which is passed through unchanged.
+// Cloud sends ADF. Server sends plain text, which passes through unchanged.
 func normalizeDescription(raw json.RawMessage) (string, bool) {
 	if len(raw) == 0 || string(raw) == "null" {
 		return "", false

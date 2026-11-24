@@ -185,8 +185,6 @@ ON CONFLICT(owner_user_id, item_id) DO UPDATE SET workspace_id = excluded.worksp
 	return tx.Commit()
 }
 
-// RestoreFilter and RestoreRecent preserve immutable snapshot identity and
-// timestamps; user-facing mutations intentionally continue to advance time.
 func (r *SQLiteNavigationRepository) RestoreFilter(filter models.SavedFilter) error {
 	owner := normalizeNavigationOwner(filter.OwnerUserID)
 	if filter.ID == "" {

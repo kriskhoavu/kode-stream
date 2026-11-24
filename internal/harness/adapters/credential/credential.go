@@ -1,7 +1,4 @@
-// Package credential resolves a harness adapter's token by the name of its
-// environment variable, at call time: the process environment first, then
-// `export NAME=value` lines in ~/.creds.zsh and ~/.creds.sh, the files the
-// Jira connection already reads. Nothing is cached or stored.
+// Package credential reads a token from the environment, then from export lines in ~/.creds.zsh and ~/.creds.sh.
 package credential
 
 import (
@@ -22,7 +19,6 @@ func Default() Resolver {
 	return Resolver{Getenv: os.Getenv, ReadFile: os.ReadFile, HomeDir: os.UserHomeDir, Files: []string{".creds.zsh", ".creds.sh"}}
 }
 
-// Resolve returns the token named by name, or "" when none is set.
 func (r Resolver) Resolve(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {

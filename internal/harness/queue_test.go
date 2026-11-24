@@ -239,7 +239,6 @@ func TestCreateTaskFromACardRanksAndStartsIt(t *testing.T) {
 	if _, err := service.CreateTask(ctx, CreateTaskInput{WorkspaceID: "ws", Key: "PM-8", StartNow: true}, actor, domain.ChannelDashboard); !IsInvalid(err) {
 		t.Fatalf("dismissed again err = %v (state %s)", err, dismissed.State)
 	}
-	// A task whose run was stopped is not finished: Run with the harness starts it again.
 	now := time.Now().UTC()
 	stopped := domain.Task{ID: "tsk-stopped", WorkspaceID: "ws", Source: domain.Source{Kind: domain.SourceJira, Key: "PM-9", Labels: []string{}}, Title: "Nine", State: domain.TaskCancelled, Note: "stopped by Anna", ScoreReasons: []string{}, DependsOn: []string{}, DiscoveredAt: now, UpdatedAt: now}
 	if err := repository.InsertTask(ctx, stopped); err != nil {

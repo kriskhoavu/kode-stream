@@ -1,7 +1,5 @@
 package itemindex
 
-// Package itemindex persists the Item domain read model.
-
 import (
 	"context"
 	"errors"
@@ -38,8 +36,7 @@ type Repository interface {
 	DeleteWorkspace(string) error
 	Query(Query) ([]models.ItemSummary, error)
 	BranchItems(string, string) ([]models.ItemSummary, error)
-	// VisitContext is the bounded, cancellable read seam. Callers that render a
-	// projection must not materialize a whole workspace index first.
+	// Callers that render a projection must not load a whole workspace index first.
 	VisitContext(context.Context, Query, func(models.ItemSummary) bool) error
 	BranchScan(string, string) (models.BranchScanMetadata, bool, error)
 	Get(string) (models.ItemDetail, bool, error)
@@ -197,8 +194,6 @@ func (i *Index) Query(q Query) ([]models.ItemSummary, error) {
 	return out, nil
 }
 
-// VisitContext streams matching summaries without materializing the index result.
-// Returning false from visit stops traversal successfully.
 func (i *Index) VisitContext(ctx context.Context, q Query, visit func(models.ItemSummary) bool) error {
 	if err := i.loadContext(ctx); err != nil {
 		return err

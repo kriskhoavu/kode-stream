@@ -55,8 +55,6 @@ type harnessReviewSessionRequest struct {
 	Rows           uint16 `json:"rows"`
 }
 
-// reviewSession starts a person's embedded session in the worktree of a run
-// waiting at Review.
 func (a *harnessController) reviewSession(w http.ResponseWriter, r *http.Request) {
 	var request harnessReviewSessionRequest
 	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {

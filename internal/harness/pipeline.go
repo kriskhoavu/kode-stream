@@ -12,9 +12,6 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// step holds one transaction's view of a run, its current stage and its task,
-// and saves every change together: stage, new stages, run, task, queued agent
-// runs, approvals and events.
 type step struct {
 	s        *Service
 	ctx      context.Context
@@ -98,7 +95,6 @@ func roundCents(value float64) float64 {
 	return float64(int64(value*10000+0.5)) / 10000
 }
 
-// addCost charges one agent run to its stage and run.
 func (st *step) addCost(agentRun domain.AgentRun) {
 	st.stage.Turns += agentRun.Turns
 	st.stage.DurationMs += agentRun.DurationMs
@@ -108,7 +104,6 @@ func (st *step) addCost(agentRun domain.AgentRun) {
 	st.run.Totals.CostUSD += agentRun.CostUSD
 }
 
-// enqueue queues an agent run of role on the current stage and round.
 func (st *step) enqueue(role domain.Role, reminder bool) {
 	agentRun := st.s.newAgentRun(st.run, st.stage, role, st.settings, reminder)
 	st.stage.Engine, st.stage.Model = agentRun.Engine, agentRun.Model
@@ -125,8 +120,6 @@ func (st *step) round(number int) *domain.Round {
 	return &st.stage.Rounds[len(st.stage.Rounds)-1]
 }
 
-// retryOrBlock retries a failed agent run's role while the stage has attempts
-// left, and blocks the run when it has none.
 func (st *step) retryOrBlock(role domain.Role, reason string) {
 	if st.stage.Attempt < st.stage.MaxAttempts {
 		st.stage.Attempt++
@@ -137,8 +130,6 @@ func (st *step) retryOrBlock(role domain.Role, reason string) {
 	st.block(reason)
 }
 
-// block fails the current stage, parks the run and asks a person whether to
-// resume it.
 func (st *step) block(reason string) {
 	st.stage.State = domain.StageFailed
 	st.stage.FailureReason = boundedText(reason, 600)
@@ -152,7 +143,6 @@ func (st *step) block(reason string) {
 	st.request(domain.GateResume, st.stage, "Stopped at "+stageWord(st.stage.Kind)+": "+st.stage.FailureReason+" Resume to try the stage again.")
 }
 
-// request asks a person to decide gate.
 func (st *step) request(gate domain.GateKind, stage domain.Stage, summary string) {
 	approval := domain.Approval{ID: domain.NewID("apr"), RunID: st.run.ID, TaskID: st.task.ID, StageID: stage.ID, SourceKey: st.task.Source.Key, Title: st.task.Title, Gate: gate, State: domain.ApprovalRequested,
 		Summary: boundedText(summary, domain.MaxSummaryChars), Context: domain.ApprovalContext{Difficulty: st.run.Difficulty, CostSoFarUSD: roundCents(st.run.Totals.CostUSD), Round: stage.Round}, RequestedAt: st.now}
@@ -167,7 +157,6 @@ func (st *step) request(gate domain.GateKind, stage domain.Stage, summary string
 	st.events = append(st.events, domain.Event{Kind: domain.EventApprovalRequested, TaskID: st.task.ID, RunID: st.run.ID, StageID: stage.ID, ApprovalID: approval.ID, Payload: payload(map[string]any{"gate": gate, "summary": approval.Summary, "sourceKey": st.task.Source.Key, "title": st.task.Title})})
 }
 
-// questions is what a report leaves for a person to settle, bounded.
 func questions(report *domain.Report) []string {
 	if report == nil {
 		return nil
@@ -184,9 +173,6 @@ func questions(report *domain.Report) []string {
 	return out
 }
 
-// ask stops the stage on an agent's own questions and asks a person. The
-// stage waits in its round; the answer sends the same role out again with
-// the questions and the answer in its brief.
 func (st *step) ask(agentRun domain.AgentRun, asked []string) {
 	st.stage.State = domain.StageAwaitingApproval
 	summary := "The " + roleWord(agentRun.Role) + " stopped to ask you before going on."
@@ -201,10 +187,6 @@ func (st *step) ask(agentRun domain.AgentRun, asked []string) {
 	st.events = append(st.events, domain.Event{Kind: domain.EventApprovalRequested, TaskID: st.task.ID, RunID: st.run.ID, StageID: st.stage.ID, ApprovalID: approval.ID, Payload: payload(map[string]any{"gate": approval.Gate, "summary": approval.Summary, "sourceKey": st.task.Source.Key, "title": st.task.Title, "questions": asked})})
 }
 
-// stopsToAsk decides what a producer's report that is blocked or asks
-// questions does: with the question gate on it asks a person and reports
-// true; with it off a blocked report blocks the run and reports true, and
-// open questions ride along to the plan gate.
 func (st *step) stopsToAsk(agentRun domain.AgentRun) bool {
 	report := agentRun.Report
 	if report == nil {
@@ -236,7 +218,6 @@ func nonEmpty(value, fallback string) string {
 	return value
 }
 
-// lastReport returns the newest successful report of role in this run.
 func (st *step) lastReport(role domain.Role) *domain.Report {
 	agentRuns, err := st.tx.ListAgentRuns(st.ctx, domain.AgentRunFilter{RunID: st.run.ID, States: []domain.AgentRunState{domain.AgentSucceeded}, Limit: 1000})
 	if err != nil {
@@ -252,8 +233,6 @@ func (st *step) lastReport(role domain.Role) *domain.Report {
 	return latest
 }
 
-// pass ends the current stage and enters the next one, or finishes the run
-// after the last.
 func (st *step) pass() {
 	st.close()
 	next := domain.NextStage(st.stage.Kind, st.settings.For(st.run.WorkspaceID).RequireReview)
@@ -269,15 +248,12 @@ func (st *step) pass() {
 	st.newStages = append(st.newStages, stage)
 }
 
-// close marks the current stage passed, without entering another.
 func (st *step) close() {
 	st.stage.State = domain.StagePassed
 	st.stage.FinishedAt = &st.now
 	st.event(domain.EventStageFinished, st.stage.ID, map[string]any{"kind": st.stage.Kind, "state": st.stage.State, "costUsd": st.stage.CostUSD, "turns": st.stage.Turns})
 }
 
-// enter starts a stage: model stages queue their producer, approval stages
-// ask a person, and non-model stages wait for the stage loop.
 func (st *step) enter(stage *domain.Stage) {
 	st.run.CurrentStageID, st.run.CurrentStageKind = stage.ID, stage.Kind
 	switch stage.Kind {
@@ -306,7 +282,6 @@ func (st *step) enter(stage *domain.Stage) {
 	st.event(domain.EventStageStarted, stage.ID, map[string]any{"kind": stage.Kind, "state": stage.State, "round": stage.Round})
 }
 
-// finishRun marks the run passed and its task done.
 func (st *step) finishRun() {
 	st.run.State = domain.RunPassed
 	st.run.FinishedAt = &st.now
@@ -315,7 +290,6 @@ func (st *step) finishRun() {
 	st.event(domain.EventRunFinished, st.stage.ID, map[string]any{"state": st.run.State, "costUsd": roundCents(st.run.Totals.CostUSD), "turns": st.run.Totals.Turns, "prUrl": st.run.PRURL})
 }
 
-// agentRunFinished moves a stage on after one of its agent runs ended.
 func (s *Service) agentRunFinished(ctx context.Context, agentRun domain.AgentRun) {
 	settings := s.settingsNow(ctx)
 	err := s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
@@ -352,7 +326,6 @@ func describeFailure(agentRun domain.AgentRun) string {
 	return roleWord(agentRun.Role) + " " + reason + "."
 }
 
-// advance applies a successful agent run's report to its stage.
 func (st *step) advance(agentRun domain.AgentRun) {
 	report := agentRun.Report
 	if agentRun.Role == domain.RolePlanner && report.Status == domain.ReportNeedsInfo {
@@ -379,9 +352,6 @@ func (st *step) advance(agentRun domain.AgentRun) {
 	}
 }
 
-// review records a reviewer's verdict: approve passes the stage; changes
-// requested starts another round with the findings, or blocks the run after
-// the last round.
 func (st *step) review(agentRun domain.AgentRun) {
 	report := agentRun.Report
 	blocking, advisory := brief.Blocking(report.Findings)

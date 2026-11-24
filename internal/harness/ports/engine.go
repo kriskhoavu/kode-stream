@@ -7,12 +7,9 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// Engine runs one coding CLI headless. It is a spawn-and-parse adapter, not
-// a provider abstraction: no routing, no auth, no guard of its own.
+// Engine is a spawn-and-parse adapter, not a provider abstraction: no routing, no auth, no guard.
 type Engine interface {
 	ID() string
-	// Detect reports whether the CLI is installed and what this adapter
-	// cannot express for it; Settings shows the result.
 	Detect(ctx context.Context) Detection
 	Start(ctx context.Context, invocation Invocation) (Handle, error)
 }
@@ -24,7 +21,7 @@ type Detection struct {
 	Unsupported []string
 }
 
-// Invocation is everything one agent run needs. Brief is never stored.
+// Brief is never stored.
 type Invocation struct {
 	Role            domain.Role
 	Brief           string
@@ -37,8 +34,7 @@ type Invocation struct {
 	MaxBudgetUSD    float64
 	SessionID       string
 	Timeout         time.Duration
-	// Env is the allow-listed environment beyond PATH and HOME.
-	Env map[string]string
+	Env             map[string]string
 }
 
 type EngineEventKind string
@@ -54,9 +50,8 @@ type EngineEvent struct {
 	SessionID string
 	Turns     int
 	Tools     []string
-	// Summary is at most 200 characters of the CLI's latest text.
-	Summary string
-	CostUSD float64
+	Summary   string
+	CostUSD   float64
 }
 
 type Result struct {
@@ -66,33 +61,22 @@ type Result struct {
 	CostUSD    float64
 	Usage      domain.Usage
 	IsError    bool
-	// StopReason is the CLI's own subtype, such as success,
-	// error_max_turns or error_max_budget_usd, or cancelled / timeout.
-	StopReason string
-	ExitCode   int
-	FinalText  string
-	Stderr     string
-	// TranscriptRef is the path of the CLI's own transcript, never its
-	// content.
+	// StopReason is the CLI's own subtype, or cancelled or timeout.
+	StopReason    string
+	ExitCode      int
+	FinalText     string
+	Stderr        string
 	TranscriptRef string
 }
 
-// TranscriptLocator is an engine that knows, before the CLI finishes, where
-// it will write the transcript of a session the harness named.
 type TranscriptLocator interface {
 	TranscriptRef(worktreePath, sessionID string) string
 }
 
-// TranscriptReader reads the last limit text turns of a CLI transcript at
-// path. A file that does not exist yet reads as no turns.
 type TranscriptReader func(path string, limit int) ([]domain.TranscriptTurn, error)
 
-// SessionCloser stops every person's session that runs on a branch of a
-// workspace and deletes its record. The harness calls it before it deletes
-// a run's working copy.
 type SessionCloser func(ctx context.Context, workspaceID, branch string) error
 
-// Handle is one running CLI process.
 type Handle interface {
 	Events() <-chan EngineEvent
 	Cancel()

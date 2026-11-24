@@ -10,9 +10,6 @@ import (
 	"kode-stream/internal/workspace/settingsfile"
 )
 
-// WorkspaceFile is the harness's part of a workspace's settings as a team
-// shares them: what the workspace runs with now, its own choices laid over
-// the settings.
 func (s *Service) WorkspaceFile(ctx context.Context, workspaceID string) (settingsfile.Harness, error) {
 	settings, err := s.Settings(ctx)
 	if err != nil {
@@ -43,8 +40,6 @@ func (s *Service) WorkspaceFile(ctx context.Context, workspaceID string) (settin
 	return out, nil
 }
 
-// ImportWorkspaceFile lays the named parts of a shared file over the
-// workspace's own choices; the parts it does not name stay as they are.
 func (s *Service) ImportWorkspaceFile(ctx context.Context, workspaceID string, file settingsfile.Harness, parts []string, actor domain.Actor) error {
 	if err := s.mutable(); err != nil {
 		return err
@@ -103,9 +98,6 @@ func (s *Service) ImportWorkspaceFile(ctx context.Context, workspaceID string, f
 	return err
 }
 
-// MoveProcedureFiles moves each workspace's harness.yaml, once, into its
-// harness settings' role skills. A workspace whose role skills are already
-// set, or whose file was moved before, is left as it is.
 func (s *Service) MoveProcedureFiles(ctx context.Context) {
 	if s.workspaces == nil || s.mutable() != nil {
 		return
@@ -151,9 +143,7 @@ func (s *Service) MoveProcedureFiles(ctx context.Context) {
 	}
 }
 
-// OwnWorkspaceModels gives every registered workspace its own models, copied
-// from the defaults, so that a change to the defaults never moves a
-// workspace's. It runs on start, after MoveProcedureFiles.
+// Runs on start, after MoveProcedureFiles.
 func (s *Service) OwnWorkspaceModels(ctx context.Context) {
 	if s.workspaces == nil || s.mutable() != nil {
 		return

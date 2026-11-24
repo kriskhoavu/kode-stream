@@ -14,13 +14,8 @@ import (
 	"time"
 )
 
-// Worktree operations used by the engineering harness. Each runs git in the
-// directory it names; none touches the workspace's own checkout except to
-// register, prune and remove worktrees.
-
 const worktreeTimeout = 2 * time.Minute
 
-// DiffFile is one changed path between a base commit and a worktree.
 type DiffFile struct {
 	Path      string `json:"path"`
 	Status    string `json:"status"`
@@ -56,7 +51,6 @@ func (g *GitAdapter) runLong(ctx context.Context, dir string, timeout time.Durat
 	return stdout.String(), nil
 }
 
-// RevParseContext resolves ref to a commit id.
 func (g *GitAdapter) RevParseContext(ctx context.Context, repoPath, ref string) (string, error) {
 	out, err := g.runLong(ctx, repoPath, worktreeTimeout, "rev-parse", "--verify", "--quiet", ref+"^{commit}")
 	if err != nil {
@@ -65,14 +59,11 @@ func (g *GitAdapter) RevParseContext(ctx context.Context, repoPath, ref string) 
 	return strings.TrimSpace(out), nil
 }
 
-// FetchRemoteContext fetches one remote with a timeout long enough for a
-// network round trip.
 func (g *GitAdapter) FetchRemoteContext(ctx context.Context, repoPath, remote string) error {
 	_, err := g.runLong(ctx, repoPath, worktreeTimeout, "fetch", "--prune", remote)
 	return err
 }
 
-// HasRemoteContext reports whether the repository names remote.
 func (g *GitAdapter) HasRemoteContext(ctx context.Context, repoPath, remote string) bool {
 	out, err := g.runLong(ctx, repoPath, worktreeTimeout, "remote")
 	if err != nil {
@@ -86,8 +77,6 @@ func (g *GitAdapter) HasRemoteContext(ctx context.Context, repoPath, remote stri
 	return false
 }
 
-// WorktreeAddContext creates branch at startPoint and checks it out in a new
-// worktree at worktreePath.
 func (g *GitAdapter) WorktreeAddContext(ctx context.Context, repoPath, worktreePath, branch, startPoint string) error {
 	if err := os.MkdirAll(filepath.Dir(worktreePath), 0o755); err != nil {
 		return err
@@ -96,7 +85,6 @@ func (g *GitAdapter) WorktreeAddContext(ctx context.Context, repoPath, worktreeP
 	return err
 }
 
-// WorktreeRemoveContext removes a worktree; force also discards its changes.
 func (g *GitAdapter) WorktreeRemoveContext(ctx context.Context, repoPath, worktreePath string, force bool) error {
 	args := []string{"worktree", "remove"}
 	if force {
@@ -106,20 +94,16 @@ func (g *GitAdapter) WorktreeRemoveContext(ctx context.Context, repoPath, worktr
 	return err
 }
 
-// WorktreePruneContext forgets worktrees whose directories are gone.
 func (g *GitAdapter) WorktreePruneContext(ctx context.Context, repoPath string) error {
 	_, err := g.runLong(ctx, repoPath, worktreeTimeout, "worktree", "prune")
 	return err
 }
 
-// DeleteBranchContext deletes a local branch.
 func (g *GitAdapter) DeleteBranchContext(ctx context.Context, repoPath, branch string) error {
 	_, err := g.runLong(ctx, repoPath, worktreeTimeout, "branch", "-D", branch)
 	return err
 }
 
-// ExcludeContext adds pattern to the repository's shared info/exclude, so
-// every worktree ignores it.
 func (g *GitAdapter) ExcludeContext(ctx context.Context, repoPath, pattern string) error {
 	out, err := g.runLong(ctx, repoPath, worktreeTimeout, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if err != nil {
@@ -151,15 +135,10 @@ func (g *GitAdapter) ExcludeContext(ctx context.Context, repoPath, pattern strin
 	return err
 }
 
-// intendToAdd records untracked files as intent-to-add, so a diff against
-// the base lists files an agent created.
-// indexLocks holds one lock per worktree: `git add` takes the worktree's
-// index lock and fails at once when another git holds it, so two readers of
-// the same run's changes take turns.
+// git add fails at once on a held index lock, so readers of one worktree take turns.
 var indexLocks sync.Map
 
-// indexLockRetries is how often intendToAdd tries again while a git outside
-// this process, such as an agent's or a person's, holds the index lock.
+// Another git process, such as an agent's or a person's, may hold the index lock.
 const indexLockRetries = 10
 
 func (g *GitAdapter) intendToAdd(ctx context.Context, worktreePath string) error {
@@ -180,8 +159,6 @@ func (g *GitAdapter) intendToAdd(ctx context.Context, worktreePath string) error
 	}
 }
 
-// DiffStatContext summarises every change in the worktree against base,
-// committed or not, new files included.
 func (g *GitAdapter) DiffStatContext(ctx context.Context, worktreePath, base string) (string, error) {
 	if err := g.intendToAdd(ctx, worktreePath); err != nil {
 		return "", err
@@ -189,7 +166,6 @@ func (g *GitAdapter) DiffStatContext(ctx context.Context, worktreePath, base str
 	return g.runLong(ctx, worktreePath, worktreeTimeout, "diff", "--stat", base)
 }
 
-// ChangedPathsContext lists every path the worktree changed against base.
 func (g *GitAdapter) ChangedPathsContext(ctx context.Context, worktreePath, base string) ([]string, error) {
 	files, err := g.DiffFilesContext(ctx, worktreePath, base)
 	if err != nil {
@@ -202,7 +178,6 @@ func (g *GitAdapter) ChangedPathsContext(ctx context.Context, worktreePath, base
 	return paths, nil
 }
 
-// DiffFilesContext lists every changed path with its status and line counts.
 func (g *GitAdapter) DiffFilesContext(ctx context.Context, worktreePath, base string) ([]DiffFile, error) {
 	if err := g.intendToAdd(ctx, worktreePath); err != nil {
 		return nil, err
@@ -240,8 +215,6 @@ func diffStatus(code string) string {
 	}
 }
 
-// RestorePathsContext returns paths to their content at base: a path base
-// holds is checked out from it, a path base lacks is deleted.
 func (g *GitAdapter) RestorePathsContext(ctx context.Context, worktreePath, base string, paths []string) error {
 	for _, path := range paths {
 		clean := filepath.Clean(path)
@@ -264,8 +237,6 @@ func (g *GitAdapter) RestorePathsContext(ctx context.Context, worktreePath, base
 	return nil
 }
 
-// CommitAllContext stages every change in the worktree and commits it with
-// message. It returns the new commit, or "" when there was nothing to commit.
 func (g *GitAdapter) CommitAllContext(ctx context.Context, worktreePath, message string) (string, error) {
 	if _, err := g.runLong(ctx, worktreePath, worktreeTimeout, "add", "--all"); err != nil {
 		return "", err
@@ -283,14 +254,11 @@ func (g *GitAdapter) CommitAllContext(ctx context.Context, worktreePath, message
 	return g.RevParseContext(ctx, worktreePath, "HEAD")
 }
 
-// PushBranchContext pushes the local branch to remote as remoteBranch and sets its upstream.
 func (g *GitAdapter) PushBranchContext(ctx context.Context, worktreePath, remote, branch, remoteBranch string) error {
 	_, err := g.runLong(ctx, worktreePath, worktreeTimeout, "push", "--set-upstream", remote, branch+":"+remoteBranch)
 	return err
 }
 
-// RefDiffFilesContext lists the paths under prefix that ref changed against
-// base, read from the repository's objects, so it needs no worktree.
 func (g *GitAdapter) RefDiffFilesContext(ctx context.Context, repoPath, base, ref, prefix string) ([]DiffFile, error) {
 	args := []string{"diff", "--name-status", "-z", "--no-renames", base, ref}
 	if prefix != "" {
@@ -338,8 +306,6 @@ func numstatCounts(out string) map[string][2]int {
 	return counts
 }
 
-// RefFileDiffContext returns the diff of one path between base and ref, read
-// from the repository's objects, bounded by maxBytes with a truncated flag.
 func (g *GitAdapter) RefFileDiffContext(ctx context.Context, repoPath, base, ref, relPath string, maxBytes int64) (string, bool, error) {
 	clean, err := cleanGitTreePath(relPath)
 	if err != nil {
@@ -356,8 +322,6 @@ func (g *GitAdapter) RefFileDiffContext(ctx context.Context, repoPath, base, ref
 	return g.boundedDiff(ctx, repoPath, maxBytes, "diff", "--no-ext-diff", "--no-renames", base, ref, "--", clean)
 }
 
-// ShowFileContext returns a file's content at ref. A file larger than limit
-// returns no content and true.
 func (g *GitAdapter) ShowFileContext(ctx context.Context, repoPath, ref, path string, limit int64) ([]byte, bool, error) {
 	clean := filepath.ToSlash(filepath.Clean(path))
 	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {

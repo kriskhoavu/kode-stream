@@ -131,8 +131,6 @@ type harnessCreateTaskRequest struct {
 	IdempotencyKey string `json:"idempotencyKey"`
 }
 
-// createTask puts a card's ticket in the queue, started at once unless the
-// request says to queue it.
 func (a *harnessController) createTask(w http.ResponseWriter, r *http.Request) {
 	var request harnessCreateTaskRequest
 	if !decodeLimitedJSON(w, r, &request, maxHarnessBodyBytes, true) {

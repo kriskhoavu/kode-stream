@@ -8,43 +8,30 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// KnowledgeSettingsFile is the optional per-Wiki-Root override read from the
-// same directory as index.md.
 const KnowledgeSettingsFile = "knowledge-settings.yaml"
 
-// RoleJourneys marks the bucket holding reusable E2E journeys.
 const RoleJourneys = "journeys"
 
-// taxonomySettingsVersion is the only supported schema version.
 const taxonomySettingsVersion = 1
 
-// knownTaxonomyRoles gates the role values a settings file may declare. An
-// unrecognised role is dropped rather than stored, so a typo cannot silently
-// disable journey lookup.
+// An unknown role is dropped, so a typo cannot silently disable journey lookup.
 var knownTaxonomyRoles = map[string]bool{RoleJourneys: true}
 
-// TaxonomySettings is the parsed knowledge-settings.yaml.
 type TaxonomySettings struct {
 	Version  int             `yaml:"version"`
 	Taxonomy TaxonomySection `yaml:"taxonomy"`
 }
 
-// TaxonomySection carries the declared tier names and bucket roles.
 type TaxonomySection struct {
 	Tiers   []string         `yaml:"tiers"`
 	Buckets []TaxonomyBucket `yaml:"buckets"`
 }
 
-// TaxonomyBucket attaches a role to a bucket directory.
 type TaxonomyBucket struct {
 	Path string `yaml:"path"`
 	Role string `yaml:"role"`
 }
 
-// ReadTaxonomySettings loads the override for one Wiki Root. An absent file is
-// the normal case and yields no warning. Every defect degrades rather than
-// failing: a file-level problem falls back to pure detection, and an
-// entry-level problem drops just that entry.
 func ReadTaxonomySettings(root string) (TaxonomySettings, bool, []KnowledgeWarning) {
 	data, err := os.ReadFile(filepath.Join(root, KnowledgeSettingsFile))
 	if os.IsNotExist(err) {
@@ -82,10 +69,7 @@ func ReadTaxonomySettings(root string) (TaxonomySettings, bool, []KnowledgeWarni
 	return settings, true, warnings
 }
 
-// ApplyTaxonomySettings folds a settings override into a detected taxonomy.
-// Declared tiers replace the detected set outright, because a curator listing
-// tiers is correcting detection; merging would make a wrongly detected tier
-// impossible to remove. Roles have nothing to merge with and are simply added.
+// Declared tiers replace detection, so a curator can remove a wrongly detected tier.
 func ApplyTaxonomySettings(taxonomy Taxonomy, settings TaxonomySettings) Taxonomy {
 	applied := Taxonomy{
 		Tiers:   taxonomy.Tiers,
@@ -104,9 +88,7 @@ func ApplyTaxonomySettings(taxonomy Taxonomy, settings TaxonomySettings) Taxonom
 	return applied
 }
 
-// ValidateTaxonomyBuckets reports declared buckets that the tree does not
-// contain. This warns rather than fails: the ordering between editing settings
-// and creating the directory is the curator's to choose.
+// Warn, not fail: the curator may create the directory after editing the settings.
 func ValidateTaxonomyBuckets(taxonomy Taxonomy, settings TaxonomySettings) []KnowledgeWarning {
 	warnings := make([]KnowledgeWarning, 0)
 	for _, bucket := range settings.Taxonomy.Buckets {

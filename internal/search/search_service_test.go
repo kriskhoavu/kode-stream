@@ -1,7 +1,5 @@
 package search
 
-// Search service contract tests.
-
 import (
 	"context"
 	"fmt"

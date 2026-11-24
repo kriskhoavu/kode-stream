@@ -16,8 +16,6 @@ import (
 	"kode-stream/internal/workspace/registry"
 )
 
-// fakeWorkspaceRegistry is a minimal registry.Repository fake: only Get and
-// List carry test behaviour, every mutation is unused and simply errors.
 type fakeWorkspaceRegistry struct {
 	workspaces map[string]models.WorkspaceConfig
 	getErr     error
@@ -67,8 +65,6 @@ func (f *fakeWorkspaceRegistry) SetRuntime(string, *models.WorkspaceRuntimeConfi
 	return models.WorkspaceConfig{}, errors.New("not implemented")
 }
 
-// fakeItemIndex is a minimal itemindex.Repository fake: only Get carries test
-// behaviour.
 type fakeItemIndex struct {
 	items map[string]models.ItemDetail
 }
@@ -97,27 +93,24 @@ func (f *fakeItemIndex) BranchScan(string, string) (models.BranchScanMetadata, b
 	return models.BranchScanMetadata{}, false, errors.New("not implemented")
 }
 
-// fakeChangeGit is a combined sessionBranchResolver + sessionChangeReader
-// fake, letting tests drive each SessionChanges/SessionFileDiff guard without
-// running real Git commands.
 type fakeChangeGit struct {
 	currentBranch      string
 	currentBranchErr   error
 	currentBranchCalls int
-	resolvedCommit   string
-	resolveErr       error
-	commitExistsErr  error
-	nameStatus       []gitadapter.NameStatusEntry
-	nameStatusTrunc  bool
-	nameStatusErr    error
-	additions        int
-	deletions        int
-	shortStatErr     error
-	revListCount     int
-	revListErr       error
-	diff             string
-	diffTruncated    bool
-	diffErr          error
+	resolvedCommit     string
+	resolveErr         error
+	commitExistsErr    error
+	nameStatus         []gitadapter.NameStatusEntry
+	nameStatusTrunc    bool
+	nameStatusErr      error
+	additions          int
+	deletions          int
+	shortStatErr       error
+	revListCount       int
+	revListErr         error
+	diff               string
+	diffTruncated      bool
+	diffErr            error
 }
 
 func (f *fakeChangeGit) CurrentBranch(string) (string, error) {
@@ -146,9 +139,6 @@ func (f *fakeChangeGit) CommitExistsContext(context.Context, string, string) err
 	return f.commitExistsErr
 }
 
-// changesTestService builds a Service wired with a fake registry (holding
-// workspace), a fake item index, a fake combined Git reader, and a real file
-// session-record repository seeded with record.
 func changesTestService(t *testing.T, workspace models.WorkspaceConfig, record SessionRecord, git *fakeChangeGit) (*Service, *FileSessionRecordRepository) {
 	t.Helper()
 	dataDir := t.TempDir()
@@ -237,11 +227,6 @@ func TestSessionChangesUnavailableWhenWorkspaceRecordMissing(t *testing.T) {
 	}
 }
 
-// TestSessionChangesPropagatesNonUnknownCommitFailure confirms that a Git
-// failure which is not a typed *gitadapter.ErrUnknownCommit (e.g. a corrupt
-// repository or a missing git binary) surfaces as an error from
-// SessionChanges rather than being folded into launch_commit_missing, so the
-// HTTP handler answers 500 instead of misreporting the launch commit as gone.
 func TestSessionChangesPropagatesNonUnknownCommitFailure(t *testing.T) {
 	workspace := models.WorkspaceConfig{ID: "ws-1", Name: "Local", Path: t.TempDir()}
 	infraErr := errors.New("git cat-file -e: exec: \"git\": executable file not found in $PATH")
@@ -285,10 +270,6 @@ func TestSessionChangesAvailableComputesFullValue(t *testing.T) {
 	}
 }
 
-// TestSessionChangesAvailableEmptyResultMarshalsFieldsPresent guards the
-// critical fix: an available result with no changes since launch must still
-// marshal files/additions/deletions/headMoved rather than omitting them, so
-// the frontend never has to treat a present-but-empty result as absent.
 func TestSessionChangesAvailableEmptyResultMarshalsFieldsPresent(t *testing.T) {
 	workspace := models.WorkspaceConfig{ID: "ws-1", Name: "Local", Path: t.TempDir()}
 	git := &fakeChangeGit{
@@ -365,9 +346,6 @@ func TestSessionRecordWorkspaceResolvesOrReportsNotFound(t *testing.T) {
 	}
 }
 
-// TestSessionChangesUsesRealGitAdapter exercises the guard chain and
-// computation against a real checkout, confirming the fakes above match the
-// real *git.GitAdapter's behaviour for the available case.
 func TestSessionChangesUsesRealGitAdapter(t *testing.T) {
 	root := t.TempDir()
 	gitCommand(t, root, "init", "-b", "main")

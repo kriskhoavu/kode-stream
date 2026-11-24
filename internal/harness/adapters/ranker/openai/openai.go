@@ -1,8 +1,4 @@
-// Package openai is the sorter's optional re-ranker: it asks a model behind
-// an OpenAI-compatible chat endpoint (the local Qwen by default) to reorder
-// the rules' top N tasks, and applies only a valid permutation of them. Task
-// text goes to the model inside task-data delimiters; the model's answer is
-// an order of ids, never an instruction.
+// Package openai lets a model reorder the top N tasks. Its answer is an order of ids, never an instruction.
 package openai
 
 import (

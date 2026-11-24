@@ -1,6 +1,3 @@
-// Package scheduler runs the harness's loops: one goroutine per loop, each
-// woken by its interval or an explicit wake, each recording when it last ran
-// and what last failed. A loop's work is a plain function, tested on its own.
 package scheduler
 
 import (
@@ -12,13 +9,10 @@ import (
 
 type Loop struct {
 	Name string
-	// Interval is read before every wait, so a settings change applies on
-	// the next cycle.
+	// Interval is read before every wait, so a settings change applies on the next cycle.
 	Interval func() time.Duration
-	// Wake runs the loop at once; nil means the loop runs on its interval
-	// only.
-	Wake <-chan struct{}
-	Run  func(ctx context.Context) error
+	Wake     <-chan struct{}
+	Run      func(ctx context.Context) error
 }
 
 type Health struct {
@@ -80,8 +74,7 @@ func (o *Orchestrator) run(ctx context.Context, loop Loop) {
 	}
 }
 
-// cycle runs one pass and records its outcome; a panic is recorded as an
-// error, so one bad pass never takes the server down.
+// A panic is recorded as an error, so one bad pass never takes the server down.
 func (o *Orchestrator) cycle(ctx context.Context, loop Loop) {
 	var err error
 	func() {
@@ -105,8 +98,6 @@ func (o *Orchestrator) cycle(ctx context.Context, loop Loop) {
 	o.mu.Unlock()
 }
 
-// Stop cancels every loop and waits at most timeout; it reports whether the
-// loops finished in time.
 func (o *Orchestrator) Stop(timeout time.Duration) bool {
 	o.mu.Lock()
 	if !o.running {

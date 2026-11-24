@@ -64,18 +64,12 @@ func (g *GitAdapter) StatusContext(ctx context.Context, workspaceID, workspacePa
 	return status, nil
 }
 
-// lastFetchedAtContext dates the most recent fetch by FETCH_HEAD's modification
-// time. A repository that has never fetched since being cloned has no such file,
-// which reports as the zero time rather than an error: an unknown fetch age is a
-// fact about the remote-tracking ref, not a failure to read the status.
+// A repository that never fetched has no FETCH_HEAD, which reads as the zero time.
 func (g *GitAdapter) lastFetchedAtContext(ctx context.Context, workspacePath string) time.Time {
 	if ctx.Err() != nil {
 		return time.Time{}
 	}
-	// A linked worktree keeps a private git dir that holds no FETCH_HEAD; the
-	// fetch is recorded once in the common dir every worktree shares. Ask for it
-	// without --path-format, which needs Git 2.31, and resolve whatever comes back
-	// against the workspace so a relative answer works too.
+	// A linked worktree's git dir holds no FETCH_HEAD. --path-format needs Git 2.31, so resolve against the workspace.
 	out, err := g.runContextLimited(ctx, workspacePath, 1<<16, "rev-parse", "--git-common-dir")
 	if err != nil {
 		return time.Time{}
@@ -91,8 +85,6 @@ func (g *GitAdapter) lastFetchedAtContext(ctx context.Context, workspacePath str
 	return info.ModTime().UTC()
 }
 
-// resolveFetchHead turns a git-common-dir answer, absolute or relative, into the
-// FETCH_HEAD path it implies. It returns "" when there is nothing to resolve.
 func (g *GitAdapter) resolveFetchHead(workspacePath, commonDir string) string {
 	if commonDir == "" {
 		return ""

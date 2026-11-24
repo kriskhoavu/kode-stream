@@ -13,8 +13,6 @@ import (
 
 const notifierInterval = 5 * time.Second
 
-// enqueueFor writes the outbox row of a stored event the bot is told about,
-// through the same repository that stored the event.
 func (s *Service) enqueueFor(ctx context.Context, repository domain.Repository, event domain.Event) error {
 	if s.notifier == nil || !notify.Notifiable[event.Kind] || event.Seq == 0 {
 		return nil
@@ -26,9 +24,6 @@ func (s *Service) notifierLoop() scheduler.Loop {
 	return scheduler.Loop{Name: "notifier", Interval: func() time.Duration { return notifierInterval }, Run: s.deliverDue}
 }
 
-// deliverDue sends every due outbox row once. A failure waits 5 s doubling
-// to 10 minutes; after five attempts the row fails and a
-// notification.failed event says so.
 func (s *Service) deliverDue(ctx context.Context) error {
 	if s.notifier == nil {
 		return nil
@@ -60,8 +55,6 @@ func (s *Service) deliverDue(ctx context.Context) error {
 	return nil
 }
 
-// webhookBody describes one stored event for the bot, with the task, run and
-// approval it names.
 func (s *Service) webhookBody(ctx context.Context, seq int64) ([]byte, error) {
 	events, err := s.repository.EventsAfter(ctx, seq-1, 1)
 	if err != nil {

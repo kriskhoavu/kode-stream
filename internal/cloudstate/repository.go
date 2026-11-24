@@ -12,16 +12,11 @@ type EnrollmentTokenRepository interface {
 	ConsumeEnrollmentToken(context.Context, string, time.Time) (bool, error)
 }
 
-// WorkspacePublicationRepository gives Agent publication an explicit durable
-// compare-and-swap boundary.  It is separate from ordinary Cloud workspace
-// upserts because browser-created snapshots do not carry Agent generations.
+// Kept apart from workspace upserts: browser-created snapshots carry no Agent generation.
 type WorkspacePublicationRepository interface {
 	PublishAgentWorkspace(context.Context, string, models.WorkspaceConfig, int64) (models.WorkspaceConfig, bool, error)
 }
 
-// Repository is the durable, tenant-scoped portion of the Cloud control plane.
-// WebSocket ownership, pending commands, and process bindings intentionally do
-// not belong here.
 type Repository interface {
 	ListWorkspaces(context.Context, string) ([]models.WorkspaceConfig, error)
 	GetWorkspace(context.Context, string, string) (models.WorkspaceConfig, bool, error)

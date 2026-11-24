@@ -1,9 +1,4 @@
-// Package harness is the engineering harness: scouts fill a ranked queue of
-// tasks, and an orchestrator moves each task through plan, approval, build,
-// test and draft pull request stages by running coding CLIs headless.
-//
-// Only the composition root, the HTTP transport and the SQL repository
-// import this tree; deleting it and those references removes the feature.
+// Package harness moves ranked tasks through plan, build, test and draft pull request by running coding CLIs headless.
 package harness
 
 import (
@@ -32,8 +27,7 @@ const (
 	EnvDashboardURL  = "KODE_STREAM_HARNESS_DASHBOARD_URL"
 )
 
-// Config is resolved once from the environment by the composition root.
-// Secrets live here and in the process only, never in the database.
+// Secrets live in Config and the process only, never in the database.
 type Config struct {
 	LocalMode     bool
 	BotToken      string
@@ -60,29 +54,20 @@ func ResolveConfig(getenv func(string) string, dataDir string, localMode bool) C
 }
 
 type Dependencies struct {
-	// Repository is nil when the storage option cannot hold harness state.
-	Repository   domain.Repository
-	Workspaces   ports.Workspaces
-	Scouts       []ports.Scout
-	Engines      []ports.Engine
-	Worktrees    ports.Worktrees
-	PullRequests []ports.PullRequests
-	// Notifier delivers the bot's webhooks; nil when no webhook URL is set.
-	Notifier ports.Notifier
-	Audit    ports.Audit
-	// RuntimeVerifyCommand returns a workspace runtime's smoke verification
-	// command, or "" when it has none.
+	Repository           domain.Repository
+	Workspaces           ports.Workspaces
+	Scouts               []ports.Scout
+	Engines              []ports.Engine
+	Worktrees            ports.Worktrees
+	PullRequests         []ports.PullRequests
+	Notifier             ports.Notifier
+	Audit                ports.Audit
 	RuntimeVerifyCommand func(*models.WorkspaceRuntimeConfig) string
-	// Reranker may reorder the rules' top N when the settings enable it.
-	Reranker queue.Reranker
-	// Transcripts reads an agent run's transcript for the dashboard; nil
-	// when no engine writes one the platform can read.
-	Transcripts ports.TranscriptReader
-	// Sessions closes a person's sessions in a run's working copy before
-	// Remove or Reset deletes it; nil where no session can run there.
-	Sessions ports.SessionCloser
-	Now      func() time.Time
-	Config   Config
+	Reranker             queue.Reranker
+	Transcripts          ports.TranscriptReader
+	Sessions             ports.SessionCloser
+	Now                  func() time.Time
+	Config               Config
 }
 
 type Service struct {
@@ -142,7 +127,6 @@ func New(deps Dependencies) *Service {
 	return service
 }
 
-// wake nudges a loop without blocking; a wake already pending is enough.
 func wake(channel chan struct{}) {
 	select {
 	case channel <- struct{}{}:
@@ -150,21 +134,16 @@ func wake(channel chan struct{}) {
 	}
 }
 
-// wakeWork nudges the dispatcher, every role loop and the stage loop.
 func (s *Service) wakeWork() {
 	for _, channel := range s.workWakes {
 		wake(channel)
 	}
 }
 
-// Supported reports whether the storage option holds harness state.
 func (s *Service) Supported() bool { return s != nil && s.repository != nil }
 
-// Config returns the resolved configuration; the transport reads the bot
-// token from it.
 func (s *Service) Config() Config { return s.config }
 
-// mutable refuses a change the harness cannot make in this process.
 func (s *Service) mutable() error {
 	if !s.Supported() {
 		return domain.ErrUnsupported
@@ -175,7 +154,6 @@ func (s *Service) mutable() error {
 	return nil
 }
 
-// emit stores an event and publishes it with its sequence number.
 func (s *Service) emit(ctx context.Context, event domain.Event) domain.Event {
 	if event.At.IsZero() {
 		event.At = s.now()
@@ -189,8 +167,7 @@ func (s *Service) emit(ctx context.Context, event domain.Event) domain.Event {
 	return stored
 }
 
-// emitIn stores an event inside a transaction; the caller publishes it after
-// the commit with publish.
+// The caller publishes the event after the commit.
 func emitIn(ctx context.Context, tx domain.Repository, event domain.Event) (domain.Event, error) {
 	return tx.AppendEvent(ctx, event)
 }
@@ -201,7 +178,6 @@ func (s *Service) publish(events ...domain.Event) {
 	}
 }
 
-// publishTransient sends an event that is not stored, such as live progress.
 func (s *Service) publishTransient(event domain.Event) {
 	if event.At.IsZero() {
 		event.At = s.now()
@@ -216,8 +192,6 @@ func payload(value any) json.RawMessage {
 	}
 	return data
 }
-
-// --- settings ---
 
 func (s *Service) Settings(ctx context.Context) (domain.Settings, error) {
 	if !s.Supported() {
@@ -259,8 +233,6 @@ func (s *Service) SaveSettings(ctx context.Context, settings domain.Settings, ex
 	return saved, nil
 }
 
-// checkEngines refuses a policy that names an engine this server does not
-// run, or an OpenCode model without its provider.
 func (s *Service) checkEngines(policy domain.ModelPolicy) error {
 	if len(s.engines) == 0 {
 		return nil
@@ -286,17 +258,6 @@ func actorOrNil(actor domain.Actor) *domain.Actor {
 	return &actor
 }
 
-// --- tasks ---
-
-// --- runs ---
-
-// --- approvals ---
-
-// --- status ---
-
-// --- events ---
-
-// EventsAfter returns stored events after seq, at most limit.
 func (s *Service) EventsAfter(ctx context.Context, after int64, limit int) ([]domain.Event, error) {
 	if !s.Supported() {
 		return []domain.Event{}, nil
@@ -311,13 +272,8 @@ func (s *Service) LastEventSeq(ctx context.Context) (int64, error) {
 	return s.repository.LastEventSeq(ctx)
 }
 
-// Subscribe returns a live subscription to every event published from now.
 func (s *Service) Subscribe(buffer int) *feed.Subscription { return s.feed.Subscribe(buffer) }
 
-// --- helpers shared by the service files ---
-
-// IsNotFound and friends let the transport map errors without importing the
-// domain package's sentinels one by one.
 func IsNotFound(err error) bool       { return errors.Is(err, domain.ErrNotFound) }
 func IsConflict(err error) bool       { return errors.Is(err, domain.ErrStateMoved) }
 func IsAlreadyDecided(err error) bool { return errors.Is(err, domain.ErrAlreadyDecided) }

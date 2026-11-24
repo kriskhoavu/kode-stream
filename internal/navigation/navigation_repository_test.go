@@ -1,7 +1,5 @@
 package navigation
 
-// Navigation repository contract tests.
-
 import (
 	"errors"
 	"fmt"

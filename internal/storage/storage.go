@@ -72,8 +72,7 @@ type AppOwnedState struct {
 	StatusService  *StorageStatusService
 	SyncService    *StorageSyncService
 	Cloud          cloudstate.Repository
-	// Harness is nil under datadir storage, which does not support it.
-	Harness harnessdomain.Repository
+	Harness        harnessdomain.Repository
 }
 
 type RepositoryBundle struct {
@@ -318,9 +317,7 @@ func openSQLStore(config Config) (*SQLStore, error) {
 		return nil, err
 	}
 	if config.Driver == StorageDriverSQLite {
-		// One connection provides deterministic transaction ownership inside a
-		// process; the busy timeout coordinates short-lived writers in another
-		// process instead of surfacing an immediate SQLITE_BUSY startup failure.
+		// One connection owns transactions in this process. The busy timeout waits for writers in other processes.
 		db.SetMaxOpenConns(1)
 		if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
 			_ = db.Close()

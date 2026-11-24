@@ -10,14 +10,11 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// readyJira turns the workspace's Jira source and its readiness check on.
 func readyJira(settings *domain.Settings) {
 	on := true
 	settings.Workspaces[0].Jira = &domain.JiraSourceSettings{Enabled: true, JQL: "project = PM", CheckReady: &on}
 }
 
-// makeReady puts the fixture's ticket in READY with a reporter and an
-// assignee, and takes back the start request, so only its status starts it.
 func makeReady(t *testing.T, fixture *pipelineFixture, status string) {
 	t.Helper()
 	ctx := context.Background()
@@ -35,7 +32,6 @@ func makeReady(t *testing.T, fixture *pipelineFixture, status string) {
 	}
 }
 
-// comment adds a comment on the fixture's ticket, as a poll would.
 func comment(t *testing.T, fixture *pipelineFixture, id, author, body string) {
 	t.Helper()
 	ctx := context.Background()
@@ -47,10 +43,6 @@ func comment(t *testing.T, fixture *pipelineFixture, id, author, body string) {
 	}
 }
 
-// A READY ticket starts on its own. Its planner finds it says too little, so
-// the run waits for the reporter with a draft comment that mentions them; the
-// assignee's own comment does not end the wait, the reporter's reply does,
-// and the planner then plans from it.
 func TestAReadyTicketWaitsForItsReporterAndPlansFromTheReply(t *testing.T) {
 	ctx := context.Background()
 	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
@@ -112,8 +104,6 @@ func TestAReadyTicketWaitsForItsReporterAndPlansFromTheReply(t *testing.T) {
 	}
 }
 
-// A person may continue without the reporter: their answer ends the
-// readiness check, so the planner plans and does not ask again.
 func TestAPersonContinuesAReadyTicketWithoutItsReporter(t *testing.T) {
 	ctx := context.Background()
 	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
@@ -143,7 +133,6 @@ func TestAPersonContinuesAReadyTicketWithoutItsReporter(t *testing.T) {
 	}
 }
 
-// Dismissing a ticket that waits for its reporter stops its run.
 func TestDismissingAReadyTicketStopsItsRun(t *testing.T) {
 	ctx := context.Background()
 	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
@@ -165,7 +154,6 @@ func TestDismissingAReadyTicketStopsItsRun(t *testing.T) {
 	}
 }
 
-// Only a ticket in a ready status, with the check on, starts on its own.
 func TestOnlyAReadyTicketStartsOnItsOwn(t *testing.T) {
 	ctx := context.Background()
 	off := false
@@ -194,7 +182,6 @@ func TestOnlyAReadyTicketStartsOnItsOwn(t *testing.T) {
 	}
 }
 
-// After MaxClarifyRounds replies the planner's questions go to a person.
 func TestAReadyTicketAsksAPersonAfterTheLastReply(t *testing.T) {
 	ctx := context.Background()
 	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {

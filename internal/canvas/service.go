@@ -62,9 +62,7 @@ type ProjectedNode struct {
 	Workspace *WorkspaceNode `json:"workspace,omitempty"`
 	Plan      *PlanNode      `json:"plan,omitempty"`
 	Session   *SessionNode   `json:"session,omitempty"`
-	// Ephemeral marks a live session drawn beside its plan without a placement.
-	// It leaves the Canvas when the session stops unless it is placed.
-	Ephemeral bool `json:"ephemeral,omitempty"`
+	Ephemeral bool           `json:"ephemeral,omitempty"`
 }
 
 type Connection struct {
@@ -447,9 +445,7 @@ func (s *Service) sessionRecordsContext(ctx context.Context, workspaceID, branch
 	return s.sessions.SessionRecords(workspaceID, branch)
 }
 
-// Ephemeral session nodes sit in a row to the right of their plan, sized like
-// an expanded session node so the terminal shows; the constants mirror the
-// Canvas board's focus layout.
+// These constants mirror the Canvas board's focus layout.
 const (
 	ephemeralGutter        = 40
 	ephemeralPlanWidth     = 245

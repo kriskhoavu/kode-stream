@@ -48,7 +48,7 @@ func TestGitHubAdapterOpensADraftThroughRESTOrTheCLI(t *testing.T) {
 func TestGitHubRepoFallsBackToTheCheckoutOrigin(t *testing.T) {
 	adapter := &Adapter{RemoteURL: func(path string) (string, error) { return "ssh://git@github.com/acme/app.git", nil }}
 	byPath := models.WorkspaceConfig{ID: "ws", Path: "/tmp/app"}
-	if !adapter.Supports(byPath, domain.WorkspaceSettings{}) || adapter.repo(byPath, domain.WorkspaceSettings{}) != "acme/app" {
+	if !adapter.Supports(byPath, domain.WorkspaceSettings{}) || adapter.repoOrOrigin(byPath, domain.WorkspaceSettings{}) != "acme/app" {
 		t.Fatal("the checkout origin must name the repository")
 	}
 	if (&Adapter{}).Supports(byPath, domain.WorkspaceSettings{}) {

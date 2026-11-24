@@ -82,10 +82,7 @@ type Manager struct {
 	closed        bool
 	observer      func(Session)
 	observerError func(Session) error
-	// running tracks the per-session reader and reaper goroutines so Close can
-	// wait for them. They notify observers, which persist session records, so
-	// returning from Close while they are still in flight lets writes land
-	// after the caller believes the manager has shut down.
+	// Close waits for these goroutines, because their observers persist session records.
 	running sync.WaitGroup
 }
 
@@ -227,8 +224,6 @@ func (m *Manager) SetObserver(observer func(Session)) {
 	m.mu.Unlock()
 }
 
-// SetStartObserver makes the synchronous running-state publication observable to
-// the launch unit of work. Runtime lifecycle observations remain best-effort.
 func (m *Manager) SetStartObserver(observer func(Session) error) {
 	m.mu.Lock()
 	m.observerError = observer
@@ -402,8 +397,7 @@ func (m *Manager) unsubscribe(s *managed, ch chan []byte) {
 	m.pruneCompleted()
 }
 
-// Durable session records hold history; the manager only needs a small recent
-// reconnect buffer. Keep subscribed sessions until their client disconnects.
+// Session records hold the history, so the manager keeps only a small reconnect buffer.
 func (m *Manager) pruneCompleted() {
 	m.mu.Lock()
 	defer m.mu.Unlock()

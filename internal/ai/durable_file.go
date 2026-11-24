@@ -41,9 +41,7 @@ func readBoundedFile(path string) ([]byte, error) {
 	return data, nil
 }
 
-// publishDurableFile is the local-store generation boundary. It preserves an
-// operator-selected mode, syncs both file and containing directory, and restores
-// the previous generation if directory durability confirmation fails.
+// Syncs the file and its directory, and restores the previous generation if the directory sync fails.
 func publishDurableFile(path string, data []byte) error {
 	return publishDurableFileWith(path, data, durableFileOps{syncDirectory: syncAIDirectory, remove: os.Remove})
 }
@@ -92,8 +90,6 @@ func publishDurableFileWith(path string, data []byte, ops durableFileOps) error 
 	if err == nil {
 		return nil
 	}
-	// Publication is not reported successful until the directory is durable. Best
-	// effort rollback retains the original exact generation (or removes a first one).
 	if existed {
 		if rollbackErr := restoreDurableFile(path, previous, mode); rollbackErr != nil {
 			return fmt.Errorf("publish AI persistence generation: %w (rollback failed: %v)", err, rollbackErr)

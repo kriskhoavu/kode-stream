@@ -134,9 +134,7 @@ func NewServer(port int) (*Server, error) {
 		Harness:             harnessService,
 	})
 
-	// Role skills and models live in each workspace's harness settings; a
-	// repository's harness.yaml is moved there once, and every workspace gets
-	// its own models, before any run reads them.
+	// Harness settings move to each workspace before any run reads them.
 	harnessService.MoveProcedureFiles(context.Background())
 	harnessService.OwnWorkspaceModels(context.Background())
 	if err := harnessService.Start(context.Background()); err != nil {
@@ -149,7 +147,6 @@ func NewServer(port int) (*Server, error) {
 	return &Server{port: port, bindAddress: runtimeConfig.BindAddress, app: api.Log(mux), sessions: sessionManager, storage: state.SQLStore, harness: harnessService}, nil
 }
 
-// harnessWiring holds what the harness service is built from.
 type harnessWiring struct {
 	paths    system.Paths
 	runtime  system.RuntimeConfig
@@ -160,7 +157,6 @@ type harnessWiring struct {
 	audit    *audit.Recorder
 }
 
-// newHarnessService wires the harness to its scouts, engines and adapters.
 func newHarnessService(w harnessWiring) *harness.Service {
 	harnessConfig := harness.ResolveConfig(os.Getenv, w.paths.Dir, w.runtime.Mode == models.RuntimeModeLocal)
 	var harnessNotifier ports.Notifier
@@ -189,7 +185,6 @@ func newHarnessService(w harnessWiring) *harness.Service {
 	})
 }
 
-// harnessTranscripts reads a Claude transcript's activity as harness turns.
 func harnessTranscripts(path string, limit int) ([]domain.TranscriptTurn, error) {
 	turns, err := ai.ReadClaudeTranscriptActivity(path, limit)
 	if err != nil {
@@ -304,9 +299,6 @@ func deprecatedSPAPath(path string) bool {
 		strings.HasPrefix(path, "/workspace/")
 }
 
-// harnessPullRequests opens pull requests where the workspace's checkout
-// points: GitHub or Bitbucket, read from its origin when the registry holds
-// no remote. A workspace with a local task folder opens none.
 func harnessPullRequests(git *appgit.GitAdapter) []ports.PullRequests {
 	github := harnessprgithub.New()
 	github.RemoteURL = git.RemoteURL

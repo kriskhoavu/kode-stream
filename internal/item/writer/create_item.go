@@ -42,9 +42,7 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 		return models.WriteResult{}, err
 	}
 	if info, err := os.Stat(fullRoot); err == nil {
-		// A manual deletion of an item's contents can leave the directory behind.
-		// An empty directory holds no item, so reuse it instead of reporting a
-		// duplicate the workspace cannot show.
+		// A manual deletion can leave an empty directory. It holds no item, so it is reused.
 		empty, emptyErr := isEmptyDir(fullRoot, info)
 		if emptyErr != nil {
 			return models.WriteResult{}, emptyErr
@@ -77,9 +75,7 @@ func (w *Writer) CreateItem(workspace models.WorkspaceConfig, input models.NewIt
 	return w.refresh(workspace, itemRoot)
 }
 
-// isEmptyDir reports whether path is a directory holding no entries. A
-// non-directory is never empty, so an existing file at the item path still
-// counts as occupied.
+// A file at the item path is not an empty directory, so it still counts as occupied.
 func isEmptyDir(path string, info os.FileInfo) (bool, error) {
 	if !info.IsDir() {
 		return false, nil

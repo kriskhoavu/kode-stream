@@ -1,7 +1,5 @@
 package item
 
-// Shared Item domain test helpers.
-
 import "os"
 
 func osMkdirAll(path string) error {

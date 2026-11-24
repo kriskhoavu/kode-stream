@@ -38,22 +38,15 @@ type LaunchTemplate struct {
 }
 
 type Settings struct {
-	DefaultProvider string                    `json:"defaultProvider" yaml:"defaultProvider"`
-	DefaultTerminal string                    `json:"defaultTerminal" yaml:"defaultTerminal"`
-	Providers       map[string]LaunchTemplate `json:"providers" yaml:"providers"`
-	Terminals       map[string]LaunchTemplate `json:"terminals" yaml:"terminals"`
-	// WorkspaceProviders is each workspace's own default provider, laid over
-	// DefaultProvider. Executables and arguments stay machine-wide.
-	WorkspaceProviders map[string]string `json:"workspaceProviders,omitempty" yaml:"workspaceProviders,omitempty"`
+	DefaultProvider    string                    `json:"defaultProvider" yaml:"defaultProvider"`
+	DefaultTerminal    string                    `json:"defaultTerminal" yaml:"defaultTerminal"`
+	Providers          map[string]LaunchTemplate `json:"providers" yaml:"providers"`
+	Terminals          map[string]LaunchTemplate `json:"terminals" yaml:"terminals"`
+	WorkspaceProviders map[string]string         `json:"workspaceProviders,omitempty" yaml:"workspaceProviders,omitempty"`
 }
 
-// WorkspaceDefaultProvider is the provider of a workspace that has not
-// chosen one of its own, while it is enabled on this machine.
 const WorkspaceDefaultProvider = "claude"
 
-// ProviderFor is the provider a session in workspaceID starts with: the
-// workspace's own, else Claude, else the machine's default. A session outside
-// any workspace starts with the machine's default.
 func (s Settings) ProviderFor(workspaceID string) string {
 	if provider := s.WorkspaceProviders[workspaceID]; provider != "" {
 		return provider

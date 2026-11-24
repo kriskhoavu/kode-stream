@@ -40,9 +40,6 @@ type WorkspaceMetadata struct {
 	ScanStatus       string   `json:"scanStatus,omitempty"`
 }
 
-// ValidateWorkspaceMetadata is the shared Agent wire-contract validator. It
-// intentionally rejects ambiguous input rather than rewriting it at either end
-// of the protocol.
 func ValidateWorkspaceMetadata(metadata WorkspaceMetadata) (WorkspaceMetadata, error) {
 	metadata.Name = strings.TrimSpace(metadata.Name)
 	metadata.BaselineBranch = strings.TrimSpace(metadata.BaselineBranch)
@@ -107,8 +104,6 @@ func hasCredentialURL(value string) bool {
 	if value == "" {
 		return false
 	}
-	// SCP-style Git remotes (git@host:org/repo.git) contain an SSH account, not
-	// a reusable provider credential, and remain an approved redacted label.
 	if !strings.Contains(value, "://") {
 		return strings.Contains(value, "\x00")
 	}

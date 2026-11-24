@@ -15,13 +15,10 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// protectedPaths are never an agent's to change, whatever the scope says.
 var protectedPaths = []string{".git/", ".harness/", ".claude/", ".kode-stream/", ".github/workflows/"}
 
-// planScope is where the planner may write.
 var planScope = []string{"plans/"}
 
-// scopeFor is the scope a producer's brief names and the harness enforces.
 func scopeFor(role domain.Role, settings domain.Settings, workspaceID string) []string {
 	if role == domain.RolePlanner {
 		return planScope
@@ -50,9 +47,6 @@ func inScope(path string, scope []string) bool {
 	return false
 }
 
-// afterProducer runs the harness's own checks on a producer's work: paths it
-// changed outside its scope are reverted, then the verification commands
-// run in the worktree. Reviewers run read-only and are not checked here.
 func (s *Service) afterProducer(ctx context.Context, run domain.Run, agentRun domain.AgentRun, settings domain.Settings, lease time.Duration) ([]string, *domain.GateRun, error) {
 	if s.worktrees == nil {
 		return nil, nil, nil
@@ -84,8 +78,6 @@ func (s *Service) afterProducer(ctx context.Context, run domain.Run, agentRun do
 	return outside, gate, nil
 }
 
-// runGate runs each verification command in the worktree with sh -c and
-// stops at the first failure. No commands means nothing to fail.
 func runGate(ctx context.Context, dir string, commands []string, timeout time.Duration) *domain.GateRun {
 	started := time.Now()
 	gate := &domain.GateRun{Passed: true}
@@ -106,8 +98,7 @@ func runGate(ctx context.Context, dir string, commands []string, timeout time.Du
 	return gate
 }
 
-// gateEnvironment is the server's environment without the harness's own
-// secrets: verification commands need the developer's toolchains.
+// Verification commands need the developer's toolchains, but never the harness's secrets.
 func gateEnvironment() []string {
 	var env []string
 	for _, entry := range os.Environ() {
@@ -170,8 +161,6 @@ func tail(text string, limit int) string {
 	return string(bytes.ToValidUTF8(data, nil))
 }
 
-// commitMessage is the harness's commit subject: the task key, then a short
-// imperative phrase.
 func commitMessage(run domain.Run, what string) string {
 	title := strings.TrimSpace(run.Title)
 	if title == "" {
@@ -184,7 +173,6 @@ func commitMessage(run domain.Run, what string) string {
 	return subject + "\n\nCommitted by the Kode Stream harness for run " + run.ID + "."
 }
 
-// commitRun commits everything in the run's worktree on its harness branch.
 func (s *Service) commitRun(ctx context.Context, run domain.Run, what string) (string, error) {
 	if s.worktrees == nil || run.WorktreePath == "" {
 		return "", nil
@@ -192,9 +180,6 @@ func (s *Service) commitRun(ctx context.Context, run domain.Run, what string) (s
 	return s.worktrees.Commit(ctx, run.WorktreePath, commitMessage(run, what))
 }
 
-// advanceBuild applies a builder's or tester's successful run: reverted
-// paths become an advisory finding, a failed gate a blocking one that starts
-// another round, and a passing gate goes to review.
 func (st *step) advanceBuild(agentRun domain.AgentRun) {
 	if agentRun.Role == domain.RoleQAFixer {
 		st.advanceFix(agentRun)
@@ -222,8 +207,6 @@ func (st *step) advanceBuild(agentRun domain.AgentRun) {
 	st.enqueue(domain.RoleCodeReviewer, false)
 }
 
-// reviewApproved passes a reviewed stage. An approved build was committed by
-// the harness before this step ran.
 func (st *step) reviewApproved(agentRun domain.AgentRun) {
 	if agentRun.Commit != "" {
 		st.event(domain.EventStageRound, st.stage.ID, map[string]any{"kind": st.stage.Kind, "round": st.stage.Round, "commit": agentRun.Commit})
@@ -231,8 +214,6 @@ func (st *step) reviewApproved(agentRun domain.AgentRun) {
 	st.pass()
 }
 
-// decorateBrief adds the scope a producer must keep to and, after a failed
-// gate, the end of its log.
 func (s *Service) decorateBrief(ctx context.Context, input brief.Input, run domain.Run, stage domain.Stage, agentRun domain.AgentRun) brief.Input {
 	settings := s.settingsNow(ctx)
 	if producer(agentRun.Role) {

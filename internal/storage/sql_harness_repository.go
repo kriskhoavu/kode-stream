@@ -9,9 +9,6 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// SQLHarnessRepository is the SQLite and Postgres implementation of the
-// harness repository. Each row keeps the columns the queue filters, claims
-// and sums on, and the rest of the entity as JSON.
 type SQLHarnessRepository struct {
 	db     *sql.DB
 	q      harnessQuerier
@@ -31,9 +28,6 @@ func newSQLHarnessRepository(store *SQLStore) *SQLHarnessRepository {
 	return &SQLHarnessRepository{db: store.db, q: store.db, driver: store.driver}
 }
 
-// OpenSQLiteHarness opens a SQLite database at path with every migration
-// applied and returns its harness repository. Tests and tools use it; the
-// server gets the repository from OpenAppOwnedState.
 func OpenSQLiteHarness(path string) (domain.Repository, func() error, error) {
 	store, err := openSQLStore(Config{Driver: StorageDriverSQLite, SQLitePath: path, Migrations: "auto"})
 	if err != nil {
@@ -94,7 +88,6 @@ func isUniqueViolation(err error) bool {
 	return strings.Contains(message, "unique") || strings.Contains(message, "duplicate key")
 }
 
-// conditional checks a conditional UPDATE changed exactly one row.
 func conditional(result sql.Result, err error) error {
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -130,23 +123,5 @@ func limitOr(limit, fallback int) int {
 	}
 	return limit
 }
-
-// --- tasks ---
-
-// --- runs ---
-
-// --- stages ---
-
-// --- agent runs ---
-
-// --- approvals ---
-
-// --- events ---
-
-// --- outbox ---
-
-// --- settings ---
-
-// --- cost ---
 
 var _ domain.Repository = (*SQLHarnessRepository)(nil)

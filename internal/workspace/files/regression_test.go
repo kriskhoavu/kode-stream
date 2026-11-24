@@ -1,9 +1,5 @@
 package workspacefiles
 
-// Package workspacefiles provides Workspace-owned file operations.
-
-// Package workspacefiles provides bounded workspace file operations.
-
 import (
 	"errors"
 	"fmt"

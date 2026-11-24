@@ -6,22 +6,14 @@ import (
 )
 
 var (
-	// ErrNotFound means the row does not exist.
-	ErrNotFound = errors.New("harness record not found")
-	// ErrStateMoved means a conditional transition matched no row: another
-	// writer changed the state or the revision first.
-	ErrStateMoved = errors.New("harness record changed since it was loaded")
-	// ErrAlreadyDecided means an approval was decided under another key.
+	ErrNotFound       = errors.New("harness record not found")
+	ErrStateMoved     = errors.New("harness record changed since it was loaded")
 	ErrAlreadyDecided = errors.New("approval was already decided")
-	// ErrUnsupported means the storage option cannot hold harness state.
-	ErrUnsupported = errors.New("the harness needs SQLite or Postgres storage")
-	// ErrUnavailable means the harness does not run in this mode.
-	ErrUnavailable = errors.New("the harness runs in Local mode only")
-	// ErrDuplicate means a uniqueness constraint refused the row.
-	ErrDuplicate = errors.New("harness record already exists")
+	ErrUnsupported    = errors.New("the harness needs SQLite or Postgres storage")
+	ErrUnavailable    = errors.New("the harness runs in Local mode only")
+	ErrDuplicate      = errors.New("harness record already exists")
 )
 
-// InvalidError is a request the caller can correct.
 type InvalidError struct{ Message string }
 
 func (e InvalidError) Error() string { return e.Message }
@@ -30,7 +22,6 @@ func Invalid(format string, args ...any) error {
 	return InvalidError{Message: fmt.Sprintf(format, args...)}
 }
 
-// IllegalTransitionError names a transition the state machine refuses.
 type IllegalTransitionError struct {
 	Entity string
 	From   string
@@ -47,8 +38,7 @@ var taskTransitions = map[TaskState][]TaskState{
 	TaskStale:      {TaskDiscovered, TaskDismissed},
 	TaskRunning:    {TaskDone, TaskBlocked, TaskCancelled},
 	TaskBlocked:    {TaskRunning, TaskCancelled, TaskDismissed},
-	// A stopped run is not finished work: a person may start the task again,
-	// dismiss it, or its source may close it.
+	// A stopped run is not finished work: the task may start again, be dismissed, or close at its source.
 	TaskCancelled: {TaskRanked, TaskDismissed, TaskStale},
 }
 
@@ -95,19 +85,14 @@ func CheckStage(from, to StageState) error {
 	return IllegalTransitionError{Entity: "stage", From: string(from), To: string(to)}
 }
 
-// TaskTerminal reports whether a task state never reopens. A cancelled task
-// is not terminal: its run was stopped, and the task may start again.
 func TaskTerminal(state TaskState) bool {
 	return state == TaskDone || state == TaskDismissed
 }
 
-// TaskStartable reports whether a person may start a task: one waiting in the
-// queue, or one whose last run was stopped.
 func TaskStartable(state TaskState) bool {
 	return state == TaskRanked || state == TaskDiscovered || state == TaskCancelled
 }
 
-// TaskActive reports whether a task belongs to a run in flight.
 func TaskActive(state TaskState) bool {
 	return state == TaskRunning || state == TaskBlocked
 }
@@ -124,8 +109,6 @@ func AgentTerminal(state AgentRunState) bool {
 	return state == AgentSucceeded || state == AgentFailed || state == AgentCancelled
 }
 
-// StageSequence is the order stages are created in. Review is skipped
-// when the settings turn it off.
 func StageSequence(requireReview bool) []StageKind {
 	sequence := []StageKind{StagePlan, StagePlanApproval, StageImplement, StageQA}
 	if requireReview {
@@ -134,7 +117,6 @@ func StageSequence(requireReview bool) []StageKind {
 	return append(sequence, StageDraftPR)
 }
 
-// NextStage returns the kind after current, or "" when current is the last.
 func NextStage(current StageKind, requireReview bool) StageKind {
 	sequence := StageSequence(requireReview)
 	for i, kind := range sequence {
@@ -145,7 +127,6 @@ func NextStage(current StageKind, requireReview bool) StageKind {
 	return ""
 }
 
-// MaxRoundsOf is the round bound of a stage kind.
 func MaxRoundsOf(kind StageKind) int {
 	switch kind {
 	case StagePlan, StageImplement:
@@ -157,7 +138,6 @@ func MaxRoundsOf(kind StageKind) int {
 	}
 }
 
-// NewStage builds a pending stage of a run.
 func NewStage(runID string, kind StageKind, ordinal int) Stage {
 	return Stage{ID: NewID("stg"), RunID: runID, Kind: kind, Ordinal: ordinal, State: StagePending, Round: 0, MaxRounds: MaxRoundsOf(kind), Attempt: 1, MaxAttempts: MaxStageAttempts, Rounds: []Round{}}
 }

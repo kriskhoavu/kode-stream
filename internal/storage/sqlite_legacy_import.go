@@ -45,9 +45,6 @@ func ImportLegacyFiles(paths system.Paths, git *appgit.GitAdapter, state *AppOwn
 	return importLegacySessionRecordsAtomic(paths.AISessionRecordsFile, state)
 }
 
-// RepairLegacyItemImport is an explicit operator-triggered repair seam for
-// installations affected by the former branch-collapsing importer. It never
-// runs automatically for a source already marked complete.
 func RepairLegacyItemImport(path string, state *AppOwnedState) error {
 	return importLegacyItemsAtomic(path, state, true)
 }
@@ -350,8 +347,6 @@ func importLegacyItemsAtomic(path string, state *AppOwnedState, repair bool) err
 	return markImportCompletedTx(tx, repository.driver, "item-index.yaml")
 }
 
-// readLegacyItemIndex reads the legacy item index. found is false when the
-// file does not exist. Every item must name its id, workspace and branch.
 func readLegacyItemIndex(path string) (fileIndexState, bool, error) {
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -372,8 +367,6 @@ func readLegacyItemIndex(path string) (fileIndexState, bool, error) {
 	return legacy, true, nil
 }
 
-// clearLegacyWorkspaces deletes the indexed rows of every workspace the
-// legacy index names, and returns those workspaces.
 func clearLegacyWorkspaces(tx *sql.Tx, driver string, legacy fileIndexState) (map[string]bool, error) {
 	workspaces := map[string]bool{}
 	for _, item := range legacy.Items {
@@ -394,8 +387,6 @@ func clearLegacyWorkspaces(tx *sql.Tx, driver string, legacy fileIndexState) (ma
 
 const insertScanWarningSQL = `INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUES (?, ?, ?, ?, ?)`
 
-// insertLegacyScans inserts each branch scan with its warnings, then the
-// index-wide warnings of a known workspace that no scan already holds.
 func insertLegacyScans(tx *sql.Tx, driver string, legacy fileIndexState, workspaces map[string]bool) error {
 	warningKeys := map[string]bool{}
 	for workspaceID, branches := range legacy.BranchScans {

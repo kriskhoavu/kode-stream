@@ -37,8 +37,7 @@ func decodeLimitedJSON(w http.ResponseWriter, r *http.Request, target any, limit
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return false
 	}
-	// A successful first Decode is not sufficient: json.Decoder otherwise
-	// accepts a second JSON value after the requested request object.
+	// json.Decoder accepts a second JSON value after the first, so require EOF.
 	var extra any
 	if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")

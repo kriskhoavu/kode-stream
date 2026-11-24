@@ -1,7 +1,5 @@
 package pathguard
 
-// Package pathguard validates workspace-relative paths.
-
 import (
 	"os"
 	"path/filepath"

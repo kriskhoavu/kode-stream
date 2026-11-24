@@ -15,14 +15,9 @@ import (
 
 const maxHarnessBodyBytes int64 = 256 << 10
 
-// harnessController serves the dashboard's harness routes. It translates HTTP
-// to calls on the harness service and errors back to HTTP, nothing else.
 type harnessController struct {
-	harness *harness.Service
-	// ai starts a person's session at a run's Review stage, and holds the
-	// workspace's default provider a settings file exports and imports.
-	ai *aiController
-	// workspaces finds the checkout a workspace's settings file lives in.
+	harness    *harness.Service
+	ai         *aiController
 	workspaces registry.Repository
 }
 
@@ -54,7 +49,6 @@ func writeHarnessInvalid(w http.ResponseWriter, message string) {
 	writeJSON(w, http.StatusBadRequest, map[string]string{"error": message, "code": "invalid_request"})
 }
 
-// harnessActor names the person behind a dashboard request.
 func harnessActor(r *http.Request) domain.Actor {
 	if session, ok := cloudSessionFromContext(r.Context()); ok {
 		name := session.User.Name

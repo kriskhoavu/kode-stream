@@ -1,7 +1,5 @@
 package navigation
 
-// This package owns persisted navigation state.
-
 import (
 	"crypto/rand"
 	"encoding/hex"
@@ -33,9 +31,7 @@ type Repository interface {
 	RecordRecent(models.RecentItem) error
 }
 
-// OwnedRepository is the Cloud-safe navigation contract. The legacy methods remain
-// available for local callers and snapshot tooling; HTTP controllers always use this
-// owner-scoped seam when it is implemented.
+// HTTP controllers use this owner-scoped interface when it is implemented.
 type OwnedRepository interface {
 	Repository
 	FiltersForOwner(string) ([]models.SavedFilter, error)
@@ -45,9 +41,7 @@ type OwnedRepository interface {
 	RecordRecentForOwner(string, models.RecentItem) error
 }
 
-// SnapshotRepository restores immutable persisted records without applying
-// user-mutation clocks. Storage migration and sync use this seam so IDs,
-// ownership, and timestamps round-trip unchanged.
+// Restores records without user-mutation clocks, so IDs, ownership and timestamps round-trip unchanged.
 type SnapshotRepository interface {
 	OwnedRepository
 	RestoreFilter(models.SavedFilter) error

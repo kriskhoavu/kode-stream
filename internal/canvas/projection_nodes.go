@@ -49,10 +49,6 @@ func canvasPlanServiceFromPath(itemPath string) string {
 	return parts[1]
 }
 
-// ephemeralSessionNodes projects every live session that has no placement but
-// whose plan is on the Canvas, so a session started from a card shows up next
-// to its plan without anyone placing it. It marks each in placed so the session
-// is not offered as unplaced as well.
 func ephemeralSessionNodes(nodes []ProjectedNode, sessions []ai.SessionRecordView, placed map[string]bool) []ProjectedNode {
 	plans := map[string]ProjectedNode{}
 	for _, node := range nodes {
@@ -121,9 +117,7 @@ func planNodeID(id string) string { return "plan:" + id }
 func sessionNodeID(id string) string { return "session:" + id }
 
 func planRef(item models.ItemSummary) EntityRef {
-	// No ObservedCommit: every item on a branch carries that branch's tip, so
-	// recording it here marked each plan node stale on any commit to the repo.
-	// Plan nodes render the current checkout, and staleness means the plan is gone.
+	// No ObservedCommit: every item carries the branch tip, so any commit would mark the node stale.
 	return EntityRef{Kind: EntityPlan, WorkspaceID: item.WorkspaceID, ItemID: item.ID, ItemPath: item.ItemPath, Identifier: item.Identifier, BranchKey: item.Branch}
 }
 

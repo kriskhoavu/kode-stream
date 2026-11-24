@@ -32,7 +32,6 @@ func TestAWorkspaceExportsAndImportsChosenParts(t *testing.T) {
 	if !settings.For("ws").RequireReview || settings.For("ws").ModelPolicy.Roles[domain.RoleCoder].Model != "haiku" {
 		t.Fatalf("imported parts were not applied: %#v", workspace)
 	}
-	// Parts the import did not name stay as they were.
 	if workspace.VerificationCommands[0] != "true" || workspace.Jira == nil || workspace.Local != nil {
 		t.Fatalf("parts not named changed: %#v", workspace)
 	}
@@ -48,7 +47,6 @@ func TestHarnessYamlMovesIntoTheSettingsOnce(t *testing.T) {
 	if workspace.Procedure[domain.RolePlanner].Skill != "feature-planning" || !workspace.ProcedureMoved {
 		t.Fatalf("workspace = %#v", workspace)
 	}
-	// Cleared by a person, the role skills stay cleared.
 	workspace.Procedure = nil
 	settings.Workspaces[0] = workspace
 	if _, err := fixture.service.SaveSettings(ctx, settings, settings.Revision, domain.Actor{}); err != nil {
@@ -64,7 +62,6 @@ func TestHarnessYamlMovesIntoTheSettingsOnce(t *testing.T) {
 func TestEachWorkspaceGetsItsOwnModelsOnce(t *testing.T) {
 	ctx := context.Background()
 	fixture := newPipeline(t, happyScript, func(settings *domain.Settings) {
-		// What a person had set before: a default and one override.
 		coder := settings.ModelPolicy.Roles[domain.RoleCoder]
 		coder.Model = "haiku"
 		settings.ModelPolicy.Roles[domain.RoleCoder] = coder
@@ -76,15 +73,12 @@ func TestEachWorkspaceGetsItsOwnModelsOnce(t *testing.T) {
 	if !settings.WorkspaceModels || len(workspace.Models) != len(domain.Roles) {
 		t.Fatalf("models were not moved: %#v", workspace.Models)
 	}
-	// The workspace keeps what it ran with: its override, and the old default.
 	if workspace.Models[domain.RolePlanner].Model != "sonnet" || workspace.Models[domain.RoleCoder].Model != "haiku" || workspace.Models[domain.RoleCoder].HighDifficultyModel != "opus" {
 		t.Fatalf("workspace models = %#v", workspace.Models)
 	}
-	// The defaults go back to Kode Stream's own.
 	if settings.ModelPolicy.Roles[domain.RoleCoder].Model != "sonnet" {
 		t.Fatalf("defaults = %#v", settings.ModelPolicy.Roles[domain.RoleCoder])
 	}
-	// A hard model the workspace clears stays cleared: it is the workspace's own now.
 	coder := workspace.Models[domain.RoleCoder]
 	coder.HighDifficultyModel = ""
 	workspace.Models[domain.RoleCoder] = coder

@@ -14,8 +14,7 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-// claudeTranscriptCache keeps each file's scan until the file changes, so a
-// board polling every few seconds re-reads only the conversations still moving.
+// A file's scan is kept until the file changes, so board polling re-reads only active conversations.
 type claudeTranscriptCache struct {
 	mu    sync.Mutex
 	scans map[string]claudeTranscriptScan
@@ -73,8 +72,6 @@ func (c *claudeTranscriptCache) scan(path string, info os.FileInfo, needles []st
 	return scan, nil
 }
 
-// needlesKey records which items a cached scan searched for, so a changed item
-// list rescans the file.
 func needlesKey(needles []string) string { return "\x00" + strings.Join(needles, "\x00") }
 
 func readTranscriptLines(path string, visit func(claudeTranscriptLine, []byte)) error {
@@ -99,9 +96,7 @@ func readTranscriptLines(path string, visit func(claudeTranscriptLine, []byte)) 
 	return scanner.Err()
 }
 
-// transcriptNeedles are the strings that tie a conversation to an item: its
-// repository path, and its identifier when that is ticket-like. A plain-word
-// identifier such as a wiki section's "platform" would match any conversation.
+// Only ticket-like identifiers count: a plain word such as "platform" would match any conversation.
 func transcriptNeedles(items []models.ItemSummary) []string {
 	seen := map[string]bool{}
 	needles := []string{}
@@ -135,7 +130,7 @@ func matchedItemIDs(items []models.ItemSummary, found []string) []string {
 	return ids
 }
 
-// mentions finds needle as a whole token: PM-04 does not match PM-042.
+// Whole tokens only: PM-04 must not match PM-042.
 func mentions(raw []byte, needle string) bool {
 	for offset := 0; ; {
 		index := bytes.Index(raw[offset:], []byte(needle))

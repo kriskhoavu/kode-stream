@@ -103,8 +103,7 @@ func (s *LifecycleService) Delete(id string) error {
 			return err
 		}
 	} else {
-		// File-backed indexes are derived and recoverable. Delete them first so a
-		// registry write failure keeps the workspace registered for a retry.
+		// File-backed indexes are derived. Delete them first, so a registry write failure leaves the workspace registered for a retry.
 		if err := s.index.DeleteWorkspace(id); err != nil {
 			return err
 		}

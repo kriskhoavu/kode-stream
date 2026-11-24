@@ -55,8 +55,7 @@ func (a *jiraController) serveAttachment(w http.ResponseWriter, content appjira.
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	if err := copyBoundedAttachment(w, content.Body); err != nil && !errors.Is(err, context.Canceled) {
-		// Headers may already be committed; ending the stream is the only safe
-		// outcome for an unknown-length oversized upstream response.
+		// Headers may already be sent, so ending the stream is the only safe outcome.
 		return
 	}
 }

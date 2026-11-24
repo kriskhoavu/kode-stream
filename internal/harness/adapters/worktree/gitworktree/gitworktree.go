@@ -1,6 +1,4 @@
-// Package gitworktree keeps each harness run in a git worktree under one root
-// outside every workspace, so the workspace scanner never indexes it and the
-// workspace's own checkout never moves.
+// Package gitworktree keeps run worktrees outside every workspace, so the workspace scanner never indexes them.
 package gitworktree
 
 import (
@@ -17,12 +15,9 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// BranchPrefix is the only local branch namespace the harness writes to.
 const BranchPrefix = "harness/"
 
-// RemoteBranchPrefix replaces BranchPrefix when a branch is pushed. Hosting
-// hooks commonly accept only feature/<KEY>-<number>-..., which a harness
-// branch, named <KEY>-<number>-<run>, then matches.
+// Hosting hooks commonly accept only feature/<KEY>-<number>-... branches.
 const RemoteBranchPrefix = "feature/"
 
 func (a *Adapter) RemoteBranch(branch string) string {
@@ -39,7 +34,6 @@ func New(root string, git *appgit.GitAdapter) *Adapter {
 	return &Adapter{Root: root, Git: git, Remote: "origin"}
 }
 
-// pathFor returns the run's worktree path and proves it stays under Root.
 func (a *Adapter) pathFor(workspaceID, runID string) (string, error) {
 	if a.Root == "" {
 		return "", fmt.Errorf("the harness worktree root is not configured")
@@ -119,7 +113,7 @@ func (a *Adapter) Remove(ctx context.Context, workspace models.WorkspaceConfig, 
 	}
 	if err := a.Git.WorktreeRemoveContext(ctx, workspace.Path, path, true); err != nil {
 		_ = a.Git.WorktreePruneContext(ctx, workspace.Path)
-		// A working copy the janitor already removed still leaves its branch to delete.
+		// The janitor may have removed the working copy already. Its branch still needs deleting.
 		if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
 			return err
 		}
@@ -180,7 +174,6 @@ func (a *Adapter) Push(ctx context.Context, path, branch string) error {
 	return a.Git.PushBranchContext(ctx, path, a.Remote, branch, a.RemoteBranch(branch))
 }
 
-// maxRunFiles bounds how many files one read returns.
 const maxRunFiles = 40
 
 func (a *Adapter) ReadRunFiles(ctx context.Context, workspace models.WorkspaceConfig, worktreePath, base, branch, prefix string, limit int64) ([]ports.RunFile, string, error) {
@@ -214,7 +207,6 @@ func (a *Adapter) ReadRunFiles(ctx context.Context, workspace models.WorkspaceCo
 	return out, "branch", nil
 }
 
-// liveWorktree reports whether a run's worktree is still on disk.
 func (a *Adapter) liveWorktree(worktreePath string) bool {
 	if worktreePath == "" || a.inside(worktreePath) != nil {
 		return false
@@ -223,8 +215,6 @@ func (a *Adapter) liveWorktree(worktreePath string) bool {
 	return err == nil && info.IsDir()
 }
 
-// branchRef is the run branch as the workspace holds it: the local harness/*
-// branch, else the branch as last pushed.
 func (a *Adapter) branchRef(ctx context.Context, workspace models.WorkspaceConfig, branch string) (string, bool) {
 	if checkBranch(branch, "") != nil {
 		return "", false
@@ -284,8 +274,7 @@ func (a *Adapter) FileDiff(ctx context.Context, workspace models.WorkspaceConfig
 	return diff, truncated, from, err
 }
 
-// readWorktreeFiles reads the changed files under prefix from a worktree,
-// refusing a symbolic link and any path that leaves the worktree.
+// A symbolic link or a path that leaves the worktree is refused.
 func readWorktreeFiles(root string, files []appgit.DiffFile, prefix string, limit int64) []ports.RunFile {
 	out := []ports.RunFile{}
 	for _, file := range files {
@@ -316,7 +305,6 @@ func readWorktreeFiles(root string, files []appgit.DiffFile, prefix string, limi
 	return out
 }
 
-// textOf returns data as text, or false for a binary file.
 func textOf(data []byte) (string, bool) {
 	if bytes.IndexByte(data, 0) >= 0 || !utf8.Valid(data) {
 		return "", false

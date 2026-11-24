@@ -40,8 +40,7 @@ func (s *Service) SessionRecords(workspaceID, branch string) ([]SessionRecordVie
 	return s.SessionRecordsContext(context.Background(), workspaceID, branch)
 }
 
-// DeleteSessionRecord removes finished session history only. Running sessions
-// must be stopped first so deleting a row can never orphan a live process.
+// A running session must stop first, so deleting a row never orphans a live process.
 func (s *Service) DeleteSessionRecord(id string) error {
 	if s.records == nil {
 		return ErrNotFound
@@ -169,9 +168,7 @@ func (s *Service) syncSessionRecord(session Session) {
 	if err != nil || !ok {
 		return
 	}
-	// A launch compensation deliberately clears the idempotency key and records a
-	// terminal failure. A late process observer must never resurrect its stale
-	// starting/running copy and poison a legitimate retry.
+	// A late observer must not resurrect a compensated record and poison a retry.
 	if record.State == StateFailed && record.IdempotencyKey == "" && session.State != StateFailed {
 		return
 	}
@@ -266,10 +263,6 @@ func (s *Service) persistStartingSession(record SessionRecord) (SessionRecord, e
 	return s.records.Upsert(record)
 }
 
-// RemoveBranchSessions stops every session that runs on one branch of a
-// workspace and deletes their records. The harness calls it before it deletes
-// a run's working copy, so no session is left in a folder that is gone. An
-// empty workspace or branch removes nothing.
 func (s *Service) RemoveBranchSessions(workspaceID, branch string) (int, error) {
 	workspaceID, branch = strings.TrimSpace(workspaceID), strings.TrimSpace(branch)
 	if s.records == nil || workspaceID == "" || branch == "" {

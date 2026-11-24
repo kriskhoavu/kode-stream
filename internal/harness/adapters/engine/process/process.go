@@ -1,5 +1,3 @@
-// Package process starts a coding CLI in its own process group and stops the
-// whole group: SIGTERM first, SIGKILL five seconds later.
 package process
 
 import (
@@ -12,11 +10,9 @@ import (
 	"time"
 )
 
-// GracePeriod is how long a CLI may take to exit after SIGTERM.
 const GracePeriod = 5 * time.Second
 
-// Environment builds a child environment from PATH, HOME and an allow-list,
-// never the server's whole environment.
+// The child never gets the server's whole environment.
 func Environment(getenv func(string) string, allowed []string, extra map[string]string) []string {
 	keys := map[string]string{}
 	for _, name := range append([]string{"PATH", "HOME", "USER", "LANG", "TMPDIR"}, allowed...) {
@@ -39,7 +35,7 @@ func Environment(getenv func(string) string, allowed []string, extra map[string]
 	return env
 }
 
-// Stop terminates cmd's process group once, whatever calls it.
+// Terminate signals the process group only once, whoever calls it.
 type Stop struct {
 	once sync.Once
 	cmd  *exec.Cmd
@@ -62,7 +58,6 @@ func (s *Stop) Terminate() {
 	})
 }
 
-// Ring keeps the last limit bytes written to it.
 type Ring struct {
 	mu    sync.Mutex
 	limit int
@@ -87,8 +82,7 @@ func (r *Ring) String() string {
 	return string(r.data)
 }
 
-// Lines calls visit with each line of r, each cut to max bytes; the rest of
-// an over-long line is skipped rather than failing the stream.
+// The rest of an over-long line is skipped, so one long line cannot fail the stream.
 func Lines(r io.Reader, max int, visit func([]byte)) error {
 	reader := bufio.NewReaderSize(r, 64<<10)
 	var line []byte
@@ -117,7 +111,6 @@ func Lines(r io.Reader, max int, visit func([]byte)) error {
 	}
 }
 
-// Summary returns at most limit characters of text on one line.
 func Summary(text string, limit int) string {
 	text = strings.Join(strings.Fields(text), " ")
 	runes := []rune(text)

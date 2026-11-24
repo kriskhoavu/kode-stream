@@ -1,6 +1,4 @@
-// Package bitbucket lists a Bitbucket Cloud repository's open issues. Bitbucket
-// Server and Data Center have no issue tracker, so a workspace there gets no
-// candidates and an explanatory error.
+// Package bitbucket lists Bitbucket Cloud issues. Bitbucket Server and Data Center have no issue tracker.
 package bitbucket
 
 import (

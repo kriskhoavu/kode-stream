@@ -11,9 +11,7 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// harnessBotController serves chat-bot. Its routes carry no Cloud
-// session: each request authenticates with the bot's bearer token, compared
-// in constant time, and every decision is recorded with channel webex.
+// Bot routes carry no Cloud session. The bearer token is compared in constant time.
 type harnessBotController struct {
 	harness *harness.Service
 }

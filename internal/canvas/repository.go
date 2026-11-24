@@ -36,9 +36,7 @@ func (e *PlacementConflictError) Error() string {
 type Repository interface {
 	ResolveDefault(ownerUserID, workspaceID, branchKey string) (Layout, bool, error)
 	FindDefault(ownerUserID, workspaceID, branchKey string) (Layout, bool, error)
-	// InitializeDefault publishes a newly-created layout and its complete initial
-	// projection together.  Callers must build the bounded deterministic seed
-	// before this call; a failed publication must not leave a visible layout.
+	// A failed publication must not leave a visible layout.
 	InitializeDefault(ownerUserID, workspaceID, branchKey string, placements []Placement) (Layout, bool, error)
 	InitializeDefaultContext(context.Context, string, string, string, []Placement) (Layout, bool, error)
 	GetLayout(id string) (Layout, bool, error)
@@ -51,9 +49,7 @@ type Repository interface {
 	ReplaceAll(Snapshot) error
 }
 
-// ContextRepository is the request-bound Canvas persistence seam. Production
-// adapters implement it so HTTP cancellation reaches database/file work rather
-// than being observed only after an unbounded operation returns.
+// HTTP cancellation reaches database and file work instead of waiting for an unbounded operation.
 type ContextRepository interface {
 	GetLayoutContext(context.Context, string) (Layout, bool, error)
 	PlacementsContext(context.Context, string) ([]Placement, error)

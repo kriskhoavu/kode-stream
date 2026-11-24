@@ -5,18 +5,13 @@ import (
 	"sort"
 )
 
-// Session list scopes for SessionRecordsAcrossWorkspaces.
 const (
 	SessionScopeActive = "active"
 	SessionScopeAll    = "all"
 )
 
-// maxGlobalSessionRows bounds the cross-workspace session list, mirroring the
-// cap the Git since-commit readers apply to their own listings.
 const maxGlobalSessionRows = 200
 
-// GlobalSessionRow is one row of the cross-workspace session list: a session
-// record view annotated with what a workspace-scoped list does not carry.
 type GlobalSessionRow struct {
 	Record         SessionRecordView `json:"record"`
 	WorkspaceName  string            `json:"workspaceName"`
@@ -25,13 +20,7 @@ type GlobalSessionRow struct {
 	ChangesCount   *int              `json:"changesCount,omitempty"`
 }
 
-// SessionRecordsAcrossWorkspaces lists session records for every registered
-// workspace mayRead allows, annotated with workspace name, best-effort
-// checkout branch, best-effort plan title, and (scope=active only) a changes
-// count. A workspace mayRead denies is simply absent from the result, never a
-// reported error -- the same oracle-avoidance the AI controller's workspace
-// authorization already follows. Rows are newest first and capped at
-// maxGlobalSessionRows.
+// A workspace mayRead denies is left out, never reported, so the list is not an oracle.
 func (s *Service) SessionRecordsAcrossWorkspaces(ctx context.Context, scope string, mayRead func(workspaceID string) bool) ([]GlobalSessionRow, bool, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, false, err
@@ -59,9 +48,6 @@ func (s *Service) SessionRecordsAcrossWorkspaces(ctx context.Context, scope stri
 		if len(views) == 0 {
 			continue
 		}
-		// Resolve the checkout branch once per workspace rather than once per
-		// session row: it is the same answer for every row from this
-		// workspace, and a workspace can carry many session rows.
 		var checkoutBranch string
 		if s.branches != nil {
 			if branch, err := s.branches.CurrentBranch(workspace.Path); err == nil {
@@ -92,10 +78,7 @@ func (s *Service) SessionRecordsAcrossWorkspaces(ctx context.Context, scope stri
 		rows = rows[:maxGlobalSessionRows]
 		truncated = true
 	}
-	// Only annotate the changes count for the rows that survived the cap:
-	// SessionChanges runs Git commands, so bounding it to at most
-	// maxGlobalSessionRows keeps the work proportional to what is returned
-	// instead of to however many active sessions exist.
+	// SessionChanges runs Git, so only the rows that survived the cap get a changes count.
 	if active {
 		for i := range rows {
 			if err := ctx.Err(); err != nil {

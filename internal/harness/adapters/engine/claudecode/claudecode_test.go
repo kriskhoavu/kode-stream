@@ -11,8 +11,6 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// fakeClaude writes a `claude` script that records its argv and stdin, then
-// either streams a scripted session or sleeps until it is stopped.
 func fakeClaude(t *testing.T, mode string) (string, string) {
 	t.Helper()
 	dir := t.TempDir()

@@ -155,8 +155,6 @@ func (s *Store) atomicHooks() atomicfile.Hooks {
 	return atomicfile.Hooks{AfterWrite: h.afterWrite, AfterSync: h.afterSync, AfterClose: h.afterClose, AfterRename: h.afterRename, AfterDirectorySync: h.afterDirectorySync}
 }
 
-// rollback restores the index that a failed publication replaced: the
-// previous content, or no file when there was none.
 func (s *Store) rollback(cause error, hadPrevious bool, previous []byte, mode os.FileMode) error {
 	if !hadPrevious {
 		if restoreErr := removeIndex(s.path); restoreErr != nil {

@@ -2,8 +2,6 @@ package domain
 
 import "strings"
 
-// Normalize fills defaults and validates every knob against its cap. It
-// returns an InvalidError naming the first value out of range.
 func (s Settings) Normalize() (Settings, error) {
 	defaults := DefaultSettings()
 	steps := []func() error{
@@ -113,8 +111,6 @@ func (s *Settings) normalizeModelPolicy() error {
 	return nil
 }
 
-// normalize fills one workspace's defaults and checks its limits, its
-// sources, its role models and its procedure.
 func (w *WorkspaceSettings) normalize() error {
 	for _, step := range []func() error{w.normalizeLimits, w.normalizeScope, w.normalizeJira, w.normalizeGitHub, w.normalizeBitbucket, w.normalizeLocal, w.normalizeModels, w.normalizeProcedure} {
 		if err := step(); err != nil {

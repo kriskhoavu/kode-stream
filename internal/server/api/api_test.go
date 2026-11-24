@@ -1,7 +1,5 @@
 package api
 
-// Package api provides the Server HTTP transport.
-
 import (
 	"context"
 	"crypto/sha256"
@@ -815,7 +813,7 @@ func TestVerificationMutationRoutesRejectTrailingAndOversizeBodiesBeforeSideEffe
 	} {
 		response := httptest.NewRecorder()
 		apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPost, test.path, strings.NewReader(test.body)))
-		if strings.HasSuffix(test.path, "/runtime") { // runtime route is PUT
+		if strings.HasSuffix(test.path, "/runtime") {
 			response = httptest.NewRecorder()
 			apiHandler.Routes().ServeHTTP(response, httptest.NewRequest(http.MethodPut, test.path, strings.NewReader(test.body)))
 		}
@@ -879,8 +877,7 @@ func TestWorkspaceRuntimeRouteClearsRuntimeOnNull(t *testing.T) {
 
 func TestVerificationCreateReturnsQueueFullWithoutPartialJob(t *testing.T) {
 	apiHandler, workspace, _, _ := reliabilityTestAPI(t)
-	// Each job holds its slot until the test releases it, so the queue is full
-	// however slowly the machine runs the jobs.
+	// Each job holds its slot until the test releases it, so the queue is full on a slow machine.
 	release := filepath.Join(t.TempDir(), "release")
 	hold := fmt.Sprintf("while [ ! -f %q ]; do sleep 0.05; done", release)
 	if _, err := apiHandler.verification.workspaces.SaveRuntime(workspace.ID, &models.WorkspaceRuntimeConfig{Type: models.RuntimeTypeCustom, Commands: models.RuntimeCommandSet{Up: "true", Down: "true", Verify: models.RuntimeVerifyCommands{Smoke: hold}}}); err != nil {
@@ -913,8 +910,7 @@ func TestVerificationCreateReturnsQueueFullWithoutPartialJob(t *testing.T) {
 	}
 }
 
-// releaseVerificationJobs lets held jobs finish and waits until they have, so
-// none still writes artifacts when the workspace's temporary directory goes.
+// Waits for held jobs, so none writes artifacts after the temporary directory goes.
 func releaseVerificationJobs(t *testing.T, apiHandler *API, workspaceID, release string, jobIDs []string) {
 	t.Helper()
 	if err := os.WriteFile(release, nil, 0o600); err != nil {

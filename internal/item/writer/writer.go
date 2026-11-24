@@ -1,7 +1,5 @@
 package itemwriter
 
-// Package itemwriter persists and refreshes Item domain files.
-
 import (
 	"errors"
 	"fmt"

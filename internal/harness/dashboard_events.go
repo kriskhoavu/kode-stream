@@ -8,9 +8,6 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// DashboardEvent describes a stored or live event for the dashboard's feed,
-// with the whole entity it is about. ok is false for an event the dashboard
-// does not show.
 func (s *Service) DashboardEvent(ctx context.Context, event domain.Event) (map[string]any, bool) {
 	describe, shown := dashboardDescribers[event.Kind]
 	if !shown {
@@ -20,8 +17,7 @@ func (s *Service) DashboardEvent(ctx context.Context, event domain.Event) (map[s
 	if !describe(s, ctx, event, out) {
 		return nil, false
 	}
-	// A run or a gate changes its task too (its state, its run, whether it
-	// needs a person), and no task event follows, so the task travels along.
+	// No task event follows a run or gate event, so the task travels along.
 	if carriesTask[event.Kind] && event.TaskID != "" {
 		if task, err := s.repository.GetTask(ctx, event.TaskID); err == nil {
 			out["task"] = dashboardTask(task)
@@ -30,8 +26,6 @@ func (s *Service) DashboardEvent(ctx context.Context, event domain.Event) (map[s
 	return out, true
 }
 
-// dashboardDescriber adds what one kind of event is about to out. It answers
-// false when the entity is gone or the event names none.
 type dashboardDescriber func(s *Service, ctx context.Context, event domain.Event, out map[string]any) bool
 
 var dashboardDescribers = func() map[domain.EventKind]dashboardDescriber {
@@ -150,7 +144,6 @@ func describeNotificationFailure(_ *Service, _ context.Context, event domain.Eve
 	return true
 }
 
-// DashboardChanges is a run's changes in the shape of a session's changes.
 type DashboardChanges struct {
 	SessionID    string                 `json:"sessionId"`
 	LaunchCommit string                 `json:"launchCommit"`
@@ -163,8 +156,7 @@ type DashboardChanges struct {
 	Availability string                 `json:"availability"`
 	Reason       string                 `json:"reason,omitempty"`
 	Branch       string                 `json:"branch"`
-	// From says where the files were read: "worktree" or "branch".
-	From string `json:"from,omitempty"`
+	From         string                 `json:"from,omitempty"`
 }
 
 type DashboardChangedFile struct {

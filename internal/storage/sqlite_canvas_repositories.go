@@ -43,8 +43,7 @@ func (r *SQLiteCanvasRepository) FindDefault(ownerUserID, workspaceID, branchKey
 	return layout, err == nil, err
 }
 
-// InitializeDefault is deliberately one transaction: creation must never be
-// observable without the complete initial placement set.
+// One transaction: a layout must never be visible without its complete initial placements.
 func (r *SQLiteCanvasRepository) InitializeDefault(ownerUserID, workspaceID, branchKey string, placements []canvas.Placement) (canvas.Layout, bool, error) {
 	return r.InitializeDefaultContext(context.Background(), ownerUserID, workspaceID, branchKey, placements)
 }
@@ -197,8 +196,6 @@ func (r *SQLiteCanvasRepository) PlacementsContext(ctx context.Context, layoutID
 	return placements, rows.Err()
 }
 
-// Mutations use the existing validated transaction implementations; their
-// context check prevents a cancelled request from entering or publishing one.
 func (r *SQLiteCanvasRepository) PatchPlacementsContext(ctx context.Context, id string, patches []canvas.PlacementPatch) ([]canvas.Placement, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

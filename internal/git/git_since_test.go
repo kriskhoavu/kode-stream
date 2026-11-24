@@ -1,8 +1,5 @@
 package git
 
-// Tests for the since-commit readers, on temporary repositories built with
-// real git.
-
 import (
 	"context"
 	"errors"
@@ -151,9 +148,7 @@ func TestNameStatusSinceRoundTripsSpecialPaths(t *testing.T) {
 
 	for _, rel := range cases {
 		writeGitFile(t, root, rel, "content\n")
-		// Stage the addition so it shows up in `git diff <sha>` too --
-		// DiffFileSince only diffs against the commit, and an untracked file
-		// carries no diff against it until it is at least staged.
+		// DiffFileSince diffs against the commit, so an untracked file needs staging to show.
 		gitRun(t, root, "add", "--", rel)
 	}
 
@@ -185,9 +180,6 @@ func TestNameStatusSinceRoundTripsSpecialPaths(t *testing.T) {
 	}
 }
 
-// canCreateFile reports whether the test filesystem accepts a file whose
-// relative path contains rel (used to probe newline support, which some
-// filesystems refuse).
 func canCreateFile(t *testing.T, root, rel string) bool {
 	t.Helper()
 	full := filepath.Join(root, filepath.FromSlash(rel))
@@ -274,8 +266,6 @@ func TestShortStatSinceHandlesBinaryOnlyChange(t *testing.T) {
 	if files != 1 {
 		t.Fatalf("files = %d, want 1", files)
 	}
-	// git's --shortstat reports no insertions/deletions for a binary-only
-	// change; the regexes should simply find nothing rather than error.
 	if additions != 0 || deletions != 0 {
 		t.Fatalf("additions=%d deletions=%d, want 0,0 for a binary-only change", additions, deletions)
 	}
@@ -320,8 +310,7 @@ func TestDiffFileSinceTruncatesUTF8OnRuneBoundary(t *testing.T) {
 	gitCommit(t, root, "base")
 	base := gitRevParse(t, root, "HEAD")
 
-	// "é" is two UTF-8 bytes; repeat it so a small byte bound is very likely
-	// to land in the middle of one of the multi-byte runes in the diff.
+	// "é" is two bytes, so a small byte bound likely lands inside a rune.
 	writeGitFile(t, root, "unicode.md", strings.Repeat("é", 200)+"\n")
 
 	adapter := New()
@@ -403,14 +392,9 @@ func TestCommitExists(t *testing.T) {
 	}
 }
 
-// TestCommitExistsPassesThroughNonMissingFailures confirms CommitExistsContext
-// only reports *ErrUnknownCommit for a clean "no such commit" exit (cat-file
-// -e exiting 1); any other failure -- here, running the command outside a
-// Git repository at all, which exits 128 with "fatal: not a git repository"
-// -- must come back as a plain error so a caller can tell "corrupt
-// repository" apart from "commit missing".
+// Only cat-file -e exiting 1 is a missing commit. Exit 128 outside a repository is a plain error.
 func TestCommitExistsPassesThroughNonMissingFailures(t *testing.T) {
-	root := t.TempDir() // deliberately not a Git repository
+	root := t.TempDir()
 
 	adapter := New()
 	err := adapter.CommitExists(root, "0000000000000000000000000000000000000000")

@@ -137,8 +137,6 @@ func sourceStructurePreview(root, cleanDirectory string, settings models.SourceS
 	return scanner.PreviewSourceStructureCard(scanner.NewFilesystemSourceReader(filepath.Dir(root)), cleanDirectory, settings.Cards[0])
 }
 
-// sourceRoot resolves a registered source: its real path, its clean path
-// relative to the workspace, and the workspace's real root.
 func (s *SourceSettingsService) sourceRoot(id, directory string) (string, string, string, error) {
 	workspace, ok, err := s.registry.Get(id)
 	if err != nil {

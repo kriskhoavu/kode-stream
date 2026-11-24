@@ -1,7 +1,5 @@
 package registry
 
-// Package registry persists registered Workspace definitions.
-
 import (
 	"errors"
 	"fmt"
@@ -110,7 +108,6 @@ func (r *Registry) Create(input models.WorkspaceInput) (models.WorkspaceConfig, 
 	return normalizeWorkspace(workspace), nil
 }
 
-// Validate checks and normalizes a workspace without changing the registry.
 func (r *Registry) Validate(input models.WorkspaceInput) (models.WorkspaceConfig, error) {
 	return r.validate(input)
 }
@@ -119,8 +116,7 @@ func (r *Registry) Path() string {
 	return r.path
 }
 
-// BatchCreate validates all inputs, rechecks duplicates while locked, and
-// persists every accepted workspace with one atomic registry replacement.
+// Duplicates are checked again under the lock. One atomic registry replacement stores the batch.
 func (r *Registry) BatchCreate(inputs []models.WorkspaceInput) ([]BatchCreateResult, error) {
 	if err := r.load(); err != nil {
 		return nil, err

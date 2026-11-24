@@ -1,7 +1,5 @@
 package git
 
-// Git service contract tests.
-
 import (
 	"context"
 	"os"

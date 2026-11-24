@@ -60,9 +60,7 @@ func newCloudAgentStore(now func() time.Time, persistence ...cloudstate.Reposito
 func (s *cloudAgentStore) ConsumeEnrollment(ctx context.Context, token agentConnectToken) (bool, error) {
 	now := s.now().UTC()
 	if token.ID == "" {
-		// Signed credentials minted by pre-protocol clients did not have a jti.
-		// Treat their full stable identity as a one-time identifier so they are
-		// never replayable while avoiding an ambiguous compatibility bypass.
+		// Credentials from pre-protocol clients have no jti, so their whole identity is used once.
 		token.ID = stableCloudUserID(token.UserID + ":" + token.AgentID + ":" + token.ExpiresAt.UTC().Format(time.RFC3339Nano))
 	}
 	if now.After(token.ExpiresAt) {
@@ -114,8 +112,7 @@ func (s *cloudAgentStore) Upsert(ctx context.Context, agent models.CloudAgent) (
 	return agent, nil
 }
 
-// forgetAgent is called with s.mu held. A disconnected socket must stop
-// authorizing live workspace requests even if its durable status write fails.
+// Called with s.mu held. A disconnected socket stops authorizing even if its status write fails.
 func (s *cloudAgentStore) forgetAgent(userID, agentID string) {
 	delete(s.agents[userID], agentID)
 	if len(s.agents[userID]) == 0 {
@@ -220,8 +217,7 @@ func (a *cloudController) consumeWorkspacePublication(ctx context.Context, token
 	if durable, ok := a.agents.persistence.(cloudstate.EnrollmentTokenRepository); ok {
 		return durable.ConsumeEnrollmentToken(ctx, token.WorkspacePublicationID, token.ExpiresAt)
 	}
-	// The in-memory store uses the same atomic set as channel enrollment but a
-	// distinct random ID, so consuming publication cannot affect connection.
+	// A distinct random ID, so consuming a publication cannot affect a connection.
 	return a.agents.ConsumeEnrollment(ctx, agentConnectToken{ID: token.WorkspacePublicationID, ExpiresAt: token.ExpiresAt})
 }
 

@@ -50,7 +50,6 @@ type Service struct {
 	importScan func(string) (models.ScanResult, error)
 }
 
-// LifecycleService owns registration, managed clone ownership, and deletion.
 type LifecycleService struct {
 	registry  registry.Repository
 	index     itemindex.Repository
@@ -59,7 +58,6 @@ type LifecycleService struct {
 	jiraCache interface{ InvalidateWorkspace(string) }
 }
 
-// ScanService owns bounded indexing and per-workspace refresh serialization.
 type ScanService struct {
 	registry registry.Repository
 	index    itemindex.Repository
@@ -67,7 +65,6 @@ type ScanService struct {
 	locks    scanLocks
 }
 
-// SourceSettingsService owns validated source settings and refresh compensation.
 type SourceSettingsService struct {
 	registry registry.Repository
 	writer   *itemwriter.Writer

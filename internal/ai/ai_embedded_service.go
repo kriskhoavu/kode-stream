@@ -12,10 +12,7 @@ import (
 	"kode-stream/internal/filesystem/pathguard"
 )
 
-// embeddedSessionID names a new embedded session and returns the arguments it
-// launches with. A Claude Code session is named after its conversation: the
-// record ID carries the conversation's UUID, passed to Claude as --session-id,
-// so the conversation can be told apart from the user's own and resumed later.
+// The record ID carries the conversation UUID passed as --session-id, so the conversation can resume.
 func embeddedSessionID(providerID string, provider LaunchTemplate, args []string) (string, []string) {
 	if !isClaudeProvider(providerID, provider) {
 		return "embedded-" + randomID(), args
@@ -29,23 +26,21 @@ func isClaudeProvider(providerID string, provider LaunchTemplate) bool {
 }
 
 type EmbeddedInput struct {
-	Provider            string   `json:"provider"`
-	ContextMode         string   `json:"contextMode"`
-	PresetID            string   `json:"presetId,omitempty"`
-	PromptDraft         string   `json:"promptDraft,omitempty"`
-	CustomPrompt        string   `json:"customPrompt,omitempty"`
-	SelectedSkills      []string `json:"selectedSkills,omitempty"`
-	SelectedAgents      []string `json:"selectedAgents,omitempty"`
-	ContextPath         string   `json:"contextPath,omitempty"`
-	ExpectedWorkspaceID string   `json:"expectedWorkspaceId,omitempty"`
-	ExpectedBranch      string   `json:"expectedBranch,omitempty"`
-	ObservedCommit      string   `json:"observedCommit,omitempty"`
-	IdempotencyKey      string   `json:"idempotencyKey,omitempty"`
-	// ResumeClaudeSessionID resumes one of the workspace's Claude conversations
-	// instead of starting a new one; the prompt inputs are then ignored.
-	ResumeClaudeSessionID string `json:"resumeClaudeSessionId,omitempty"`
-	Columns               uint16 `json:"columns"`
-	Rows                  uint16 `json:"rows"`
+	Provider              string   `json:"provider"`
+	ContextMode           string   `json:"contextMode"`
+	PresetID              string   `json:"presetId,omitempty"`
+	PromptDraft           string   `json:"promptDraft,omitempty"`
+	CustomPrompt          string   `json:"customPrompt,omitempty"`
+	SelectedSkills        []string `json:"selectedSkills,omitempty"`
+	SelectedAgents        []string `json:"selectedAgents,omitempty"`
+	ContextPath           string   `json:"contextPath,omitempty"`
+	ExpectedWorkspaceID   string   `json:"expectedWorkspaceId,omitempty"`
+	ExpectedBranch        string   `json:"expectedBranch,omitempty"`
+	ObservedCommit        string   `json:"observedCommit,omitempty"`
+	IdempotencyKey        string   `json:"idempotencyKey,omitempty"`
+	ResumeClaudeSessionID string   `json:"resumeClaudeSessionId,omitempty"`
+	Columns               uint16   `json:"columns"`
+	Rows                  uint16   `json:"rows"`
 }
 
 func (s *Service) StartEmbeddedWorkspace(workspaceID string, input EmbeddedInput) (EmbeddedResult, error) {
@@ -154,9 +149,7 @@ func (s *Service) StartEmbedded(itemID string, input EmbeddedInput) (EmbeddedRes
 	return s.startRecorded(record, StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: mode, Executable: capability.Executable, Args: args, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 }
 
-// resumeClaudeEmbedded continues one of the workspace's Claude conversations
-// in an embedded terminal for the item. The record is named after the
-// conversation with a suffix, since one conversation may be resumed many times.
+// One conversation may resume many times, so the record ID adds a suffix.
 func (s *Service) resumeClaudeEmbedded(itemID string, item models.ItemDetail, workspace models.WorkspaceConfig, branch, commit, conversation string, input EmbeddedInput) (EmbeddedResult, error) {
 	if _, err := s.claudeTranscriptPath(workspace.ID, conversation); err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -193,8 +186,6 @@ func (s *Service) resumeClaudeEmbedded(itemID string, item models.ItemDetail, wo
 	return s.startRecorded(record, StartRequest{ID: record.ID, ItemID: itemID, ItemIdentifier: item.Identifier, ItemTitle: item.Title, WorkspaceID: item.WorkspaceID, Provider: providerID, Intent: intent, Executable: capability.Executable, Args: []string{"--resume", conversation}, Dir: workspace.Path, Columns: input.Columns, Rows: input.Rows})
 }
 
-// embeddedTarget finds the item and its workspace, and refuses an item that
-// moved to a workspace other than the one the caller saw.
 func (s *Service) embeddedTarget(itemID, expectedWorkspaceID string) (models.ItemDetail, models.WorkspaceConfig, error) {
 	item, found, err := s.launch.index.Get(itemID)
 	if err != nil {
@@ -216,8 +207,6 @@ func (s *Service) embeddedTarget(itemID, expectedWorkspaceID string) (models.Ite
 	return item, workspace, nil
 }
 
-// embeddedRevision picks the branch and commit a session starts from, and
-// refuses an item that moved to a branch other than the one the caller saw.
 func embeddedRevision(item models.ItemDetail, input EmbeddedInput) (string, string, error) {
 	if expected := strings.TrimSpace(input.ExpectedBranch); expected != "" && strings.TrimSpace(item.Branch) != "" && expected != item.Branch {
 		return "", "", launchErrorWithDetails("terminal_branch_mismatch", "the plan reference moved to a different branch", map[string]string{"expectedBranch": expected, "currentBranch": item.Branch})
@@ -233,8 +222,6 @@ func embeddedRevision(item models.ItemDetail, input EmbeddedInput) (string, stri
 	return requestedBranch, observedCommit, nil
 }
 
-// checkEmbeddedContext accepts the two context modes, and card context only
-// for an editable working-tree item inside its workspace.
 func checkEmbeddedContext(mode string, item models.ItemDetail, workspace models.WorkspaceConfig) error {
 	if mode != "workspace_only" && mode != "card_context" {
 		return launchError("invalid_context_mode", "contextMode must be workspace_only or card_context")
@@ -251,7 +238,6 @@ func checkEmbeddedContext(mode string, item models.ItemDetail, workspace models.
 	return nil
 }
 
-// embeddedProvider returns an enabled provider whose executable is installed.
 func (s *Service) embeddedProvider(providerID string) (LaunchTemplate, Capability, error) {
 	settings, err := s.Settings()
 	if err != nil {
@@ -268,8 +254,6 @@ func (s *Service) embeddedProvider(providerID string) (LaunchTemplate, Capabilit
 	return provider, capability, nil
 }
 
-// startRecorded starts the terminal for a persisted starting record. When the
-// start fails it marks the record failed, so no record stays starting.
 func (s *Service) startRecorded(record SessionRecord, request StartRequest) (EmbeddedResult, error) {
 	session, grant, err := s.embedded.Start(request)
 	if err != nil {
@@ -294,8 +278,7 @@ func (s *Service) markLaunchFailed(record SessionRecord) error {
 	record.State = StateFailed
 	record.EndedAt = now
 	record.LastKnownAt = now
-	// A failed reservation must not occupy the caller's idempotency key: there
-	// is no live process for a retry to discover.
+	// A failed reservation frees the idempotency key: no live process exists for a retry to find.
 	record.IdempotencyKey = ""
 	_, err := s.records.Upsert(record)
 	return err
@@ -308,12 +291,8 @@ func (s *Service) recordsGet(id string) (SessionRecord, bool, error) {
 	return s.records.Get(id)
 }
 
-// ReviewIntent marks a session a person opened at a harness run's Review
-// stage. Its branch is the run's own branch, which names the run.
 const ReviewIntent = "harness_review"
 
-// ReviewInput starts a session in a harness run's worktree. The harness
-// supplies the folder, branch and brief; the caller only picks a provider.
 type ReviewInput struct {
 	WorkspaceID    string
 	Dir            string
@@ -325,8 +304,6 @@ type ReviewInput struct {
 	Rows           uint16
 }
 
-// StartEmbeddedReview starts an embedded session in a harness run's
-// worktree, so a person can try the change and edit it on the run's branch.
 func (s *Service) StartEmbeddedReview(input ReviewInput) (EmbeddedResult, error) {
 	if s.embedded == nil {
 		return EmbeddedResult{}, launchError("launch_failed", "embedded AI sessions are unavailable")

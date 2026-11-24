@@ -194,9 +194,6 @@ func (r *SQLiteWorkspaceRepository) Delete(id string) error {
 	return nil
 }
 
-// DeleteWorkspaceState removes every SQL-owned projection in one transaction.
-// It is used by the workspace application service instead of coordinating two
-// independently committing repositories.
 func (r *SQLiteWorkspaceRepository) DeleteWorkspaceState(id string) error {
 	tx, err := r.db.Begin()
 	if err != nil {

@@ -92,13 +92,11 @@ func (d *Detector) DetectSource(parent context.Context, workspace models.Workspa
 	if err != nil || !found {
 		return KnowledgeWiki{}, false, err
 	}
-	scan := &sourceScan{ctx: ctx, detector: d, workspace: workspace, workspaceRoot: workspaceRoot, source: cleanSource, root: resolved, limits: limits}
+	scan := &sourceScan{ctx: ctx, detector: d, workspace: workspace, workspaceRoot: workspaceRoot, sourcePath: cleanSource, resolvedRoot: resolved, limits: limits}
 	return scan.run()
 }
 
-// readStableBounded never allocates more than limit bytes.  The path is
-// re-stated before and after reading so a discovery-time size cannot be used
-// to smuggle a later, larger replacement into the parser.
+// Stat before and after the read, so a file swapped after discovery cannot pass a larger body.
 func readStableBounded(ctx context.Context, path string, limit int64) ([]byte, string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", err

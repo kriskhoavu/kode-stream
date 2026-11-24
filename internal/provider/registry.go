@@ -5,7 +5,6 @@ import (
 	"sync"
 )
 
-// Instance identifies one administrator-configured provider endpoint.
 type Instance struct {
 	ID      string
 	Name    string
@@ -13,7 +12,6 @@ type Instance struct {
 	BaseURL string
 }
 
-// Factory constructs an integration for one configured endpoint and user connection.
 type Factory interface {
 	Kind() string
 	New(Instance, string) GitProviderIntegration

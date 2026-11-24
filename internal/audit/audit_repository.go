@@ -1,7 +1,5 @@
 package audit
 
-// This package owns the append-only audit repository.
-
 import (
 	"bufio"
 	"context"

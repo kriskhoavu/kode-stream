@@ -106,8 +106,7 @@ func (g *GitAdapter) SwitchBranch(workspacePath, name string) error {
 	return err
 }
 
-// SwitchBranchSafely serializes the decision, optional stash, and checkout so a
-// branch can never be switched using a stale dirty-tree assessment.
+// Decide, stash and check out under one lock, so a stale dirty-tree assessment never switches a branch.
 func (g *GitAdapter) SwitchBranchSafely(workspacePath, name, strategy, stashMessage string) (string, error) {
 	return g.SwitchBranchSafelyContext(context.Background(), workspacePath, name, strategy, stashMessage)
 }
@@ -154,9 +153,7 @@ func (g *GitAdapter) SwitchBranchSafelyContext(ctx context.Context, workspacePat
 	return stashRef, err
 }
 
-// CanCarryChanges is deliberately conservative.  It permits a normal checkout
-// only when the target does not touch a tracked local path and cannot collide
-// with an untracked path.
+// Conservative: allow only a target that touches no tracked local path and no untracked path.
 func (g *GitAdapter) CanCarryChanges(workspacePath, target string, status models.GitStatus) (bool, error) {
 	return g.CanCarryChangesContext(context.Background(), workspacePath, target, status)
 }
@@ -211,9 +208,7 @@ func pathsOverlap(a, b string) bool {
 	return a == b || strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
 }
 
-// newMutationLock returns a held-token channel standing in for a mutex. The
-// token is put in before the channel is published, so a second caller that
-// finds the entry can never wait on a lock the first caller has not seeded.
+// The token goes in before the channel is published, so a second caller never waits on an empty lock.
 func newMutationLock() chan struct{} {
 	lock := make(chan struct{}, 1)
 	lock <- struct{}{}
@@ -232,9 +227,7 @@ func (g *GitAdapter) WithWorkspaceMutationContext(ctx context.Context, workspace
 	if resolved, err := filepath.EvalSymlinks(key); err == nil {
 		key = resolved
 	}
-	// Load first: LoadOrStore evaluates its argument whether or not it stores,
-	// so building the channel inline allocated one per mutation and threw it
-	// away again on every call after the first for a workspace.
+	// Load first: LoadOrStore evaluates its argument even when it does not store.
 	value, ok := g.mutations.Load(key)
 	if !ok {
 		value, _ = g.mutations.LoadOrStore(key, newMutationLock())

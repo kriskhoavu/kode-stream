@@ -7,15 +7,6 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// The dashboard reads the harness through these views. They carry the
-// domain fields and add the names the dashboard's screens use: a run with its
-// current stage and active agent run, an agent run with its verdict and
-// findings, approval context in plain words, settings as a flat list of
-// sources, and events that carry the whole entity they are about. The bot
-// routes keep the domain shapes.
-
-// DashboardRoleOf names a role key the way the dashboard does: the tester's
-// pool is "qa".
 func DashboardRoleOf(key domain.RoleKey) string {
 	if key == domain.RoleKeyQAFixer {
 		return "qa"
@@ -23,7 +14,6 @@ func DashboardRoleOf(key domain.RoleKey) string {
 	return string(key)
 }
 
-// RoleKeyFromDashboard reads a dashboard role id; "qa" is the tester's pool.
 func RoleKeyFromDashboard(role string) domain.RoleKey {
 	if role == "qa" {
 		return domain.RoleKeyQAFixer
@@ -46,8 +36,7 @@ type DashboardTask struct {
 
 func dashboardTask(task domain.Task) DashboardTask {
 	view := DashboardTask{Task: task, Milestone: task.Source.Milestone, Epic: task.Source.Epic, CreatedAt: task.DiscoveredAt}
-	// A list carries neither the untrusted body nor the comments; the
-	// detail view and the brief read them.
+	// A list leaves out the untrusted body and the comments.
 	view.Body, view.Comments = "", nil
 	if task.Source.Labels == nil {
 		view.Source.Labels = []string{}
@@ -105,8 +94,7 @@ type DashboardRun struct {
 	domain.Run
 	CurrentStage   *domain.Stage      `json:"currentStage,omitempty"`
 	ActiveAgentRun *DashboardAgentRun `json:"activeAgentRun,omitempty"`
-	// RemoteBranch is the name the branch is pushed under.
-	RemoteBranch string `json:"remoteBranch,omitempty"`
+	RemoteBranch   string             `json:"remoteBranch,omitempty"`
 }
 
 func (s *Service) dashboardRun(ctx context.Context, run domain.Run) DashboardRun {
@@ -129,7 +117,6 @@ func (s *Service) dashboardRun(ctx context.Context, run domain.Run) DashboardRun
 	return view
 }
 
-// DashboardRuns lists runs with their current stage and active agent run.
 func (s *Service) DashboardRuns(ctx context.Context, filter domain.RunFilter) ([]DashboardRun, error) {
 	runs, err := s.Runs(ctx, filter)
 	if err != nil {
@@ -153,10 +140,8 @@ type DashboardApprovalContext struct {
 	Verdict    domain.Verdict `json:"verdict,omitempty"`
 	Questions  []string       `json:"questions,omitempty"`
 	Role       domain.Role    `json:"role,omitempty"`
-	// Reporter and Draft belong to a clarify gate: who it waits for, and the
-	// comment a person may post on the ticket to ask them.
-	Reporter string `json:"reporter,omitempty"`
-	Draft    string `json:"draft,omitempty"`
+	Reporter   string         `json:"reporter,omitempty"`
+	Draft      string         `json:"draft,omitempty"`
 }
 
 type DashboardApproval struct {
@@ -164,7 +149,6 @@ type DashboardApproval struct {
 	Context DashboardApprovalContext `json:"context"`
 }
 
-// plainDifficulty reads the planner's rating as the dashboard's two words.
 func plainDifficulty(difficulty string) string {
 	switch difficulty {
 	case "high":
@@ -200,7 +184,6 @@ func (s *Service) DashboardApprovals(ctx context.Context, filter domain.Approval
 	return out, nil
 }
 
-// DashboardDecision maps a decided approval for the dashboard.
 func (s *Service) DashboardDecision(ctx context.Context, approval domain.Approval) DashboardApproval {
 	return s.dashboardApproval(ctx, approval)
 }
@@ -248,8 +231,6 @@ func (s *Service) DashboardRunDetail(ctx context.Context, id string) (DashboardR
 	return detail, nil
 }
 
-// DashboardAgentRunView is one agent run. A harness agent run is not a Kode
-// Stream terminal session, so it never carries one.
 type DashboardAgentRunView struct {
 	AgentRun DashboardAgentRun `json:"agentRun"`
 }
@@ -261,12 +242,6 @@ func (s *Service) DashboardAgentRun(ctx context.Context, id string) (DashboardAg
 	}
 	return DashboardAgentRunView{AgentRun: dashboardAgentRun(agentRun)}, nil
 }
-
-// --- status ---
-
-// --- cost ---
-
-// --- settings ---
 
 func nonNil[T any](values []T) []T {
 	if values == nil {
@@ -282,15 +257,8 @@ func orEmpty[K comparable, V any](values map[K]V) map[K]V {
 	return values
 }
 
-// --- events ---
-
-// --- changes ---
-
-// DashboardTasks maps tasks for the dashboard, without their bodies.
 func DashboardTasks(tasks []domain.Task) []DashboardTask { return dashboardTasks(tasks) }
 
-// DashboardTaskWithBody maps one task with its untrusted body, for its
-// detail view.
 func DashboardTaskWithBody(task domain.Task) DashboardTask {
 	view := dashboardTask(task)
 	view.Body, view.Comments = task.Body, task.Comments

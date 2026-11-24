@@ -1,7 +1,5 @@
 package git
 
-// Package gitadapter implements domain Git repository ports.
-
 import (
 	"context"
 	"errors"

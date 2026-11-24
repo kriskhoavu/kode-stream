@@ -20,7 +20,6 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// script decides what the fake engine does for one call of a role.
 type script func(role domain.Role, call int, invocation ports.Invocation) (report map[string]any, result ports.Result)
 
 type fakeEngine struct {
@@ -122,7 +121,6 @@ func newPipeline(t *testing.T, s script, adjust ...func(*domain.Settings)) *pipe
 	service := New(Dependencies{Repository: repository, Workspaces: fakeWorkspaces{"ws": workspace}, Engines: []ports.Engine{engine}, Worktrees: gitworktree.New(filepath.Join(t.TempDir(), "worktrees"), appgit.New()), Transcripts: transcripts, Config: Config{LocalMode: true}})
 	settings := domain.DefaultSettings()
 	settings.Enabled = true
-	// Most tests follow a run to its end; a Review test turns Review back on.
 	settings.RequireReview = false
 	settings.Workspaces = []domain.WorkspaceSettings{{WorkspaceID: "ws", VerificationCommands: []string{"true"}}}
 	for _, apply := range adjust {
@@ -140,8 +138,6 @@ func newPipeline(t *testing.T, s script, adjust ...func(*domain.Settings)) *pipe
 	return &pipelineFixture{service: service, repository: repository, engine: engine, task: task, workspace: workspace}
 }
 
-// settle runs the dispatcher and every role loop until no agent run is
-// queued or running.
 func (p *pipelineFixture) settle(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
@@ -156,8 +152,6 @@ func (p *pipelineFixture) settle(t *testing.T) {
 			}
 		}
 		for _, loop := range p.service.stageLoops(nil) {
-			// A stage loop reports a failed attempt as an error and retries;
-			// the stage's state is what the tests check.
 			_ = loop.Run(ctx)
 		}
 		p.service.mu.Lock()
@@ -381,7 +375,6 @@ func TestACancelledTaskStaysOpenAndStartsAgainWithANewRun(t *testing.T) {
 	if task.State != domain.TaskCancelled || task.StartRequested {
 		t.Fatalf("cancelled task = %s startRequested=%v", task.State, task.StartRequested)
 	}
-	// The dispatcher does not start a stopped task on its own.
 	if err := fixture.service.dispatchCycle(ctx); err != nil {
 		t.Fatal(err)
 	}

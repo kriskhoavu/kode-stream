@@ -5,25 +5,15 @@ import (
 	"strings"
 )
 
-// minTierParents is the number of distinct parent directories a name must
-// appear under, inside a single bucket, to be recognised as a tier.
 const minTierParents = 2
 
-// Taxonomy describes the structural shape of one Wiki Root: which directory
-// names are tiers, which buckets exist, and what each bucket means.
 type Taxonomy struct {
 	Tiers   map[string]bool
 	Buckets map[string]bool
 	Roles   map[string]string
 }
 
-// DetectTaxonomy infers tier names from the layout of the pages already
-// indexed. A directory name is a tier when, inside at least one bucket, it
-// appears under two or more distinct parents.
-//
-// Counting parents within a bucket rather than across the whole tree is
-// load-bearing: a subject area appearing in two buckets reaches the threshold
-// globally and would be mistaken for a tier.
+// Count parents per bucket. A subject area in two buckets would reach the threshold across the tree.
 func DetectTaxonomy(paths []string) Taxonomy {
 	parentsByBucket := make(map[string]map[string]map[string]struct{})
 	buckets := make(map[string]bool)
@@ -60,9 +50,7 @@ func DetectTaxonomy(paths []string) Taxonomy {
 	return Taxonomy{Tiers: tiers, Buckets: buckets, Roles: make(map[string]string)}
 }
 
-// Classify resolves a page path into its bucket, area, and tier. Segments on
-// either side of a recognised tier form the area, so a layout deeper than the
-// taxonomy expects yields a longer area rather than a dropped path component.
+// Segments on both sides of a tier form the area, so a deeper layout keeps every path component.
 func (t Taxonomy) Classify(relativePath string) (bucket, area, tier string) {
 	segments := pathSegments(relativePath)
 	if len(segments) == 0 {
@@ -80,8 +68,6 @@ func (t Taxonomy) Classify(relativePath string) (bucket, area, tier string) {
 	return bucket, strings.Join(areaSegments, "/"), tier
 }
 
-// pathSegments returns the directory segments of a page path, dropping the file
-// name. A page at the Wiki Root has none.
 func pathSegments(relativePath string) []string {
 	directory := path.Dir(normalizePath(relativePath))
 	directory = strings.Trim(directory, "/")
@@ -91,11 +77,7 @@ func pathSegments(relativePath string) []string {
 	return strings.Split(directory, "/")
 }
 
-// applyTaxonomy classifies every page in one Wiki Root. Detection needs the
-// finished page set, so it runs here rather than per file during parsing.
-//
-// A settings file that could not be used leaves the detected taxonomy in place,
-// so a broken override costs the wiki its overrides and nothing else.
+// Detection needs the finished page set, so it runs after parsing. A broken settings file keeps detection.
 func applyTaxonomy(root string, pages []KnowledgePage) ([]KnowledgePage, string, []KnowledgeWarning) {
 	paths := make([]string, 0, len(pages))
 	for _, page := range pages {
@@ -113,8 +95,6 @@ func applyTaxonomy(root string, pages []KnowledgePage) ([]KnowledgePage, string,
 	return pages, journeysBucketFor(taxonomy), warnings
 }
 
-// journeysBucketFor returns the bucket declared with the journeys role, or the
-// default when no settings file names one.
 func journeysBucketFor(taxonomy Taxonomy) string {
 	for bucket, role := range taxonomy.Roles {
 		if role == RoleJourneys {
@@ -124,12 +104,8 @@ func journeysBucketFor(taxonomy Taxonomy) string {
 	return DefaultJourneysBucket
 }
 
-// DefaultJourneysBucket is the bucket assumed to hold reusable E2E journeys
-// when no settings file declares one, so a Wiki Root with no settings file
-// works without configuration.
 const DefaultJourneysBucket = "e2e-testing"
 
-// journeysBucket resolves the bucket holding reusable E2E journeys.
 func (w KnowledgeWiki) journeysBucket() string {
 	if strings.TrimSpace(w.JourneysBucket) == "" {
 		return DefaultJourneysBucket
@@ -137,13 +113,7 @@ func (w KnowledgeWiki) journeysBucket() string {
 	return w.JourneysBucket
 }
 
-// pageIsJourney reports whether a page belongs to the Wiki Root's journeys
-// bucket.
-//
-// A page carrying no bucket comes from an index without taxonomy fields, so the
-// path is used instead until the next rescan. Both branches require a full
-// segment match rather than a prefix, so a sibling bucket such as
-// e2e-testing-archive does not match by accident.
+// A page with no bucket comes from an older index. Whole segments match, so e2e-testing-archive does not.
 func pageIsJourney(wiki KnowledgeWiki, page KnowledgePage) bool {
 	bucket := wiki.journeysBucket()
 	if page.Bucket != "" {

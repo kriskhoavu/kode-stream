@@ -1,7 +1,5 @@
 package api
 
-// Package api provides the Server HTTP transport.
-
 import (
 	"net/http"
 	"net/http/httptest"

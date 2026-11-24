@@ -46,11 +46,7 @@ func (s *Service) ConfigureEmbedded(manager *Manager) *Service {
 
 func (s *Service) EmbeddedManager() *Manager { return s.embedded }
 
-// SetRuntimeMode records the server's actual runtime mode, so the
-// content-provider guard in SessionChanges can use it instead of assuming
-// Cloud. server.go calls this once, right after resolving the mode itself; a
-// Service nobody calls it on keeps defaulting to Cloud, the conservative
-// choice (see New).
+// A Service that never gets this call keeps Cloud, the conservative default.
 func (s *Service) SetRuntimeMode(mode models.RuntimeMode) *Service {
 	s.runtimeMode = mode
 	return s

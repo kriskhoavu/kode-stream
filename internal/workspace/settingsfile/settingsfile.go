@@ -1,9 +1,4 @@
-// Package settingsfile reads and writes `.kode-stream/settings.yaml`, the
-// file a team uses to share a workspace's settings through its repository.
-// Kode Stream never reads it on its own: a person exports chosen parts of a
-// workspace's settings into it, and imports chosen parts from it. It holds
-// only settings a commit may safely set: no tool permission, executable,
-// terminal argument or credential.
+// Package settingsfile reads and writes .kode-stream/settings.yaml. It holds only settings a commit may safely set.
 package settingsfile
 
 import (
@@ -22,12 +17,10 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// Path is where a repository keeps the file, relative to its root.
 const Path = ".kode-stream/settings.yaml"
 
 const maxFileBytes = 64 << 10
 
-// The parts a person exports or imports, one at a time.
 const (
 	PartProvider  = "provider"
 	PartPipeline  = "pipeline"
@@ -38,10 +31,8 @@ const (
 	PartSources   = "sources"
 )
 
-// Parts lists every part, in the order the file and the screen show them.
 var Parts = []string{PartProvider, PartPipeline, PartTests, PartScope, PartModels, PartProcedure, PartSources}
 
-// Engines are the coding CLIs a model entry may name.
 var Engines = []string{"claudecode", "codex", "opencode"}
 
 type File struct {
@@ -54,7 +45,6 @@ type AI struct {
 	Provider string `yaml:"provider" json:"provider"`
 }
 
-// Harness holds the harness's part of a workspace's settings.
 type Harness struct {
 	Enabled      *bool                                `yaml:"enabled,omitempty" json:"enabled,omitempty"`
 	AutoStart    *bool                                `yaml:"autoStart,omitempty" json:"autoStart,omitempty"`
@@ -74,8 +64,7 @@ type Model struct {
 	MaxTurns  int    `yaml:"maxTurns,omitempty" json:"maxTurns,omitempty"`
 }
 
-// Source is one place the harness finds tasks. TokenEnvVar names an
-// environment setting, never a token.
+// TokenEnvVar names an environment setting, never a token.
 type Source struct {
 	Kind        string   `yaml:"kind" json:"kind"`
 	Enabled     bool     `yaml:"enabled" json:"enabled"`
@@ -91,9 +80,6 @@ var (
 	sourceKinds  = []string{string(domain.SourceJira), string(domain.SourceGitHub), string(domain.SourceBitbucket), string(domain.SourceLocal)}
 )
 
-// Load reads the file of the checkout at dir. A missing file is found false
-// and no error; a file that does not parse or holds a value outside these
-// rules is an error, and nothing of it is used.
 func Load(dir string) (File, bool, error) {
 	path := filepath.Join(dir, Path)
 	info, err := os.Lstat(path)
@@ -122,8 +108,7 @@ func Load(dir string) (File, bool, error) {
 	return file, true, err
 }
 
-// Parse decodes and checks a file's text. A key the file format does not
-// have is refused, so a setting it may not hold cannot slip in.
+// An unknown key is refused, so a setting the file may not hold cannot slip in.
 func Parse(data []byte) (File, error) {
 	var file File
 	decoder := yaml.NewDecoder(bytes.NewReader(data))
@@ -134,7 +119,6 @@ func Parse(data []byte) (File, error) {
 	return file, Validate(file)
 }
 
-// Validate checks every value against what the file may hold.
 func Validate(file File) error {
 	if file.Version != 1 {
 		return fmt.Errorf("%s: version must be 1", Path)
@@ -197,7 +181,6 @@ func Validate(file File) error {
 	return nil
 }
 
-// Has lists the parts the file holds.
 func (f File) Has() []string {
 	out := []string{}
 	h := f.Harness
@@ -226,8 +209,6 @@ func (f File) Has() []string {
 	return out
 }
 
-// Take copies the named parts of from over into, leaving into's other parts
-// as they are.
 func Take(into, from File, parts []string) File {
 	into.Version = 1
 	if into.Harness == nil {
@@ -268,7 +249,6 @@ func (h *Harness) empty() bool {
 	return h.Enabled == nil && h.AutoStart == nil && h.Review == nil && h.AskQuestions == nil && h.Tests == nil && h.Scope == nil && h.Models == nil && h.Procedure == nil && h.Sources == nil
 }
 
-// ValidParts refuses a part name the file does not have.
 func ValidParts(parts []string) error {
 	if len(parts) == 0 {
 		return errors.New("name at least one part")
@@ -283,7 +263,6 @@ func ValidParts(parts []string) error {
 
 const header = "# A workspace's settings, shared through the repository. Kode Stream exports\n# chosen parts into this file and imports chosen parts from it; it never\n# reads it on its own. See Settings in Kode Stream.\n"
 
-// Write saves the file into the checkout at dir, creating .kode-stream.
 func Write(dir string, file File) error {
 	if err := Validate(file); err != nil {
 		return err

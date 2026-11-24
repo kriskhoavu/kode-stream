@@ -52,10 +52,8 @@ const (
 	StagePlanApproval StageKind = "plan_approval"
 	StageImplement    StageKind = "implement"
 	StageQA           StageKind = "qa"
-	// StageReview waits for a person to try the change, in a session of
-	// their own in the run's worktree, and hand it off or send it back.
-	StageReview  StageKind = "review"
-	StageDraftPR StageKind = "draft_pr"
+	StageReview       StageKind = "review"
+	StageDraftPR      StageKind = "draft_pr"
 )
 
 type StageState string
@@ -86,7 +84,6 @@ type Round struct {
 	Advisory           int     `json:"advisory"`
 }
 
-// MaxStageAttempts bounds how often a failed stage is retried.
 const MaxStageAttempts = 3
 
 type Stage struct {
@@ -114,15 +111,10 @@ type Stage struct {
 	FinishedAt    *time.Time `json:"finishedAt,omitempty"`
 	Rounds        []Round    `json:"rounds"`
 	Findings      []Finding  `json:"findings,omitempty"`
-	// Answers are a person's answers to the questions an agent of this stage
-	// stopped to ask; every later brief of the stage carries them.
-	Answers []Answer `json:"answers,omitempty"`
-	// LastGate is the harness's latest verification run in a QA stage.
-	LastGate *GateRun `json:"lastGate,omitempty"`
-	// Reviewed marks a QA stage a person's hand-off started: it already
-	// went through Review, so passing it goes on to the draft pull request.
-	Reviewed bool  `json:"reviewed,omitempty"`
-	Revision int64 `json:"revision"`
+	Answers       []Answer   `json:"answers,omitempty"`
+	LastGate      *GateRun   `json:"lastGate,omitempty"`
+	Reviewed      bool       `json:"reviewed,omitempty"`
+	Revision      int64      `json:"revision"`
 }
 
 type Role string
@@ -135,11 +127,8 @@ const (
 	RoleQAFixer      Role = "qa_fixer"
 )
 
-// Roles lists every agent role in pipeline order.
 var Roles = []Role{RolePlanner, RolePlanReviewer, RoleCoder, RoleCodeReviewer, RoleQAFixer}
 
-// RoleKey names a pausable worker: the two non-model loops and the four slot
-// pools. Plan review and code review share the reviewer pool.
 type RoleKey string
 
 const (
@@ -162,7 +151,6 @@ func ValidRoleKey(key RoleKey) bool {
 	return false
 }
 
-// PoolOf returns the slot pool an agent role draws from.
 func PoolOf(role Role) RoleKey {
 	switch role {
 	case RolePlanner:
@@ -176,7 +164,6 @@ func PoolOf(role Role) RoleKey {
 	}
 }
 
-// RolesOf returns the agent roles that draw from a slot pool.
 func RolesOf(pool RoleKey) []Role {
 	switch pool {
 	case RoleKeyPlanner:

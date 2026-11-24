@@ -1,7 +1,5 @@
 package jira
 
-// Client is the Jira HTTP repository used by JiraService.
-
 import (
 	"bytes"
 	"context"
@@ -62,9 +60,7 @@ type Issue struct {
 	Key     string `json:"key"`
 	Summary string `json:"summary"`
 	Status  string `json:"status"`
-	// StatusCategory is Jira's own coarse grouping ("new", "indeterminate",
-	// "done"). Workflow status names are project-specific, so this is the only
-	// reliable signal for colouring a status.
+	// Workflow status names are project-specific, so the category is the only reliable colour signal.
 	StatusCategory string       `json:"statusCategory,omitempty"`
 	Description    string       `json:"description"`
 	IssueType      string       `json:"issueType"`
@@ -146,9 +142,7 @@ func (c *Client) GetIssue(ctx context.Context, connection models.JiraConnection,
 	description, truncated := normalizeDescription(payload.Fields.Description)
 	clip.truncated = truncated
 	if description == "" {
-		// Projects often keep the prose in a custom field ("User Story
-		// Description" and friends) and leave the standard one empty. Only pay
-		// for the wider lookup when the standard field gave us nothing.
+		// Projects often keep the prose in a custom field. Look there only when the standard field is empty.
 		if custom, customTruncated, err := c.customDescription(ctx, connection, version, key); err == nil && custom != "" {
 			description = custom
 			clip.truncated = clip.truncated || customTruncated
@@ -162,7 +156,6 @@ func (c *Client) GetIssue(ctx context.Context, connection models.JiraConnection,
 	return issue, nil
 }
 
-// clipper bounds Jira strings and remembers whether any was cut.
 type clipper struct{ truncated bool }
 
 func (c *clipper) text(value string) string {
@@ -200,9 +193,7 @@ func issueFromResponse(payload jiraIssueResponse, baseURL, description string, c
 	return issue
 }
 
-// boundedAttachments keeps at most maxAttachments attachments. An attachment
-// whose content URL was clipped is dropped: a clipped proxy URL is not a
-// stable authorization target.
+// A clipped content URL is not a stable authorization target, so the attachment is dropped.
 func boundedAttachments(values []jiraAttachment, clip *clipper) []Attachment {
 	attachments := []Attachment{}
 	for i, value := range values {
@@ -225,8 +216,6 @@ func boundedAttachments(values []jiraAttachment, clip *clipper) []Attachment {
 	return attachments
 }
 
-// getJSON sends an authorized GET and decodes a bounded JSON answer. A 404
-// answers notFound.
 func (c *Client) getJSON(ctx context.Context, connection models.JiraConnection, endpoint string, notFound error, what string, target any) error {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -324,9 +313,7 @@ func boundedStrings(values []string, count, bytes int, truncated *bool) []string
 	return result
 }
 
-// customDescription looks for a description held in a custom field. Jira only
-// reports human-readable field names under expand=names, so the field is
-// matched by its display name rather than a hard-coded customfield id.
+// Jira reports field names only under expand=names, so the field is matched by display name.
 func (c *Client) customDescription(ctx context.Context, connection models.JiraConnection, version, key string) (string, bool, error) {
 	endpoint := connection.BaseURL + "/rest/api/" + version + "/issue/" + url.PathEscape(key) + "?expand=names&fields=*all"
 	var payload struct {
@@ -343,7 +330,7 @@ func (c *Client) customDescription(ctx context.Context, connection models.JiraCo
 		}
 		ids = append(ids, id)
 	}
-	// Stable order so the same ticket always resolves to the same field.
+	// Stable order, so one ticket always resolves to the same field.
 	sort.Strings(ids)
 	for _, id := range ids {
 		if text, truncated := normalizeDescription(payload.Fields[id]); text != "" {

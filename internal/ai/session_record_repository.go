@@ -267,9 +267,7 @@ func (r *FileSessionRecordRepository) load() ([]SessionRecord, error) {
 	return decodeSessionRecords(data)
 }
 
-// decodeSessionRecords validates a candidate generation before it is published.
-// Keeping decoding separate lets imports/sync reject an unsafe snapshot without
-// replacing the last durable file.
+// Decode before publishing, so an unsafe snapshot never replaces the last durable file.
 func decodeSessionRecords(data []byte) ([]SessionRecord, error) {
 	var records []SessionRecord
 	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
@@ -295,10 +293,7 @@ func decodeSessionRecords(data []byte) ([]SessionRecord, error) {
 	return records, nil
 }
 
-// staleSessionRecordFields names fields an abandoned or newer build may have
-// written on a session record. They carry no safety risk, so they are stripped
-// before strict decoding instead of failing the whole store. Any other unknown
-// field still fails: a record must never carry a prompt, arguments, or output.
+// Harmless fields from other builds are stripped. Any other unknown field still fails decoding.
 var staleSessionRecordFields = map[string]bool{"laneId": true}
 
 func stripStaleSessionRecordFields(data []byte) ([]byte, int, error) {

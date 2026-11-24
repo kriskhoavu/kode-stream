@@ -1,7 +1,5 @@
 package fileaccess
 
-// Package fileaccess provides bounded content access.
-
 import (
 	"bytes"
 	"path/filepath"

@@ -186,9 +186,7 @@ func validateAutomationConfig(config *models.RuntimeAutomationConfig) error {
 	return nil
 }
 
-// ValidateAutomationCommandTemplate keeps administrator-authored shell templates
-// explicit: only the documented placeholders are supported and user-controlled
-// placeholders must occupy their own shell token so they can be quoted safely.
+// A user-controlled placeholder must be its own shell token, so it can be quoted safely.
 func ValidateAutomationCommandTemplate(template string) error {
 	template = strings.TrimSpace(template)
 	if template == "" {
@@ -216,8 +214,7 @@ func ValidateAutomationCommandTemplate(template string) error {
 	return nil
 }
 
-// ValidateArtifactRelativePath makes saved paths safe before a later job uses
-// them and is intentionally repeated at collection time for old configuration.
+// Repeated at collection time, because old configuration may hold an unsafe path.
 func ValidateArtifactRelativePath(path string) error {
 	path = filepath.ToSlash(filepath.Clean(strings.TrimSpace(path)))
 	if path == "" || path == "." || filepath.IsAbs(path) || path == ".." || strings.HasPrefix(path, "../") {

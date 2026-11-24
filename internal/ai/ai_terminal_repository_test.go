@@ -109,7 +109,7 @@ func TestDisconnectedSessionExpiresAfterGracePeriod(t *testing.T) {
 		t.Fatal(err)
 	}
 	disconnect()
-	// Poll rather than sleep a fixed time: on a busy machine the expiry may run late.
+	// Poll: on a busy machine the expiry may run late.
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		current, err := manager.Get(session.ID)

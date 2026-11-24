@@ -127,9 +127,7 @@ func renderAutomationCommand(template string, runner models.AutomationRunner, en
 	rendered := strings.TrimSpace(template)
 	modeArgs := automationModeArgs(runner, displayMode)
 	hasModePlaceholder := strings.Contains(rendered, "{modeArgs}") || strings.Contains(rendered, "{headed}") || strings.Contains(rendered, "{browser}")
-	// The command template remains administrator-authored, but values originating
-	// from the request are always a single POSIX shell word. Template validation
-	// rejects quoted user placeholders so values cannot escape their token.
+	// A request value is always one POSIX shell word, so it cannot escape its token.
 	rendered = strings.ReplaceAll(rendered, "{env}", shellQuoteIfNeeded(environment))
 	rendered = strings.ReplaceAll(rendered, "{specs}", shellQuoteIfNeeded(strings.Join(selectedSpecs, ",")))
 	rendered = strings.ReplaceAll(rendered, "{modeArgs}", modeArgs)

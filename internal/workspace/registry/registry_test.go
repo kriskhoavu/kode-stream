@@ -1,7 +1,5 @@
 package registry
 
-// Package registry persists registered Workspace definitions.
-
 import (
 	"errors"
 	"os"
@@ -109,9 +107,7 @@ func TestUnrelatedUpdatePreservesLegacyRuntimeWithoutRevalidatingIt(t *testing.T
 		t.Fatal(err)
 	}
 
-	// Older releases accepted quoted placeholders. Keep such stored settings
-	// intact during an unrelated source edit; the runtime endpoint validates
-	// them when an administrator explicitly edits runtime settings.
+	// Older releases accepted quoted placeholders. An unrelated source edit keeps them intact.
 	repository.mu.Lock()
 	legacyRuntime := *repository.records[0].Runtime
 	legacyAutomation := *legacyRuntime.Automation
@@ -178,7 +174,7 @@ func TestCreateRemoteCloneRequiresRemoteURL(t *testing.T) {
 		Path:             root,
 		RegistrationMode: models.WorkspaceRegistrationModeRemoteClone,
 		BaselineBranch:   "main",
-		Sources: models.SourceList("plans"),
+		Sources:          models.SourceList("plans"),
 	})
 	if err == nil || !strings.Contains(err.Error(), "remote URL") {
 		t.Fatalf("err = %v", err)

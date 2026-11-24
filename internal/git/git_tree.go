@@ -58,9 +58,6 @@ func (g *GitAdapter) TreeWalk(workspacePath, ref, root string) ([]TreeEntry, err
 	return parseTreeEntries(clean, out)
 }
 
-// TreeWalkBounded lists a review tree without allowing git output or the
-// returned model to grow without bound. The caller receives a stable limit
-// error instead of a partial tree with unknown omissions.
 func (g *GitAdapter) TreeWalkBounded(ctx context.Context, workspacePath, ref, root string, maxEntries, maxDepth int) ([]TreeEntry, error) {
 	clean, err := cleanGitTreePath(root)
 	if err != nil {
@@ -69,8 +66,7 @@ func (g *GitAdapter) TreeWalkBounded(ctx context.Context, workspacePath, ref, ro
 	if maxEntries <= 0 || maxDepth < 0 {
 		return nil, ErrTreeLimit
 	}
-	// ls-tree records are small, but cap stdout too so a pathological tree is
-	// terminated before an unbounded buffer allocation.
+	// ls-tree records are small, but stdout is capped so a pathological tree stops early.
 	outputLimit := int64(maxEntries*1024 + 4096)
 	out, err := g.runContextLimited(ctx, workspacePath, outputLimit, "ls-tree", "-r", "-t", "-z", "-l", treeish(ref, clean))
 	if err != nil {
@@ -99,9 +95,6 @@ func (g *GitAdapter) TreeWalkBounded(ctx context.Context, workspacePath, ref, ro
 	return entries, nil
 }
 
-// TreeReadFileBounded checks the Git object size before streaming a bounded
-// prefix. Images are rejected when oversized; text callers can display the
-// bounded prefix with an explicit truncation flag.
 func (g *GitAdapter) TreeReadFileBounded(ctx context.Context, workspacePath, ref, relPath string, maxBytes int64) ([]byte, int64, bool, error) {
 	clean, err := cleanGitTreePath(relPath)
 	if err != nil {

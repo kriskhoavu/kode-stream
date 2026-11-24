@@ -116,7 +116,6 @@ func (a *aiController) aiSessionRecords(w http.ResponseWriter, r *http.Request) 
 	respond(w, records, err)
 }
 
-// claudeTranscripts lists the workspace's Claude Code conversations by item.
 // Transcripts live in the user's home, so only Local mode has any.
 func (a *aiController) claudeTranscripts(w http.ResponseWriter, r *http.Request) {
 	if !a.claudeTranscriptsAvailable(w, r) {
@@ -442,8 +441,7 @@ func (a *aiController) saveAISettings(w http.ResponseWriter, r *http.Request) {
 	respond(w, saved, err)
 }
 
-// Cloud denials intentionally use the same response as a missing resource.  Session
-// IDs are process-local bearer-adjacent identifiers and must not become an oracle.
+// Cloud denials answer like a missing resource, so a session ID is not an oracle.
 func (a *aiController) authorizeWorkspace(w http.ResponseWriter, r *http.Request, workspaceID string) bool {
 	if a.runtimeConfig.Mode != models.RuntimeModeCloud {
 		return true

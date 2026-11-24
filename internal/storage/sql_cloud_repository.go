@@ -11,8 +11,6 @@ import (
 	"kode-stream/internal/provider"
 )
 
-// SQLCloudRepository persists only durable Cloud metadata. Runtime connections
-// remain owned by the HTTP/WebSocket process.
 type SQLCloudRepository struct {
 	db     *sql.DB
 	driver string

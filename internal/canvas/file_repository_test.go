@@ -207,9 +207,7 @@ func TestFileRepositoryKeepsViewportVersionIndependent(t *testing.T) {
 	}
 }
 
-// A placement written by a build that knew more entity kinds (an abandoned
-// "lane" build left three of these behind) must not brick the store: the
-// unknown placements are dropped and everything else loads.
+// Placements of an unknown entity kind are dropped, so they cannot brick the store.
 func TestFileRepositoryDropsPlacementsOfUnknownEntityKind(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "canvases.yaml")
 	repository := NewFileRepository(path)

@@ -20,10 +20,7 @@ const (
 	harnessSubscriberBuffer = 256
 )
 
-// events streams harness events. Stored events after the client's sequence
-// come first, then live ones. Each message carries `id: <seq>` and no event
-// name, so EventSource.onmessage receives every type; a subscriber that falls
-// behind gets `event: reset` and refetches its snapshot.
+// No event name, so EventSource.onmessage gets every type. A subscriber that falls behind gets reset.
 func (a *harnessController) events(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -31,9 +28,7 @@ func (a *harnessController) events(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	after := harnessAfter(r)
-	// The transport's request timeout would end a long stream; the stream
-	// ends on its own lifetime or on the first failed write instead, and the
-	// client reconnects with Last-Event-ID.
+	// The request timeout would end a long stream. The client reconnects with Last-Event-ID.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), harnessStreamLifetime)
 	defer cancel()
 	subscription := a.harness.Subscribe(harnessSubscriberBuffer)
@@ -68,9 +63,7 @@ func (a *harnessController) events(w http.ResponseWriter, r *http.Request) {
 
 	keepAlive := time.NewTicker(harnessKeepAlive)
 	defer keepAlive.Stop()
-	// The request context ends both when the client goes away (Canceled) and
-	// when the transport's timeout fires (DeadlineExceeded); only the first
-	// ends the stream.
+	// Only a client cancel ends the stream. The transport timeout does not.
 	disconnected := r.Context().Done()
 	for {
 		select {
@@ -118,8 +111,6 @@ func harnessAfter(r *http.Request) int64 {
 	return value
 }
 
-// writeHarnessEvent sends one event with the entity it is about; an event
-// the dashboard does not show is skipped.
 func (a *harnessController) writeHarnessEvent(ctx context.Context, w http.ResponseWriter, event domain.Event) bool {
 	view, ok := a.harness.DashboardEvent(ctx, event)
 	if !ok {

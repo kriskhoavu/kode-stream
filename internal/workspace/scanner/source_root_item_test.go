@@ -9,8 +9,6 @@ import (
 	gitadapter "kode-stream/internal/git"
 )
 
-// An item created with scope == source root lands at plans/<identifier>,
-// and must be scanned as an item, not mistaken for a scope.
 func TestScanSurfacesSourceRootScopeItem(t *testing.T) {
 	root := t.TempDir()
 	itemRoot := filepath.Join(root, "plans", "DI-510")
@@ -20,7 +18,6 @@ func TestScanSurfacesSourceRootScopeItem(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(itemRoot, "README.md"), []byte("# DI-510\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// a sibling normal item so the source is not a document collection
 	sibling := filepath.Join(root, "plans", "api", "DI-170")
 	if err := os.MkdirAll(sibling, 0o755); err != nil {
 		t.Fatal(err)

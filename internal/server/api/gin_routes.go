@@ -46,9 +46,7 @@ func (a *API) registerGinRoutes(api *gin.RouterGroup) {
 	}
 }
 
-// policyForRoute is the capability inventory for protected route families.
-// New owners cannot inherit access merely because they use GET: registration
-// fails until their policy is declared here.
+// A route family fails registration until its policy is declared here, even for GET.
 func policyForRoute(route routeSpec) (routePolicy, bool) {
 	policy := routePolicy{capability: models.CapabilityRead, csrf: isMutatingMethod(route.method)}
 	switch route.owner {
@@ -69,7 +67,6 @@ func policyForRoute(route routeSpec) (routePolicy, bool) {
 	case "git":
 		policy.capability = models.CapabilityGit
 	case "cloud-agent":
-		// Authenticated users may mint a connect token and list their own agents.
 		policy.capability = models.CapabilityRead
 	case "audit", "navigation", "canvas", "state", "search", "cloud-command", "cloud-snapshot", "workspace", "workspace-files", "workspace-search", "workspace-health", "item", "item-search", "jira", "knowledge", "workspace-stream":
 		if isMutatingMethod(route.method) {
@@ -81,8 +78,7 @@ func policyForRoute(route routeSpec) (routePolicy, bool) {
 	return policy, true
 }
 
-// routeManifest is the single route inventory used by registration and tests.
-// Ownership and auth grouping therefore cannot drift from the running router.
+// Registration and tests share this inventory, so auth grouping cannot drift from the router.
 func routeManifest(a *API) []routeSpec {
 	return []routeSpec{
 		{http.MethodGet, "/health", "health", publicRoute, ginHTTPHandler(a.health.health)},

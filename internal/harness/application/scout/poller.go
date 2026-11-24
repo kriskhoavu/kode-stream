@@ -1,6 +1,3 @@
-// Package scout polls every configured issue source and keeps the task table
-// in step with it: new issues become discovered tasks, known ones are
-// refreshed, and an issue a source stops listing goes stale after three polls.
 package scout
 
 import (
@@ -18,8 +15,6 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// StaleAfterMissedPolls is how many successful polls may miss a task before
-// it is marked stale.
 const StaleAfterMissedPolls = 3
 
 type Emit func(context.Context, domain.Event) domain.Event
@@ -48,8 +43,6 @@ func NewPoller(repository domain.Repository, workspaces ports.Workspaces, scouts
 	return &Poller{repository: repository, workspaces: workspaces, scouts: scouts, now: now, emit: emit, health: map[string]Health{}}
 }
 
-// Poll asks every enabled source of every configured workspace, or of one
-// workspace when workspaceID is set. It returns the sources it asked.
 func (p *Poller) Poll(ctx context.Context, settings domain.Settings, workspaceID string) ([]Health, error) {
 	var polled []Health
 	var errs []error
@@ -98,8 +91,6 @@ func (p *Poller) pollOne(ctx context.Context, scout ports.Scout, workspaceID str
 	return health
 }
 
-// apply upserts the candidates of one successful poll and ages the tasks it
-// no longer lists. It returns how many tasks it added.
 func (p *Poller) apply(ctx context.Context, workspaceID string, kind domain.SourceKind, candidates []domain.Candidate) (int, error) {
 	seen := map[string]bool{}
 	added := 0
@@ -165,7 +156,7 @@ func (p *Poller) upsert(ctx context.Context, workspaceID string, candidate domai
 		p.emit(ctx, domain.Event{Kind: domain.EventTaskDiscovered, TaskID: task.ID, Payload: taskPayload(task, "")})
 		return true, nil
 	}
-	// The first workspace to find an issue owns it; a task never reopens.
+	// The first workspace to find an issue owns it. A task never reopens.
 	if existing.WorkspaceID != workspaceID || domain.TaskTerminal(existing.State) {
 		return false, nil
 	}
@@ -229,7 +220,6 @@ func fingerprint(task domain.Task) string {
 	return strings.Join([]string{reporter, lastComment, string(task.State), task.Title, task.Body, task.Source.Status, task.Source.Priority, task.Source.Assignee, task.Source.Milestone, task.Source.Epic, task.Source.URL, strings.Join(labels, ","), strings.Join(deps, ","), fmt.Sprint(task.EstimatedMinutes)}, "\x00")
 }
 
-// boundedComments keeps the latest MaxTaskComments comments, each bounded.
 func boundedComments(comments []domain.Comment) []domain.Comment {
 	if len(comments) > domain.MaxTaskComments {
 		comments = comments[len(comments)-domain.MaxTaskComments:]
@@ -242,7 +232,6 @@ func boundedComments(comments []domain.Comment) []domain.Comment {
 	return out
 }
 
-// bounded cuts value to at most limit bytes without splitting a rune.
 func bounded(value string, limit int) string {
 	if len(value) <= limit {
 		return value
@@ -263,7 +252,6 @@ func taskPayload(task domain.Task, note string) []byte {
 	return data
 }
 
-// Health lists every source polled so far, ordered by workspace and kind.
 func (p *Poller) Health() []Health {
 	p.mu.Lock()
 	defer p.mu.Unlock()

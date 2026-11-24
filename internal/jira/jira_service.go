@@ -54,8 +54,6 @@ func NewService(reg registry.Repository, index itemindex.Repository, client *Cli
 	return &JiraService{registry: reg, index: index, client: client, cache: map[string]cacheEntry{}, inFlight: map[string]*inFlightIssue{}, generation: map[string]uint64{}, refreshes: map[string]int{}, now: time.Now}
 }
 
-// InvalidateWorkspace drops only process-local values after a workspace change
-// was committed. It is deliberately a narrow lifecycle seam, not a registry wrapper.
 func (s *Service) InvalidateWorkspace(workspaceID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -170,8 +168,7 @@ func (s *Service) issueByKey(ctx context.Context, workspace models.WorkspaceConf
 	return state, nil
 }
 
-// A generation only needs to exist while a request can still publish a result.
-// Retaining one for every issue key ever requested grows without a bound.
+// A generation lives only while a request can publish, so the map stays bounded.
 func (s *Service) releaseGenerationLocked(key string) {
 	if s.inFlight[key] == nil && s.refreshes[key] == 0 {
 		delete(s.generation, key)
@@ -288,8 +285,6 @@ func (s *Service) Attachment(ctx context.Context, itemID, attachmentID string) (
 	return s.client.GetAttachment(ctx, *workspace.Jira, *attachment)
 }
 
-// WorkspaceAttachment serves an attachment of an issue looked up by key in a
-// workspace, for a ticket that is not a Kode Stream item.
 func (s *Service) WorkspaceAttachment(ctx context.Context, workspaceID, issueKey, attachmentID string) (AttachmentContent, error) {
 	state, err := s.WorkspaceIssue(ctx, workspaceID, issueKey, false)
 	if err != nil {

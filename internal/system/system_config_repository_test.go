@@ -1,7 +1,5 @@
 package system
 
-// Configuration repository contract tests.
-
 import (
 	"encoding/json"
 	"errors"

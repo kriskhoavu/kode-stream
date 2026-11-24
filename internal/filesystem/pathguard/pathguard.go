@@ -1,7 +1,5 @@
 package pathguard
 
-// Package pathguard validates workspace-relative paths.
-
 import (
 	"fmt"
 	"os"
@@ -23,8 +21,6 @@ func SafeJoin(root, rel string) (string, error) {
 	return absFull, nil
 }
 
-// ResolveExisting returns an existing workspace-relative path after resolving
-// symlinks and proving the result remains below root.
 func ResolveExisting(root, rel string) (string, error) {
 	full, err := SafeJoin(root, rel)
 	if err != nil {
@@ -44,7 +40,6 @@ func ResolveExisting(root, rel string) (string, error) {
 	return realPath, nil
 }
 
-// ValidateMarkdownFile resolves an existing regular Markdown file below root.
 func ValidateMarkdownFile(root, rel string) (string, error) {
 	resolved, err := ResolveExisting(root, rel)
 	if err != nil {
@@ -61,9 +56,7 @@ func ValidateMarkdownFile(root, rel string) (string, error) {
 	return resolved, nil
 }
 
-// ValidateMarkdownTarget validates a workspace-relative Markdown write target.
-// The file may not exist yet, but its nearest existing parent must resolve
-// below root so a symlink cannot redirect the eventual write.
+// The nearest existing parent must resolve below root, so a symlink cannot redirect the write.
 func ValidateMarkdownTarget(root, rel string) (string, error) {
 	full, err := SafeJoin(root, rel)
 	if err != nil {

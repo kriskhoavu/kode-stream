@@ -1,6 +1,4 @@
-// Package e2eresult defines the bounded evidence format shared by plan and
-// knowledge E2E surfaces. Legacy Markdown is deliberately readable only as
-// unknown evidence: it has no proof that it belongs to the current runbook.
+// Package e2eresult parses bounded E2E evidence. Legacy Markdown reads only as unknown evidence.
 package e2eresult
 
 import (
@@ -34,9 +32,7 @@ type document struct {
 
 func Fingerprint(data []byte) string { sum := sha256.Sum256(data); return hex.EncodeToString(sum[:]) }
 
-// ReadFile bounds an untrusted agent-written latest-result before it reaches a
-// decoder. It deliberately returns the oversized sentinel data to Parse so the
-// caller receives the stable unknown-result diagnostic rather than an I/O leak.
+// Oversized data goes to Parse as a sentinel, so the caller gets the stable unknown-result diagnostic.
 func ReadFile(path string) ([]byte, error) {
 	return ReadFileLimit(path, MaxBytes)
 }

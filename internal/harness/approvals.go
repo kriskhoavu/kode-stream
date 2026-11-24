@@ -16,35 +16,27 @@ type Decision string
 const (
 	DecisionApprove Decision = "approve"
 	DecisionReject  Decision = "reject"
-	// DecisionReplan answers Review only: it sends the change back to Plan.
-	DecisionReplan Decision = "replan"
+	DecisionReplan  Decision = "replan"
 )
 
 type DecideInput struct {
-	Decision       Decision
-	Reason         string
-	IdempotencyKey string
-	// ExpectedRevision is the approval revision the decider saw; nil means
-	// the current one.
+	Decision         Decision
+	Reason           string
+	IdempotencyKey   string
 	ExpectedRevision *int64
 	RequestID        string
 	Actor            domain.Actor
 	Channel          domain.Channel
 
-	// head is the run's commit once a Review decision committed the
-	// reviewer's own changes; set by Decide, never by a caller.
-	head string
+	// Decide sets reviewedHead. A caller never does.
+	reviewedHead string
 }
 
-// AlreadyDecidedError carries the approval as it was decided.
 type AlreadyDecidedError struct{ Approval domain.Approval }
 
 func (e AlreadyDecidedError) Error() string { return domain.ErrAlreadyDecided.Error() }
 func (e AlreadyDecidedError) Unwrap() error { return domain.ErrAlreadyDecided }
 
-// Decide records a person's decision on a waiting approval and applies it.
-// The same idempotency key again returns the recorded approval; a decision
-// on an approval decided under another key is AlreadyDecidedError.
 func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInput) (domain.Approval, error) {
 	if err := s.mutable(); err != nil {
 		return domain.Approval{}, err
@@ -60,8 +52,6 @@ func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInp
 	if input.Decision != DecisionApprove && input.Reason == "" {
 		return domain.Approval{}, domain.Invalid("a reason is required to ask for changes")
 	}
-	// A question gate's approval is the answer itself; it is checked once the
-	// approval is loaded, below.
 	if input.Channel == "" {
 		input.Channel = domain.ChannelDashboard
 	}
@@ -74,7 +64,7 @@ func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInp
 		return recorded, nil
 	}
 	settings := s.settingsNow(ctx)
-	input.head = s.commitReview(ctx, approvalID)
+	input.reviewedHead = s.commitReview(ctx, approvalID)
 	var decided domain.Approval
 	err := s.atomic(ctx, func(tx domain.Repository, record func(domain.Event) error) error {
 		approval, err := tx.GetApproval(ctx, approvalID)
@@ -121,8 +111,7 @@ func (s *Service) Decide(ctx context.Context, approvalID string, input DecideInp
 	return decided, nil
 }
 
-// commitApprovedPlan commits the approved plan on the run branch, so each
-// builder's changes are measured against it.
+// The plan is committed so that each builder's changes are measured against it.
 func (s *Service) commitApprovedPlan(ctx context.Context, runID string) {
 	run, err := s.repository.GetRun(ctx, runID)
 	if err != nil {
@@ -197,7 +186,7 @@ func (s *Service) applyDecision(ctx context.Context, tx domain.Repository, recor
 		}
 		st.run.State, st.run.FailureReason = domain.RunRunning, ""
 		st.task.State, st.task.NeedsYou = domain.TaskRunning, false
-		resumed := domain.NewStage(st.run.ID, retryKind(st.stage.Kind), st.stage.Ordinal)
+		resumed := domain.NewStage(st.run.ID, resumeStageKind(st.stage.Kind), st.stage.Ordinal)
 		for _, finding := range st.stage.Findings {
 			if finding.Round == 0 || finding.Round == st.stage.Round {
 				finding.Round = 0
@@ -215,9 +204,7 @@ func (s *Service) applyDecision(ctx context.Context, tx domain.Repository, recor
 	return nil
 }
 
-// retryKind is the stage a resume starts again: a rejected plan approval
-// goes back to planning.
-func retryKind(kind domain.StageKind) domain.StageKind {
+func resumeStageKind(kind domain.StageKind) domain.StageKind {
 	if kind == domain.StagePlanApproval {
 		return domain.StagePlan
 	}
@@ -234,7 +221,6 @@ func nonEmptyName(actor domain.Actor) string {
 	return "a person"
 }
 
-// DecideRun decides the one approval a run is waiting on.
 func (s *Service) DecideRun(ctx context.Context, runID string, input DecideInput) (domain.Approval, error) {
 	if !s.Supported() {
 		return domain.Approval{}, domain.ErrUnsupported
@@ -255,10 +241,6 @@ func (s *Service) DecideRun(ctx context.Context, runID string, input DecideInput
 	return s.Decide(ctx, waiting[0].ID, input)
 }
 
-// --- reporting ---
-
-// CostSummary sums recorded cost per day, run, role or model. It reports
-// only; nothing acts on it.
 func (s *Service) CostSummary(ctx context.Context, groupBy domain.CostGroup, from, to time.Time) (domain.CostSummary, error) {
 	if groupBy == "" {
 		groupBy = domain.CostByDay
@@ -290,9 +272,7 @@ func (s *Service) CostSummary(ctx context.Context, groupBy domain.CostGroup, fro
 	return summary, nil
 }
 
-// commitReview commits what a person changed in the run's worktree during
-// Review, before any decision on it, so a handed-off change carries it and
-// a builder sent back starts from it. It returns the run's commit after.
+// The reviewer's changes are committed before the decision, so a hand-off carries them.
 func (s *Service) commitReview(ctx context.Context, approvalID string) string {
 	approval, err := s.repository.GetApproval(ctx, approvalID)
 	if err != nil || approval.Gate != domain.GateReview || approval.State != domain.ApprovalRequested {
@@ -307,11 +287,10 @@ func (s *Service) commitReview(ctx context.Context, approvalID string) string {
 	} else if commit != "" {
 		s.record(ctx, run, "harness.commit", models.AuditStatusSuccess, "Committed the changes made in Review", nil)
 	}
-	return s.head(ctx, run)
+	return s.worktreeHead(ctx, run)
 }
 
-// head is the commit a run's worktree is at, or "" when it is unknown.
-func (s *Service) head(ctx context.Context, run domain.Run) string {
+func (s *Service) worktreeHead(ctx context.Context, run domain.Run) string {
 	if s.worktrees == nil || run.WorktreePath == "" {
 		return ""
 	}
@@ -322,11 +301,6 @@ func (s *Service) head(ctx context.Context, run domain.Run) string {
 	return head
 }
 
-// applyReview applies a person's Review decision. A hand-off goes on to the
-// draft pull request, through the tests again when the change moved after
-// they passed. Reject sends the change back to Build, replan back to Plan,
-// each with the reviewer's words as a blocking finding; both come back to
-// Review once their tests pass.
 func (s *Service) applyReview(st *step, input DecideInput) error {
 	if input.Decision == DecisionApprove {
 		tested := ""
@@ -337,7 +311,7 @@ func (s *Service) applyReview(st *step, input DecideInput) error {
 				}
 			}
 		}
-		if input.head == tested {
+		if input.reviewedHead == tested {
 			st.pass()
 			return st.save()
 		}

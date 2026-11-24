@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-
 	appaisession "kode-stream/internal/ai"
 	"kode-stream/internal/common/models"
 	gitadapter "kode-stream/internal/git"
@@ -21,10 +20,6 @@ import (
 	"kode-stream/internal/workspace/registry"
 )
 
-// sessionsTestFixture is a real (not faked) Git checkout, workspace registry,
-// item index, and AI session service, wired the way server.go wires them,
-// so sessions_test.go exercises the sessions controller against the same
-// collaborators the ai package tests already validate in isolation.
 type sessionsTestFixture struct {
 	controller *sessionsController
 	records    *appaisession.FileSessionRecordRepository
@@ -72,8 +67,6 @@ func newSessionsTestFixture(t *testing.T, mode models.RuntimeMode) sessionsTestF
 		return commit
 	}()
 
-	// A change made after the launch commit so an available SessionChanges has
-	// something to report.
 	if err := os.WriteFile(filepath.Join(root, "seed.txt"), []byte("changed"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -139,8 +132,7 @@ func TestSessionChangesReturns404ForUnknownSession(t *testing.T) {
 	}
 }
 
-// A Cloud caller who is not the workspace's owner must see the same 404 a
-// missing session would give, never a 403 that would confirm the session exists.
+// A non-owner must see the 404 a missing session gives, never a 403.
 func TestSessionChangesCloudOwnership(t *testing.T) {
 	for _, tc := range []struct {
 		caller string
@@ -199,8 +191,6 @@ func TestSessionDiffReturnsDiffForAvailableChanges(t *testing.T) {
 
 func TestSessionDiffReturnsConflictWhenChangesUnavailable(t *testing.T) {
 	fixture := newSessionsTestFixture(t, models.RuntimeModeLocal)
-	// Overwrite the seeded record with an empty ObservedCommit so the guard
-	// chain reports launch_commit_unknown.
 	record, found, err := fixture.records.Get("session-1")
 	if err != nil || !found {
 		t.Fatalf("found=%v err=%v", found, err)
@@ -231,8 +221,6 @@ func TestGlobalSessionsRejectsInvalidScope(t *testing.T) {
 func TestGlobalSessionsDefaultsToActiveScope(t *testing.T) {
 	fixture := newSessionsTestFixture(t, models.RuntimeModeLocal)
 	payload := fetchGlobalSessions(t, fixture, "/api/sessions", "")
-	// The seeded record is exited (not live), so the default active scope
-	// excludes it.
 	if len(payload.Rows) != 0 {
 		t.Fatalf("rows=%#v", payload.Rows)
 	}
@@ -273,8 +261,6 @@ type globalSessionsPayload struct {
 	Truncated bool                            `json:"truncated"`
 }
 
-// fetchGlobalSessions asks the global sessions route, as a Cloud caller when
-// one is named, and decodes its 200 answer.
 func fetchGlobalSessions(t *testing.T, fixture sessionsTestFixture, path, caller string) globalSessionsPayload {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)

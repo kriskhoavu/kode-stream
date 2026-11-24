@@ -1,7 +1,5 @@
 package itemindex
 
-// Package itemindex persists the Item domain read model.
-
 import (
 	"context"
 	"errors"

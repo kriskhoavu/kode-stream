@@ -8,9 +8,6 @@ import (
 	"kode-stream/internal/workspace/settingsfile"
 )
 
-// settingsFileView is what Settings shows for a workspace's shared file:
-// whether its checkout has one, what it holds, and what an export of the
-// workspace's settings now would write.
 type settingsFileView struct {
 	Path    string             `json:"path"`
 	Exists  bool               `json:"exists"`
@@ -42,7 +39,6 @@ func (a *harnessController) settingsFileWorkspace(w http.ResponseWriter, r *http
 	return workspace, true
 }
 
-// currentSettingsFile is the workspace's settings as an export writes them.
 func (a *harnessController) currentSettingsFile(r *http.Request, workspaceID string) (settingsfile.File, error) {
 	harnessPart, err := a.harness.WorkspaceFile(r.Context(), workspaceID)
 	if err != nil {

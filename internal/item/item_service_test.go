@@ -1,7 +1,5 @@
 package item
 
-// Item service contract tests.
-
 import (
 	"errors"
 	"os"

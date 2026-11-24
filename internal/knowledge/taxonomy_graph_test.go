@@ -2,8 +2,6 @@ package knowledge
 
 import "testing"
 
-// The graph payload must carry the taxonomy, otherwise the views cannot group
-// by it and fall back to the raw domain path.
 func TestBuildGraphCarriesTaxonomyOntoNodes(t *testing.T) {
 	taxonomy := DetectTaxonomy(referenceWikiPaths())
 	pages := []KnowledgePage{

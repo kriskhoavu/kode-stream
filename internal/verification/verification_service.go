@@ -72,7 +72,6 @@ func (s *Service) Limits() (int, time.Duration) {
 	return cap(s.slots), s.timeout
 }
 
-// JobCount is a diagnostic snapshot of in-memory retained jobs.
 func (s *Service) JobCount() int {
 	if s == nil {
 		return 0
@@ -288,7 +287,6 @@ func (s *Service) run(jobID string, workspace models.WorkspaceConfig) {
 	s.mutate(jobID, func(state *Job) { state.ExitCode = 0 })
 }
 
-// jobStep is one stage of a verification job and what its failure means.
 type jobStep struct {
 	name                string
 	run                 func() error
@@ -299,9 +297,6 @@ type jobStep struct {
 	automationArtifacts bool
 }
 
-// jobSteps lists a job's stages in order: prepare, start, health checks and
-// the verification itself. Every stage after prepare stops the runtime when
-// it fails.
 func (s *Service) jobSteps(ctx context.Context, job Job, path string, runtimeLog, verifyLog io.Writer) []jobStep {
 	config := job.Runtime
 	return []jobStep{

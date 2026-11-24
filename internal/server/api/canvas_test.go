@@ -133,8 +133,6 @@ func TestCanvasDefaultRejectsInvalidBodiesAndPartialFixtureIsUnavailable(t *test
 			t.Fatalf("partial fixture body=%q status=%d", body, response.Code)
 		}
 	}
-	// Once Canvas exists, the missing Workstream dependency must still be a
-	// stable unavailable response, before the body can trigger branch work.
 	controller.canvas = &appcanvas.Service{}
 	response := httptest.NewRecorder()
 	controller.resolveDefaultCanvas(response, httptest.NewRequest(http.MethodPost, "/api/canvas/default", bytes.NewBufferString(`{"workspaceId":"w"}`)))

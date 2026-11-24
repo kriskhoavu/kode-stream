@@ -1,6 +1,4 @@
-// Package bitbucket opens a pull request on Bitbucket: a draft on Bitbucket
-// Cloud, and on Bitbucket Server one whose title starts with [DRAFT], since
-// older Server versions have no draft flag.
+// Package bitbucket opens a draft pull request. On Server the title starts with [DRAFT], since older versions have no draft flag.
 package bitbucket
 
 import (
@@ -25,17 +23,11 @@ type Adapter struct {
 	CloudURL   string
 	HTTPClient *http.Client
 	Tokens     credential.Resolver
-	// RemoteURL reads a checkout's origin; nil means only the registered
-	// remote and the settings are consulted.
-	RemoteURL func(path string) (string, error)
+	RemoteURL  func(path string) (string, error)
 }
 
 const defaultTokenEnvVar = "BITBUCKET_TOKEN"
 
-// Target names where the pull request goes: the settings' Bitbucket entry when
-// it is complete, else the workspace's origin when that is a Bitbucket host.
-// bitbucket.org is Cloud (workspace/repo); any other Bitbucket host is Server
-// (project/repo under https://host).
 func (a *Adapter) Target(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) (domain.BitbucketSourceSettings, bool) {
 	if config := settings.Bitbucket; config != nil && config.Workspace != "" && config.Repo != "" && (config.Cloud || config.BaseURL != "") {
 		out := *config
@@ -66,9 +58,6 @@ var (
 	httpsRemote = regexp.MustCompile(`^https?://(?:[^@/]+@)?([^/:]+)(?::\d+)?/(.+)$`)
 )
 
-// ParseRemote turns a git origin into a Bitbucket target. It accepts the three
-// shapes git uses (ssh://, scp-like and https) and Bitbucket Server's /scm/
-// prefix on https clones; a host that is not Bitbucket answers false.
 func ParseRemote(remote string) (domain.BitbucketSourceSettings, bool) {
 	var host, path string
 	for _, pattern := range []*regexp.Regexp{sshRemote, httpsRemote, scpRemote} {

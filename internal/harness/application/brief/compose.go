@@ -7,8 +7,6 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// Compose writes the brief an agent runs from: its goal, context, scope,
-// constraints, deliverable and verification, in that order.
 func Compose(input Input) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# Brief: %s for %s\n", roleName(input.Role), input.Task.Key)
@@ -63,8 +61,6 @@ func writeContext(b *strings.Builder, input Input) {
 	writeDataBlock(b, "The end of the failing verification log:", input.LogTail)
 }
 
-// writeDataBlock writes an introduced block of task data, or nothing when
-// there is no data.
 func writeDataBlock(b *strings.Builder, intro, data string) {
 	if data == "" {
 		return

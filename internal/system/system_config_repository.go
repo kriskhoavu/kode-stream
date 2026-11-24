@@ -1,7 +1,5 @@
 package system
 
-// This package owns application path configuration persistence.
-
 import (
 	"errors"
 	"fmt"

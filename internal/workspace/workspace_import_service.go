@@ -154,8 +154,6 @@ func (s *Service) Import(request models.WorkspaceImportRequest) ([]models.Worksp
 	return results, nil
 }
 
-// uniqueImportKeys trims the selected candidate keys and drops blanks and
-// repeats, keeping the caller's order.
 func uniqueImportKeys(keys []string) []string {
 	selected := make([]string, 0, len(keys))
 	seen := map[string]struct{}{}
@@ -173,8 +171,6 @@ func uniqueImportKeys(keys []string) []string {
 	return selected
 }
 
-// indexImported scans one imported workspace and records the outcome on its
-// result and in the audit log.
 func (s *Service) indexImported(workspaceID string, result *models.WorkspaceImportResult) {
 	if s.importScan == nil && (s.scans == nil || s.scans.scanner == nil || s.index == nil) {
 		result.Status = "scan_failed"

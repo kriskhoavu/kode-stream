@@ -48,7 +48,6 @@ func (a *auditLog) Append(event models.AuditEvent) (models.AuditEvent, error) {
 	return event, nil
 }
 
-// withOrigin gives the fixture's workspace a bare origin to push to.
 func withOrigin(t *testing.T, fixture *pipelineFixture) string {
 	t.Helper()
 	origin := filepath.Join(t.TempDir(), "origin.git")
@@ -58,8 +57,6 @@ func withOrigin(t *testing.T, fixture *pipelineFixture) string {
 	return origin
 }
 
-// failOnRun returns a verification command that fails only on its n-th run
-// in this test, counting runs in a file outside the worktree.
 func failOnRun(t *testing.T, n int) string {
 	counter := filepath.Join(t.TempDir(), "runs")
 	return "c=$(cat " + counter + " 2>/dev/null || echo 0); c=$((c+1)); echo $c > " + counter + "; if [ $c -eq " + string(rune('0'+n)) + " ]; then echo 'export.go is broken'; exit 1; fi"
@@ -69,8 +66,7 @@ func TestARunGoesFromBuildThroughTestsToADraftPullRequest(t *testing.T) {
 	ctx := context.Background()
 	draftRetryDelay = 0
 	defer func() { draftRetryDelay = time.Minute }()
-	// Gate runs: 1 the builder's, 2 QA's first (fails), 3 the tester's,
-	// 4 and 5 QA's second try.
+	// Gate runs: 1 the builder's, 2 QA's first (fails), 3 the tester's, 4 and 5 QA's second try.
 	command := failOnRun(t, 2)
 	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
 		switch role {
@@ -122,7 +118,6 @@ func TestARunGoesFromBuildThroughTestsToADraftPullRequest(t *testing.T) {
 		t.Fatal("the worktree was kept after the pull request")
 	}
 	pushed := gitOutput(t, origin, "log", "--format=%s", remote)
-	// The planner wrote no files here, so there is no plan commit.
 	if !strings.HasPrefix(pushed, "PM-7: Fix the tests of Add export\nPM-7: Add export\nbase\n") {
 		t.Fatalf("pushed branch log = %q", pushed)
 	}
@@ -156,7 +151,6 @@ func TestTestsThatKeepFailingBlockTheRunAndAPRApprovalGatesThePush(t *testing.T)
 
 }
 
-// reviewing is a run that passed its tests and waits at Review.
 func reviewing(t *testing.T) (*pipelineFixture, *fakePulls, string) {
 	t.Helper()
 	fixture := newPipeline(t, happyScript, func(settings *domain.Settings) { settings.RequireReview = true })

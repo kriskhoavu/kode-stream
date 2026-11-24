@@ -11,35 +11,28 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-// MaxSearchResults bounds one search.
 const MaxSearchResults = 200
 
-// SearchedIssue is one search hit with the fields a queue ranks and orders
-// on. Every string is untrusted and bounded.
 type SearchedIssue struct {
-	Key                     string   `json:"key"`
-	Summary                 string   `json:"summary"`
-	Description             string   `json:"description"`
-	Status                  string   `json:"status"`
-	StatusCategory          string   `json:"statusCategory,omitempty"`
-	IssueType               string   `json:"issueType"`
-	Priority                string   `json:"priority,omitempty"`
-	Assignee                string   `json:"assignee,omitempty"`
-	Labels                  []string `json:"labels"`
-	UpdatedAt               string   `json:"updatedAt,omitempty"`
-	BrowserURL              string   `json:"browserUrl"`
-	BlockedBy               []string `json:"blockedBy"`
-	FixVersions             []string `json:"fixVersions"`
-	Epic                    string   `json:"epic,omitempty"`
-	OriginalEstimateSeconds int64    `json:"originalEstimateSeconds,omitempty"`
-	// Reporter is who opened the issue; nil when Jira names nobody.
-	Reporter *Person `json:"reporter,omitempty"`
-	// Comments are the issue's latest comments, oldest first, at most
-	// MaxSearchedComments, each bounded.
-	Comments []SearchedComment `json:"comments"`
+	Key                     string            `json:"key"`
+	Summary                 string            `json:"summary"`
+	Description             string            `json:"description"`
+	Status                  string            `json:"status"`
+	StatusCategory          string            `json:"statusCategory,omitempty"`
+	IssueType               string            `json:"issueType"`
+	Priority                string            `json:"priority,omitempty"`
+	Assignee                string            `json:"assignee,omitempty"`
+	Labels                  []string          `json:"labels"`
+	UpdatedAt               string            `json:"updatedAt,omitempty"`
+	BrowserURL              string            `json:"browserUrl"`
+	BlockedBy               []string          `json:"blockedBy"`
+	FixVersions             []string          `json:"fixVersions"`
+	Epic                    string            `json:"epic,omitempty"`
+	OriginalEstimateSeconds int64             `json:"originalEstimateSeconds,omitempty"`
+	Reporter                *Person           `json:"reporter,omitempty"`
+	Comments                []SearchedComment `json:"comments"`
 }
 
-// SearchedComment is one comment on a searched issue. Its body is untrusted.
 type SearchedComment struct {
 	ID        string `json:"id"`
 	Author    string `json:"author"`
@@ -47,8 +40,6 @@ type SearchedComment struct {
 	Body      string `json:"body"`
 }
 
-// MaxSearchedComments and maxCommentBytes bound what a search keeps of an
-// issue's comments.
 const (
 	MaxSearchedComments = 10
 	maxCommentBytes     = 4 << 10
@@ -109,8 +100,6 @@ type jiraSearchIssue struct {
 
 const searchFields = "summary,status,description,issuetype,assignee,reporter,comment,priority,labels,updated,fixVersions,parent,timeoriginalestimate,issuelinks"
 
-// SearchIssues runs a JQL search: Jira Server and Data Center through API 2
-// search, Jira Cloud through API 3 search/jql. It reads only.
 func (c *Client) SearchIssues(ctx context.Context, connection models.JiraConnection, jql string, max int) ([]SearchedIssue, error) {
 	if strings.TrimSpace(jql) == "" {
 		return nil, fmt.Errorf("a JQL query is required")
@@ -142,8 +131,6 @@ func (c *Client) SearchIssues(ctx context.Context, connection models.JiraConnect
 	return issues, nil
 }
 
-// searchedIssue bounds and converts one issue of a search. It answers false
-// for an issue without a key.
 func searchedIssue(raw jiraSearchIssue, baseURL string) (SearchedIssue, bool) {
 	var truncated bool
 	key, _ := boundedString(raw.Key, maxScalarBytes)
@@ -192,7 +179,6 @@ func searchedIssue(raw jiraSearchIssue, baseURL string) (SearchedIssue, bool) {
 	return issue, true
 }
 
-// searchedComments keeps the last MaxSearchedComments comments, bounded.
 func searchedComments(comments []jiraSearchComment) []SearchedComment {
 	if len(comments) > MaxSearchedComments {
 		comments = comments[len(comments)-MaxSearchedComments:]

@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// ParseConnectToken accepts either a raw connect token or a kodestream://connect deep link.
 func ParseConnectToken(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {

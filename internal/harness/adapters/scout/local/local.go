@@ -1,7 +1,3 @@
-// Package local lists tasks written as Markdown files in a folder, so a
-// person can try the harness's pipeline without an issue tracker. Each file
-// is one task: its name is the task's key, its first heading the title, and
-// the rest the body. It reads only.
 package local
 
 import (
@@ -17,13 +13,10 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// maxFiles bounds how many task files one poll reads.
 const maxFiles = 200
 
-// maxFileBytes bounds one task file; the poller trims the body further.
 const maxFileBytes = 64 << 10
 
-// keyPattern is the file names that are tasks: SANDBOX-1.md, not notes.txt.
 var keyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,63}$`)
 
 type Scout struct{}
@@ -36,8 +29,6 @@ func (s *Scout) Enabled(_ models.WorkspaceConfig, settings domain.WorkspaceSetti
 	return settings.Local != nil && settings.Local.Enabled && strings.TrimSpace(settings.Local.Dir) != ""
 }
 
-// Dir is the task folder: an absolute Dir as it is, a relative one inside
-// the workspace's checkout.
 func Dir(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) string {
 	dir := strings.TrimSpace(settings.Local.Dir)
 	if filepath.IsAbs(dir) {
@@ -89,8 +80,6 @@ func (s *Scout) Poll(ctx context.Context, workspace models.WorkspaceConfig, sett
 	return candidates, nil
 }
 
-// parse takes the first "# " heading as the title and the rest as the body.
-// A file with no heading is titled by its key.
 func parse(text, key string) (string, string) {
 	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
 	for index, line := range lines {

@@ -1,5 +1,3 @@
-// Package github opens a draft pull request on GitHub: through the REST API
-// when a token is set, otherwise through `gh pr create --draft`.
 package github
 
 import (
@@ -24,11 +22,8 @@ type Adapter struct {
 	BaseURL    string
 	HTTPClient *http.Client
 	Tokens     credential.Resolver
-	// GH runs the gh CLI in dir; nil means exec.
-	GH func(ctx context.Context, dir string, args ...string) (string, error)
-	// RemoteURL reads a checkout's origin for a workspace registered by path
-	// alone; nil means only the registered remote and the settings count.
-	RemoteURL func(path string) (string, error)
+	GH         func(ctx context.Context, dir string, args ...string) (string, error)
+	RemoteURL  func(path string) (string, error)
 }
 
 func New() *Adapter {
@@ -39,7 +34,6 @@ func (a *Adapter) ID() string { return "github" }
 
 var githubRemote = regexp.MustCompile(`github\.com[:/]([^/]+/[^/]+?)(\.git)?/?$`)
 
-// Repo names the repository: the settings' repo, else the workspace remote.
 func Repo(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) string {
 	if settings.GitHub != nil && strings.Count(settings.GitHub.Repo, "/") == 1 {
 		return settings.GitHub.Repo
@@ -50,9 +44,7 @@ func Repo(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) s
 	return ""
 }
 
-// repo is Repo with one more fallback: the origin of the checkout at the
-// workspace's path, for a workspace registered without a remote.
-func (a *Adapter) repo(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) string {
+func (a *Adapter) repoOrOrigin(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) string {
 	if repo := Repo(workspace, settings); repo != "" {
 		return repo
 	}
@@ -67,11 +59,11 @@ func (a *Adapter) repo(workspace models.WorkspaceConfig, settings domain.Workspa
 }
 
 func (a *Adapter) Supports(workspace models.WorkspaceConfig, settings domain.WorkspaceSettings) bool {
-	return a.repo(workspace, settings) != ""
+	return a.repoOrOrigin(workspace, settings) != ""
 }
 
 func (a *Adapter) CreateDraft(ctx context.Context, request ports.PullRequest) (string, error) {
-	repo := a.repo(request.Workspace, request.Settings)
+	repo := a.repoOrOrigin(request.Workspace, request.Settings)
 	if repo == "" {
 		return "", fmt.Errorf("workspace %s has no GitHub repository", request.Workspace.ID)
 	}

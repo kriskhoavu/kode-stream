@@ -172,7 +172,6 @@ func (s *Service) SaveFile(id, fileID string, input models.FileSaveInput) (model
 		if writeErr != nil {
 			return writeErr
 		}
-		// Content edits affect the derived description/documents projection.
 		_, writeErr = s.writer.RefreshWorkspace(workspace)
 		if writeErr != nil {
 			saved.Committed, saved.RefreshRequired, saved.RefreshError = true, true, writeErr.Error()
@@ -292,9 +291,7 @@ func (s *Service) Create(input models.NewItemInput) (models.WriteResult, error) 
 	return result, err
 }
 
-// withItemMutation is the single branch-proof/mutation/index-publication unit
-// for checkout items. It prevents a branch switch between validation and the
-// final write or refresh.
+// One lock covers validation, write and refresh, so no branch switch lands between them.
 func (s *Service) withItemMutation(workspace models.WorkspaceConfig, item models.ItemDetail, operation func(models.ItemDetail) error) error {
 	if item.SourceMode == "snapshot" {
 		return ErrSnapshotReadOnly
@@ -304,9 +301,6 @@ func (s *Service) withItemMutation(workspace models.WorkspaceConfig, item models
 	}
 	return s.git.WithWorkspaceMutation(workspace.Path, func() error {
 		if err := s.requireCurrentCheckoutBranch(workspace, item); err != nil {
-			// Lightweight file-backed fixtures without a repository remain
-			// supported for Local recovery operations; production workspaces
-			// always prove their checkout under this same lock.
 			if !strings.Contains(err.Error(), "not a git repository") {
 				return err
 			}

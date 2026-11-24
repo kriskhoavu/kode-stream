@@ -14,21 +14,19 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-// scanCandidate is one Markdown file found under a wiki source.
 type scanCandidate struct {
-	path          string // absolute
-	rel           string // relative to the wiki root
-	workspacePath string // relative to the workspace
+	absPath       string
+	wikiPath      string
+	workspacePath string
 }
 
-// sourceScan reads one wiki source inside a workspace within its limits.
 type sourceScan struct {
 	ctx           context.Context
 	detector      *Detector
 	workspace     models.WorkspaceConfig
 	workspaceRoot string
-	source        string // the cleaned source, relative to the workspace
-	root          string // the source's resolved absolute path
+	sourcePath    string
+	resolvedRoot  string
 	limits        ScanLimits
 
 	pages      []KnowledgePage
@@ -38,8 +36,6 @@ type sourceScan struct {
 	links      int
 }
 
-// resolveSourceRoot checks the source stays inside the workspace and holds
-// an index.md; found is false when it does not exist or is not a wiki.
 func resolveSourceRoot(workspaceRoot, source string) (clean, resolved string, found bool, err error) {
 	clean = filepath.Clean(strings.TrimSpace(source))
 	if clean == "." || clean == "" || filepath.IsAbs(clean) || strings.HasPrefix(clean, "..") {
@@ -62,11 +58,9 @@ func resolveSourceRoot(workspaceRoot, source string) (clean, resolved string, fo
 	return clean, resolved, true, nil
 }
 
-// candidates lists the source's Markdown files, skipping hidden directories
-// and symlinks, within the file budget.
 func (s *sourceScan) candidates() ([]scanCandidate, error) {
 	found := make([]scanCandidate, 0)
-	err := filepath.WalkDir(s.root, func(current string, entry fs.DirEntry, walkErr error) error {
+	err := filepath.WalkDir(s.resolvedRoot, func(current string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -74,7 +68,7 @@ func (s *sourceScan) candidates() ([]scanCandidate, error) {
 			return err
 		}
 		if entry.IsDir() {
-			if current != s.root && strings.HasPrefix(entry.Name(), ".") {
+			if current != s.resolvedRoot && strings.HasPrefix(entry.Name(), ".") {
 				return filepath.SkipDir
 			}
 			return nil
@@ -85,7 +79,7 @@ func (s *sourceScan) candidates() ([]scanCandidate, error) {
 		if _, err := entry.Info(); err != nil {
 			return err
 		}
-		rel, err := filepath.Rel(s.root, current)
+		rel, err := filepath.Rel(s.resolvedRoot, current)
 		if err != nil {
 			return err
 		}
@@ -93,7 +87,7 @@ func (s *sourceScan) candidates() ([]scanCandidate, error) {
 		if err != nil {
 			return err
 		}
-		found = append(found, scanCandidate{path: current, rel: filepath.ToSlash(rel), workspacePath: filepath.ToSlash(relWorkspace)})
+		found = append(found, scanCandidate{absPath: current, wikiPath: filepath.ToSlash(rel), workspacePath: filepath.ToSlash(relWorkspace)})
 		if len(found) > s.limits.MaxFiles {
 			return fmt.Errorf("file budget exceeded")
 		}
@@ -102,7 +96,6 @@ func (s *sourceScan) candidates() ([]scanCandidate, error) {
 	return found, err
 }
 
-// ignored names the candidates the workspace's ignore rules exclude.
 func (s *sourceScan) ignored(candidates []scanCandidate) (map[string]bool, error) {
 	if s.detector.ignore == nil {
 		return map[string]bool{}, nil
@@ -115,41 +108,39 @@ func (s *sourceScan) ignored(candidates []scanCandidate) (map[string]bool, error
 }
 
 func (s *sourceScan) warn(path string, code WarningCode, message string) {
-	s.warnings = append(s.warnings, KnowledgeWarning{WorkspaceID: s.workspace.ID, WikiRoot: filepath.ToSlash(s.source), Path: path, Code: code, Message: message})
+	s.warnings = append(s.warnings, KnowledgeWarning{WorkspaceID: s.workspace.ID, WikiRoot: filepath.ToSlash(s.sourcePath), Path: path, Code: code, Message: message})
 }
 
-// adopt stamps warnings from a later step with this scan's workspace and root.
 func (s *sourceScan) adopt(warnings []KnowledgeWarning) {
 	for index := range warnings {
 		warnings[index].WorkspaceID = s.workspace.ID
-		warnings[index].WikiRoot = filepath.ToSlash(s.source)
+		warnings[index].WikiRoot = filepath.ToSlash(s.sourcePath)
 	}
 	s.warnings = append(s.warnings, warnings...)
 }
 
-// readPage reads and parses one candidate, charging it to the budgets.
 func (s *sourceScan) readPage(file scanCandidate) error {
 	s.files++
 	if s.files > s.limits.MaxFiles {
 		return fmt.Errorf("file budget exceeded")
 	}
-	data, warning, err := readStableBounded(s.ctx, file.path, min(s.limits.MaxFileBytes, s.limits.MaxTotalBytes-s.totalBytes))
+	data, warning, err := readStableBounded(s.ctx, file.absPath, min(s.limits.MaxFileBytes, s.limits.MaxTotalBytes-s.totalBytes))
 	if warning != "" {
-		s.warn(file.rel, "file_too_large", "file exceeds scan size limit")
+		s.warn(file.wikiPath, "file_too_large", "file exceeds scan size limit")
 		return nil
 	}
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return err
 		}
-		s.warn(file.rel, "invalid_metadata", "file changed or could not be read during scan")
+		s.warn(file.wikiPath, "invalid_metadata", "file changed or could not be read during scan")
 		return nil
 	}
 	s.totalBytes += int64(len(data))
-	if s.totalBytes > s.limits.MaxTotalBytes { // defensive: the bounded reader must make this unreachable.
+	if s.totalBytes > s.limits.MaxTotalBytes {
 		return fmt.Errorf("byte budget exceeded")
 	}
-	page, pageWarnings, err := ParsePage(file.rel, data)
+	page, pageWarnings, err := ParsePage(file.wikiPath, data)
 	s.adopt(pageWarnings)
 	if err != nil {
 		return nil
@@ -165,11 +156,10 @@ func (s *sourceScan) readPage(file scanCandidate) error {
 	return nil
 }
 
-// wiki resolves the pages' relationships and taxonomy into the wiki.
 func (s *sourceScan) wiki() KnowledgeWiki {
 	pages, relationshipWarnings, _ := ResolveRelationships(s.pages)
 	s.adopt(relationshipWarnings)
-	pages, journeysBucket, taxonomyWarnings := applyTaxonomy(s.root, pages)
+	pages, journeysBucket, taxonomyWarnings := applyTaxonomy(s.resolvedRoot, pages)
 	s.adopt(taxonomyWarnings)
 	sort.Slice(s.warnings, func(i, j int) bool {
 		if s.warnings[i].Path == s.warnings[j].Path {
@@ -177,14 +167,13 @@ func (s *sourceScan) wiki() KnowledgeWiki {
 		}
 		return s.warnings[i].Path < s.warnings[j].Path
 	})
-	return KnowledgeWiki{WorkspaceID: s.workspace.ID, Root: filepath.ToSlash(s.source), DisplayName: displayName(s.source), JourneysBucket: journeysBucket, Pages: pages, Warnings: s.warnings, IndexedAt: time.Now().UTC()}
+	return KnowledgeWiki{WorkspaceID: s.workspace.ID, Root: filepath.ToSlash(s.sourcePath), DisplayName: displayName(s.sourcePath), JourneysBucket: journeysBucket, Pages: pages, Warnings: s.warnings, IndexedAt: time.Now().UTC()}
 }
 
-// run scans the source; found is false when it holds no readable page.
 func (s *sourceScan) run() (KnowledgeWiki, bool, error) {
 	candidates, err := s.candidates()
 	if err != nil {
-		return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", s.source, err)
+		return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", s.sourcePath, err)
 	}
 	ignored, err := s.ignored(candidates)
 	if err != nil {
@@ -193,13 +182,13 @@ func (s *sourceScan) run() (KnowledgeWiki, bool, error) {
 	s.pages, s.warnings = make([]KnowledgePage, 0), make([]KnowledgeWarning, 0)
 	for _, file := range candidates {
 		if err := s.ctx.Err(); err != nil {
-			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", s.source, err)
+			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", s.sourcePath, err)
 		}
 		if ignored[file.workspacePath] {
 			continue
 		}
 		if err := s.readPage(file); err != nil {
-			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", s.source, err)
+			return KnowledgeWiki{}, false, fmt.Errorf("scan %s: %w", s.sourcePath, err)
 		}
 	}
 	if len(s.pages) == 0 {

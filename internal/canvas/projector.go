@@ -9,8 +9,6 @@ import (
 	"kode-stream/internal/workspace"
 )
 
-// projector turns one layout's stored placements into the nodes the canvas
-// draws, rebinding placements whose item changed ID.
 type projector struct {
 	s               *Service
 	ctx             context.Context
@@ -48,13 +46,7 @@ func (s *Service) projectContext(ctx context.Context, layout Layout, workspaceCo
 	return Projection{Layout: layout, Nodes: nodes, Connections: derivedConnections(nodes), Unplaced: p.unplaced(items, sessions)}
 }
 
-// index maps items by ID and by path, sessions by ID, and which nodes are
-// placed. Placements reference items by ID, but the ID scheme has changed
-// before (see stablePlanID) without migrating stored placements. The path
-// index lets an orphaned placement rebind to the item it always meant,
-// because (workspace, branch, path) determines the current ID uniquely.
-// placed is filled before projecting so a rebind can tell whether the item is
-// already placed under its current ID, rather than depending on order.
+// Rebind by path: (workspace, branch, path) determines the current ID after an ID scheme change.
 func (p *projector) index(items []models.ItemSummary, sessions []ai.SessionRecordView, placements []Placement) {
 	p.itemByID, p.itemByPath = map[string]models.ItemSummary{}, map[string]models.ItemSummary{}
 	for _, item := range items {
@@ -71,8 +63,6 @@ func (p *projector) index(items []models.ItemSummary, sessions []ai.SessionRecor
 	}
 }
 
-// readGit reads the checkout's branch, the layout branch's commit and the
-// status; content is unavailable when the status cannot be read.
 func (p *projector) readGit() {
 	p.contentAvailable = strings.TrimSpace(p.workspaceConfig.Path) != ""
 	if p.s.git == nil || !p.contentAvailable {
@@ -107,8 +97,6 @@ func (p *projector) resolveActions() {
 	p.readForbidden = p.actions[models.WorkspaceActionRepositoryRead].State == models.ActionCapabilityForbidden
 }
 
-// project resolves one placement into a node; keep is false for a hidden
-// placement, a superseded duplicate or one older versions left behind.
 func (p *projector) project(placement Placement) (ProjectedNode, bool) {
 	if placement.Hidden {
 		return ProjectedNode{}, false
@@ -148,21 +136,16 @@ func (p *projector) workspaceNode() *WorkspaceNode {
 	return &view
 }
 
-// planNode resolves a plan placement, rebinding it by path when its item
-// changed ID.
 func (p *projector) planNode(node ProjectedNode) (ProjectedNode, bool) {
 	item, ok := p.itemByID[node.EntityRef.ItemID]
 	if !ok {
-		// Canvas only projects ticket roots under plans/{service}/{ticket}.
-		// Ignore placements left behind by older versions that treated every
-		// indexed item (including wiki folders) as a plan.
+		// Placements from older versions may point at wiki folders. Only plans/{service}/{ticket} roots project.
 		if canvasPlanServiceFromPath(node.EntityRef.ItemPath) == "" {
 			return node, false
 		}
 		rebound, found := p.itemByPath[canvasPathKey(node.EntityRef.ItemPath)]
 		if !found {
-			// The plan itself is gone. Keep the placement stale so it stays
-			// recoverable instead of being deleted behind the user's back.
+			// The plan is gone. Keep the placement stale, so it stays recoverable.
 			node.State = NodeStale
 			return node, true
 		}
@@ -171,9 +154,7 @@ func (p *projector) planNode(node ProjectedNode) (ProjectedNode, bool) {
 			// orphan is a superseded duplicate of that node.
 			return node, false
 		}
-		// Adopt the placement: re-anchor it to the current identity so the
-		// node resolves under the ID scheme in use now rather than the one
-		// it was placed under.
+		// Re-anchor the placement to the item's current ID.
 		p.placed[planNodeID(rebound.ID)] = true
 		item = rebound
 		node.EntityRef.ItemID = item.ID
@@ -182,7 +163,6 @@ func (p *projector) planNode(node ProjectedNode) (ProjectedNode, bool) {
 	return node, true
 }
 
-// unplaced lists the workspace, items and sessions no node shows yet.
 func (p *projector) unplaced(items []models.ItemSummary, sessions []ai.SessionRecordView) []EntityRef {
 	unplaced := []EntityRef{}
 	if !p.placed[workspaceNodeID(p.layout.WorkspaceID)] {

@@ -1,8 +1,4 @@
-// Package opencode runs OpenCode headless for one agent run:
-// `opencode run --format json` in the run's worktree. OpenCode takes its
-// message as an argument, so the brief goes in a file under .harness/ that
-// is attached to a one-line message and removed when the run ends; the brief
-// never reaches argv. The model is `provider/model`.
+// Package opencode runs OpenCode headless. The brief goes in a file and never reaches argv.
 package opencode
 
 import (
@@ -23,14 +19,12 @@ import (
 
 const ID = "opencode"
 
-// BriefFile is where the brief waits for OpenCode, relative to the worktree.
 const BriefFile = ".harness/brief.md"
 
 const message = "Follow the attached brief exactly. It names your goal, scope, constraints, deliverable and verification."
 
 var DefaultEnv = []string{"OPENCODE_CONFIG", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "OPENAI_BASE_URL", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "SSL_CERT_FILE"}
 
-// Unsupported lists what this adapter cannot pass to OpenCode.
 var Unsupported = []string{"maxTurns", "maxBudgetUsd", "allowedTools", "disallowedTools", "permissionMode"}
 
 type Engine struct {
@@ -139,8 +133,6 @@ type event struct {
 	} `json:"part"`
 }
 
-// Line reads OpenCode's JSON events: text and tool parts are progress, and
-// each finished step adds a turn, its cost and its tokens.
 func (p *parser) Line(raw []byte, emit func(ports.EngineEvent)) {
 	var line event
 	if json.Unmarshal(raw, &line) != nil {

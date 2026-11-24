@@ -18,8 +18,6 @@ const (
 	terminalWriteTimeout = 10 * time.Second
 )
 
-// terminalChannel carries one embedded session over one WebSocket: the
-// session's output and state out, a viewer's input, resizes and cancel in.
 type terminalChannel struct {
 	id            string
 	manager       *appaisession.Manager
@@ -59,8 +57,6 @@ func (c *terminalChannel) fail(message string) {
 	_ = c.write(channelOutput{Type: "error", Message: message})
 }
 
-// readLoop handles the viewer's messages until one closes the channel or
-// the connection drops, then closes done.
 func (c *terminalChannel) readLoop(done chan<- struct{}) {
 	defer close(done)
 	for {
@@ -71,7 +67,6 @@ func (c *terminalChannel) readLoop(done chan<- struct{}) {
 	}
 }
 
-// readMessage reads exactly one JSON message from one text frame.
 func (c *terminalChannel) readMessage() (channelInput, bool) {
 	messageType, reader, err := c.connection.NextReader()
 	if err != nil || messageType != websocket.TextMessage {
@@ -92,7 +87,6 @@ func (c *terminalChannel) readMessage() (channelInput, bool) {
 	return message, true
 }
 
-// handle applies one message and says whether the channel stays open.
 func (c *terminalChannel) handle(message channelInput) bool {
 	switch message.Type {
 	case "input":
@@ -139,9 +133,7 @@ func (c *terminalChannel) input(data string) bool {
 	return true
 }
 
-// resize refuses a size outside the PTY's limits but keeps the channel open:
-// a viewer briefly laid out at a sliver must not lose the session, which the
-// manager cancels once nobody is watching.
+// A sliver-sized layout must not lose the session, so the channel stays open.
 func (c *terminalChannel) resize(columns, rows uint16) {
 	if columns == 0 || rows == 0 || columns > maxTerminalDimension || rows > maxTerminalDimension {
 		c.fail("invalid terminal size")
@@ -152,8 +144,6 @@ func (c *terminalChannel) resize(columns, rows uint16) {
 	}
 }
 
-// pump sends output and state changes until the session ends, the
-// connection fails or the reader stops.
 func (c *terminalChannel) pump(output <-chan []byte, lastState string, readDone <-chan struct{}) {
 	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()

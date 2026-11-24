@@ -5,8 +5,6 @@ import (
 	"sync"
 )
 
-// ConnectionStore owns opaque, per-user credentials. Callers can resolve an
-// integration but never read credential material back through an API response.
 type ConnectionStore struct {
 	mu     sync.RWMutex
 	tokens map[string]string

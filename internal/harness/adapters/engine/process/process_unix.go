@@ -7,7 +7,6 @@ import (
 	"syscall"
 )
 
-// Prepare puts the command in a process group of its own.
 func Prepare(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 }

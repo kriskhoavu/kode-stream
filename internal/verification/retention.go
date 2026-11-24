@@ -6,8 +6,7 @@ import (
 	"time"
 )
 
-// ConfigureRetention bounds process-local completed job history. Active jobs are
-// never removed; callers may reduce these values in resource-constrained hosts.
+// Active jobs are never removed.
 func (s *Service) ConfigureRetention(maxTerminal int, retention time.Duration) *Service {
 	if maxTerminal > 0 {
 		s.maxTerminal = maxTerminal
@@ -18,8 +17,6 @@ func (s *Service) ConfigureRetention(maxTerminal int, retention time.Duration) *
 	return s
 }
 
-// RetentionWarnings exposes cleanup failures to host diagnostics without
-// resurrecting pruned job records. Returned data is copied for callers.
 func (s *Service) RetentionWarnings() []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

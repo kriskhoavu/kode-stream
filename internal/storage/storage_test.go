@@ -202,7 +202,6 @@ INSERT INTO scan_warnings (workspace_id, branch, item_path, code, message) VALUE
 	} {
 		var count int
 		if err := db.QueryRow("SELECT COUNT(*) FROM "+check.table+" WHERE id = ?", check.value).Scan(&count); err != nil {
-			// The quarantine tables have domain-specific evidence columns.
 			query := map[string]string{
 				"orphaned_branch_scans_v7":  "SELECT COUNT(*) FROM orphaned_branch_scans_v7 WHERE workspace_id = ?",
 				"orphaned_scan_warnings_v7": "SELECT COUNT(*) FROM orphaned_scan_warnings_v7 WHERE message = ?",

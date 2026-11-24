@@ -26,7 +26,6 @@ type Usage struct {
 	CostUSD          float64 `json:"costUsd"`
 }
 
-// MaxReportBytes and MaxDiffStatBytes bound what an agent run keeps.
 const (
 	MaxReportBytes   = 64 << 10
 	MaxDiffStatBytes = 8 << 10
@@ -59,32 +58,25 @@ type AgentRun struct {
 	FailureReason   string        `json:"failureReason,omitempty"`
 	Report          *Report       `json:"report,omitempty"`
 	DiffStat        string        `json:"diffStat,omitempty"`
-	// OutOfScope lists paths the harness reverted after the agent changed
-	// them outside its scope.
-	OutOfScope []string `json:"outOfScope,omitempty"`
-	// HarnessGate is the harness's own run of the verification commands.
-	HarnessGate *GateRun `json:"harnessGate,omitempty"`
-	// Commit is the harness's commit after this agent run, if any.
-	Commit      string     `json:"commit,omitempty"`
-	Progress    string     `json:"progress,omitempty"`
-	LeaseOwner  string     `json:"-"`
-	LeaseUntil  *time.Time `json:"-"`
-	HeartbeatAt *time.Time `json:"heartbeatAt,omitempty"`
-	QueuedAt    time.Time  `json:"queuedAt"`
-	StartedAt   *time.Time `json:"startedAt,omitempty"`
-	FinishedAt  *time.Time `json:"finishedAt,omitempty"`
-	Revision    int64      `json:"revision"`
+	OutOfScope      []string      `json:"outOfScope,omitempty"`
+	HarnessGate     *GateRun      `json:"harnessGate,omitempty"`
+	Commit          string        `json:"commit,omitempty"`
+	Progress        string        `json:"progress,omitempty"`
+	LeaseOwner      string        `json:"-"`
+	LeaseUntil      *time.Time    `json:"-"`
+	HeartbeatAt     *time.Time    `json:"heartbeatAt,omitempty"`
+	QueuedAt        time.Time     `json:"queuedAt"`
+	StartedAt       *time.Time    `json:"startedAt,omitempty"`
+	FinishedAt      *time.Time    `json:"finishedAt,omitempty"`
+	Revision        int64         `json:"revision"`
 }
 
-// TranscriptTurn is one text turn of an agent's own transcript, read from the
-// CLI's file when asked for and kept nowhere.
 type TranscriptTurn struct {
 	Role string    `json:"role"`
 	Text string    `json:"text"`
 	At   time.Time `json:"at,omitempty"`
 }
 
-// AgentRunSummary is the list form shown on a stage.
 type AgentRunSummary struct {
 	ID         string        `json:"id"`
 	Role       Role          `json:"role"`
@@ -105,19 +97,15 @@ func (a AgentRun) Summary() AgentRunSummary {
 	return AgentRunSummary{ID: a.ID, Role: a.Role, Engine: a.Engine, Model: a.Model, State: a.State, Round: a.Round, Attempt: a.Attempt, Turns: a.Turns, CostUSD: a.CostUSD, DurationMs: a.DurationMs, StartedAt: a.StartedAt, FinishedAt: a.FinishedAt, Progress: a.Progress}
 }
 
-// ReportSchema names the structured report version agents write.
 const ReportSchema = "harness.report/v1"
 
-// Answer is what a person replied when an agent stopped to ask.
 type Answer struct {
-	Role      Role     `json:"role"`
-	Round     int      `json:"round"`
-	Questions []string `json:"questions"`
-	Answer    string   `json:"answer"`
-	By        string   `json:"by,omitempty"`
-	// FromSource marks a reply on the ticket itself, which the harness read
-	// from the source, rather than an answer a person gave in Kode Stream.
-	FromSource bool `json:"fromSource,omitempty"`
+	Role       Role     `json:"role"`
+	Round      int      `json:"round"`
+	Questions  []string `json:"questions"`
+	Answer     string   `json:"answer"`
+	By         string   `json:"by,omitempty"`
+	FromSource bool     `json:"fromSource,omitempty"`
 }
 
 type Finding struct {
@@ -134,26 +122,19 @@ type Gate struct {
 	Passed  bool   `json:"passed"`
 }
 
-// MaxLogTailBytes bounds the verification output the harness keeps.
 const MaxLogTailBytes = 8 << 10
 
-// GateRun is one run of the verification commands by the harness itself.
 type GateRun struct {
 	Command    string `json:"command"`
 	Passed     bool   `json:"passed"`
 	ExitCode   int    `json:"exitCode"`
 	DurationMs int64  `json:"durationMs"`
-	// LogTail is the last 8 KB of the failing command's output. It is
-	// untrusted and goes to a brief only inside task-data delimiters.
+	// LogTail is untrusted and goes to a brief only inside task-data delimiters.
 	LogTail string `json:"logTail,omitempty"`
-	// Head is the commit a passing run verified, so Review can tell
-	// whether anything changed after it.
-	Head string `json:"head,omitempty"`
+	Head    string `json:"head,omitempty"`
 }
 
-// Text is a report field an agent writes as words. A model sometimes writes
-// it as a list of lines instead; Text takes both, joining a list one item a
-// line, so the shape alone never loses a report.
+// A model sometimes writes a report field as a list of lines, so Text accepts both.
 type Text string
 
 func (t *Text) UnmarshalJSON(data []byte) error {
@@ -188,26 +169,14 @@ type Report struct {
 type GateKind string
 
 const (
-	GateStart  GateKind = "start"
-	GatePlan   GateKind = "plan"
-	GateResume GateKind = "resume"
-	// GateReview is the Review stage: approve hands the change off, reject
-	// sends it back to Build, and replan back to Plan.
-	GateReview GateKind = "review"
-	// GateQuestion is an agent's own stop: it could not decide alone and
-	// asks a person; approving sends the answer back into its round.
+	GateStart    GateKind = "start"
+	GatePlan     GateKind = "plan"
+	GateResume   GateKind = "resume"
+	GateReview   GateKind = "review"
 	GateQuestion GateKind = "question"
-	// GateClarify waits for a ticket's reporter: the planner found the
-	// ticket does not say enough to plan from. A new comment on the ticket
-	// sends the planner out again; a person may also continue with what they
-	// know, or dismiss the ticket.
-	GateClarify GateKind = "clarify"
+	GateClarify  GateKind = "clarify"
 )
 
-// ReportNeedsInfo is the status a planner reports when a ready ticket does
-// not say enough to plan from.
 const ReportNeedsInfo = "needs_info"
 
-// MaxClarifyRounds bounds how often a planner waits for a ticket's reporter
-// before it asks a person instead.
 const MaxClarifyRounds = 3

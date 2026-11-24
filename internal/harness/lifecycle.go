@@ -9,9 +9,7 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// Start runs the orchestrator's loops in Local mode on SQL storage. Every
-// agent run left running by a previous process is interrupted first, because
-// a restart means its CLI process is gone.
+// A restart means every CLI process is gone, so agent runs left running are interrupted first.
 func (s *Service) Start(ctx context.Context) error {
 	if !s.Supported() || !s.config.LocalMode {
 		return nil
@@ -38,8 +36,6 @@ func (s *Service) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop ends the loops and every agent run they started, waiting at most
-// timeout. It is safe to call when the orchestrator never started.
 func (s *Service) Stop(timeout time.Duration) {
 	if s == nil {
 		return
@@ -55,8 +51,7 @@ func (s *Service) Stop(timeout time.Duration) {
 	}
 }
 
-// settingsNow reads the current settings; a read failure falls back to the
-// defaults, which keep the harness off.
+// A read failure falls back to the defaults, which keep the harness off.
 func (s *Service) settingsNow(ctx context.Context) domain.Settings {
 	settings, err := s.repository.LoadSettings(ctx)
 	if err != nil {
@@ -75,7 +70,6 @@ func (s *Service) interval(pick func(domain.Intervals) int) func() time.Duration
 	}
 }
 
-// active reports whether a loop should work this cycle.
 func active(settings domain.Settings, key domain.RoleKey) bool {
 	return settings.Enabled && !settings.Paused[key]
 }
@@ -120,8 +114,6 @@ func (s *Service) sortCycle(ctx context.Context) error {
 	return s.Sort(ctx)
 }
 
-// recoveryCycle returns expired leases to the queue: an agent run whose lease
-// ran out is interrupted and re-queued while it has attempts left.
 func (s *Service) recoveryCycle(ctx context.Context) error {
 	agentRuns, _, err := s.repository.RecoverExpiredLeases(ctx, s.now())
 	if err != nil {
@@ -133,8 +125,6 @@ func (s *Service) recoveryCycle(ctx context.Context) error {
 	return nil
 }
 
-// requeueInterrupted puts an interrupted agent run back in the queue while it
-// has attempts left, and fails it otherwise.
 func (s *Service) requeueInterrupted(ctx context.Context, agentRun domain.AgentRun) {
 	expect := domain.Expect{State: string(agentRun.State), Revision: agentRun.Revision}
 	if agentRun.Attempt+1 <= domain.MaxStageAttempts {

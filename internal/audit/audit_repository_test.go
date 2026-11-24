@@ -1,7 +1,5 @@
 package audit
 
-// Audit repository contract tests.
-
 import (
 	"context"
 	"os"

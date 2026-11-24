@@ -140,8 +140,6 @@ func TestFileSessionRecordRepositoryRejectsInvalidCandidateYAMLWithoutReplacingP
 	}
 }
 
-// An abandoned build stamped laneId on session records. That field is harmless
-// and must be ignored on load, while a genuinely unsafe field still fails.
 func TestFileSessionRecordRepositoryIgnoresStaleLaneIDButRejectsUnsafeFields(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ai-session-records.yaml")
 	stale := "- id: s1\n  workspaceId: w1\n  provider: codex\n  intent: implement\n  requestedBranch: main\n  laneId: lane-1\n  state: exited\n  startedAt: 2026-09-11T00:00:00Z\n  lastKnownAt: 2026-09-11T00:00:00Z\n"

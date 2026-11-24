@@ -14,13 +14,10 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// ErrReportMissing means the agent wrote no report the harness can read.
 var ErrReportMissing = errors.New("report_missing")
 
 const fenceOpen = "```json harness-report"
 
-// ReadReport reads the report from the worktree, falling back to a fenced
-// block in the agent's final text, and validates it for role.
 func ReadReport(worktreePath string, finalText string, role domain.Role) (domain.Report, error) {
 	data, err := readReportFile(filepath.Join(worktreePath, ReportPath))
 	if err != nil || len(bytes.TrimSpace(data)) == 0 {
@@ -40,8 +37,7 @@ func ReadReport(worktreePath string, finalText string, role domain.Role) (domain
 	return Validate(report, role)
 }
 
-// ClearReport removes a report left by an earlier agent run, so the next run
-// cannot pass with it.
+// A report left by an earlier run must not let the next run pass.
 func ClearReport(worktreePath string) error {
 	err := os.Remove(filepath.Join(worktreePath, ReportPath))
 	if errors.Is(err, os.ErrNotExist) {
@@ -82,7 +78,6 @@ func fencedReport(text string) []byte {
 	return []byte(strings.TrimSpace(rest[:end]))
 }
 
-// Validate checks the fields a role must report and bounds every text.
 func Validate(report domain.Report, role domain.Role) (domain.Report, error) {
 	if report.Schema == "" {
 		report.Schema = domain.ReportSchema
@@ -133,7 +128,6 @@ func Validate(report domain.Report, role domain.Role) (domain.Report, error) {
 	return report, nil
 }
 
-// Blocking counts the findings a producer must fix.
 func Blocking(findings []domain.Finding) (blocking, advisory int) {
 	for _, finding := range findings {
 		if finding.Severity == "blocking" {

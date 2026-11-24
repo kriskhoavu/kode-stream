@@ -1,7 +1,5 @@
 package workstream
 
-// Package workstream owns branch-scoped planning context for a workspace.
-
 import (
 	"context"
 	"crypto/sha256"

@@ -1,5 +1,4 @@
-// Package queue ranks harness tasks. RuleRanker scores every task by rules a
-// person can read; a model re-ranker may only reorder the rules' top N.
+// Package queue ranks tasks by rules a person can read. A model may only reorder the rules' top N.
 package queue
 
 import (
@@ -13,14 +12,12 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// Scored is a task with its new score and the reasons behind it.
 type Scored struct {
 	Task    domain.Task
 	Score   float64
 	Reasons []string
 }
 
-// Ranker orders a workspace's ranked tasks, best first.
 type Ranker interface {
 	Rank(ctx context.Context, tasks []domain.Task, settings domain.Settings, now time.Time) ([]Scored, error)
 }
@@ -42,7 +39,6 @@ var priorityBase = map[string]float64{
 	"lowest": 5, "trivial": 5, "p4": 5,
 }
 
-// Score computes one task's score and the reasons, one per non-zero term.
 func (RuleRanker) Score(task domain.Task, settings domain.Settings, now time.Time) (float64, []string) {
 	reasons := []string{}
 	base, ok := priorityBase[strings.ToLower(strings.TrimSpace(task.Source.Priority))]
@@ -100,7 +96,6 @@ func (r RuleRanker) Rank(_ context.Context, tasks []domain.Task, settings domain
 	return scored, nil
 }
 
-// SortScored orders best first; ties go to the task found first.
 func SortScored(scored []Scored) {
 	sort.SliceStable(scored, func(i, j int) bool {
 		if scored[i].Score != scored[j].Score {
@@ -113,16 +108,11 @@ func SortScored(scored []Scored) {
 	})
 }
 
-// Reranker may reorder the rules' top N; it never adds, drops or moves a
-// task in or out of the top N, and never moves a pinned task.
 type Reranker interface {
 	Rerank(ctx context.Context, ranked []Scored, settings domain.Settings) ([]Scored, error)
 }
 
-// ApplyOrder reorders the unpinned tasks among ranked's first topN by order
-// (task ids, best first) and hands them the same scores in the new order, so
-// the stored ranking follows. An order that is not a permutation of those
-// ids is refused and ranked comes back unchanged.
+// An order that is not a permutation of the top N ids is refused.
 func ApplyOrder(ranked []Scored, topN int, order []string) ([]Scored, bool) {
 	if topN > len(ranked) {
 		topN = len(ranked)

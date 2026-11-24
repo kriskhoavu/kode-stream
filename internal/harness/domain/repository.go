@@ -5,8 +5,6 @@ import (
 	"time"
 )
 
-// Expect is the state and revision a conditional write requires. A write
-// whose row no longer matches both fails with ErrStateMoved.
 type Expect struct {
 	State    string
 	Revision int64
@@ -71,17 +69,13 @@ type CostSummary struct {
 	Rows     []CostRow `json:"rows"`
 }
 
-// Claim is the lease a loop takes on a queued row.
 type Claim struct {
 	Owner      string
 	LeaseUntil time.Time
 	Now        time.Time
 }
 
-// Repository persists harness state. Every Save is one conditional UPDATE on
-// id, state and revision; the returned value carries the new revision.
-// Atomic runs fn inside one transaction; fn must use only the repository it
-// is given.
+// Every Save is one conditional UPDATE on id, state and revision. Atomic's fn must use only the repository it is given.
 type Repository interface {
 	Atomic(ctx context.Context, fn func(Repository) error) error
 
@@ -90,10 +84,8 @@ type Repository interface {
 	FindTaskBySource(ctx context.Context, kind SourceKind, key string) (Task, bool, error)
 	ListTasks(ctx context.Context, filter TaskFilter) ([]Task, error)
 	SaveTask(ctx context.Context, task Task, expect Expect) (Task, error)
-	// DeleteTasks removes every task the filter matches and returns them.
 	DeleteTasks(ctx context.Context, filter TaskFilter) ([]Task, error)
-	// DeleteTaskHistory removes one task with its runs, stages, agent runs
-	// and approvals. Events stay: they are the log of what happened.
+	// Events stay: they are the log of what happened.
 	DeleteTaskHistory(ctx context.Context, taskID string) error
 
 	InsertRun(ctx context.Context, run Run) error
@@ -105,22 +97,15 @@ type Repository interface {
 	GetStage(ctx context.Context, id string) (Stage, error)
 	ListStages(ctx context.Context, runID string) ([]Stage, error)
 	SaveStage(ctx context.Context, stage Stage, expect Expect) (Stage, error)
-	// ClaimStage moves the oldest pending stage of one of kinds whose retry
-	// time has come to running under a lease.
 	ClaimStage(ctx context.Context, kinds []StageKind, claim Claim) (Stage, bool, error)
 
 	InsertAgentRun(ctx context.Context, agentRun AgentRun) error
 	GetAgentRun(ctx context.Context, id string) (AgentRun, error)
 	ListAgentRuns(ctx context.Context, filter AgentRunFilter) ([]AgentRun, error)
 	SaveAgentRun(ctx context.Context, agentRun AgentRun, expect Expect) (AgentRun, error)
-	// ClaimAgentRun moves the oldest queued agent run of one of roles to
-	// running under a lease.
 	ClaimAgentRun(ctx context.Context, roles []Role, claim Claim) (AgentRun, bool, error)
-	// RecoverExpiredLeases moves running agent runs and stages whose lease
-	// has expired: agent runs to interrupted, stages back to pending.
+	// Expired agent runs go to interrupted, and expired stages back to pending.
 	RecoverExpiredLeases(ctx context.Context, now time.Time) ([]AgentRun, []Stage, error)
-	// InterruptRunning moves every running agent run to interrupted and every
-	// running non-model stage back to pending; it runs once at start-up.
 	InterruptRunning(ctx context.Context, now time.Time) ([]AgentRun, error)
 
 	InsertApproval(ctx context.Context, approval Approval) error

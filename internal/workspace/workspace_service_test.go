@@ -1,7 +1,5 @@
 package workspace
 
-// Workspace service contract tests.
-
 import (
 	"fmt"
 	"os"
@@ -158,7 +156,7 @@ func TestCreateRemoteCloneWorkspace(t *testing.T) {
 		RemoteURL:        "https://example.com/org/remote.git",
 		CloneRoot:        cloneRoot,
 		BaselineBranch:   "main",
-		Sources: models.SourceList("plans"),
+		Sources:          models.SourceList("plans"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +192,7 @@ func TestCreateRemoteCloneWorkspaceRejectsInvalidURL(t *testing.T) {
 		RemoteURL:        "not-a-url",
 		CloneRoot:        t.TempDir(),
 		BaselineBranch:   "main",
-		Sources: models.SourceList("plans"),
+		Sources:          models.SourceList("plans"),
 	})
 	if err == nil || !strings.Contains(err.Error(), "remote URL") {
 		t.Fatalf("err = %v", err)
@@ -229,7 +227,7 @@ func TestDeleteRefusesLegacyManagedCloneWithoutOwnershipProof(t *testing.T) {
 		RegistrationMode: models.WorkspaceRegistrationModeRemoteClone,
 		RemoteURL:        "https://example.com/org/repo.git",
 		BaselineBranch:   "main",
-		Sources: models.SourceList("plans"),
+		Sources:          models.SourceList("plans"),
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// BitbucketServer implements the Bitbucket Server/Data Center REST API.
 type BitbucketServer struct{ HTTPIntegration }
 
 func NewBitbucketServer(baseURL, token string) *BitbucketServer {

@@ -1,6 +1,4 @@
-// Package notify shapes and schedules the harness's outbound webhooks. The
-// outbox row is written with the event, so delivery is at least once; the
-// receiver dedupes on the event id.
+// Package notify writes the outbox row with the event, so delivery is at least once and the receiver dedupes on the event id.
 package notify
 
 import (
@@ -14,11 +12,9 @@ const (
 	MaxAttempts = 5
 	firstDelay  = 5 * time.Second
 	maxDelay    = 10 * time.Minute
-	// Target names the one webhook the harness delivers to.
-	Target = "bot-webhook"
+	Target      = "bot-webhook"
 )
 
-// Notifiable lists the event kinds the bot is told about.
 var Notifiable = map[domain.EventKind]bool{
 	domain.EventApprovalRequested: true,
 	domain.EventStageFinished:     true,
@@ -26,8 +22,6 @@ var Notifiable = map[domain.EventKind]bool{
 	domain.EventRunFinished:       true,
 }
 
-// Backoff is the wait before attempt number attempts+1: 5 s doubling to at
-// most 10 minutes.
 func Backoff(attempts int) time.Duration {
 	delay := firstDelay
 	for i := 1; i < attempts; i++ {
@@ -63,13 +57,10 @@ type ApprovalRef struct {
 	Gate      string     `json:"gate"`
 	Revision  int64      `json:"revision"`
 	ExpiresAt *time.Time `json:"expiresAt,omitempty"`
-	// Questions are what the agent asks on a question gate; the answer is
-	// the approval's reason.
-	Questions []string `json:"questions,omitempty"`
-	Role      string   `json:"role,omitempty"`
+	Questions []string   `json:"questions,omitempty"`
+	Role      string     `json:"role,omitempty"`
 }
 
-// Payload is the webhook body.
 type Payload struct {
 	EventID  string            `json:"eventId"`
 	Seq      int64             `json:"seq"`

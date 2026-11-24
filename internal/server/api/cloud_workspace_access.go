@@ -45,9 +45,7 @@ func (a agentAccessAdapter) Command(session cloudSession, workspace models.Works
 	if !roleCapabilities(session.User.Role)[capability] {
 		return models.CommandResult{}, http.StatusForbidden, "role cannot run this command"
 	}
-	// A connected socket is not yet a durable command queue.  Refuse rather
-	// than acknowledge work that cannot be delivered/correlated exactly once.
-	// This is intentionally stable until a persisted command lifecycle exists.
+	// No durable command queue exists yet, so refuse work that cannot be delivered exactly once.
 	return models.CommandResult{}, http.StatusServiceUnavailable, "Cloud Agent command delivery is unavailable"
 }
 

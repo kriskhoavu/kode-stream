@@ -9,9 +9,6 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// A planner that lists open questions stops its round at a question gate;
-// the answer sends the planner out again with the questions and the answer
-// in its brief, and the plan then reaches review as usual.
 func TestAPlannerWithOpenQuestionsStopsToAskAndContinuesFromTheAnswer(t *testing.T) {
 	ctx := context.Background()
 	fixture := newPipeline(t, func(role domain.Role, call int, invocation ports.Invocation) (map[string]any, ports.Result) {
@@ -63,8 +60,6 @@ func TestAPlannerWithOpenQuestionsStopsToAskAndContinuesFromTheAnswer(t *testing
 	}
 }
 
-// With the gate off for the task, open questions ride along to the plan
-// gate and a blocked report blocks the run instead of asking.
 func TestWithTheQuestionGateOffQuestionsReachThePlanGateAndBlockedBlocks(t *testing.T) {
 	ctx := context.Background()
 	no := false

@@ -21,9 +21,7 @@ const (
 	ChannelDashboard Channel = "dashboard"
 	ChannelWebex     Channel = "webex"
 	ChannelAPI       Channel = "api"
-	// ChannelSource is a decision the harness took on what the source said,
-	// such as the reporter replying on a ticket.
-	ChannelSource Channel = "source"
+	ChannelSource    Channel = "source"
 )
 
 type Actor struct {
@@ -33,22 +31,16 @@ type Actor struct {
 }
 
 type ApprovalContext struct {
-	Difficulty   string  `json:"difficulty,omitempty"`
-	Subtasks     int     `json:"subtasks,omitempty"`
-	CostSoFarUSD float64 `json:"costSoFarUsd"`
-	Round        int     `json:"round,omitempty"`
-	// Questions are what the agent asked (a question gate), or what the
-	// planner left open for a person to settle (a plan gate).
-	Questions []string `json:"questions,omitempty"`
-	// Role is the agent that asked.
-	Role Role `json:"role,omitempty"`
-	// Reporter is who a clarify gate waits for, and Draft the comment a
-	// person may post on the ticket to ask them.
-	Reporter string `json:"reporter,omitempty"`
-	Draft    string `json:"draft,omitempty"`
+	Difficulty   string   `json:"difficulty,omitempty"`
+	Subtasks     int      `json:"subtasks,omitempty"`
+	CostSoFarUSD float64  `json:"costSoFarUsd"`
+	Round        int      `json:"round,omitempty"`
+	Questions    []string `json:"questions,omitempty"`
+	Role         Role     `json:"role,omitempty"`
+	Reporter     string   `json:"reporter,omitempty"`
+	Draft        string   `json:"draft,omitempty"`
 }
 
-// MaxQuestions bounds how many questions one report may raise.
 const MaxQuestions = 10
 
 type Approval struct {
@@ -111,7 +103,6 @@ type Event struct {
 	Payload    json.RawMessage `json:"payload"`
 }
 
-// NotificationState tracks one outbound webhook delivery.
 type NotificationState string
 
 const (

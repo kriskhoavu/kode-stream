@@ -221,8 +221,6 @@ func (s *Service) resolvePrompt(presetID, promptDraft, customPrompt string) (str
 	return "", "", launchError("invalid_prompt", "selected AI preset is unavailable")
 }
 
-// ItemWorkspace is deliberately narrow transport support for ownership checks;
-// it does not expose the workspace path or item content.
 func (s *Service) ItemWorkspace(itemID string) (string, error) {
 	if s.launch == nil || s.launch.index == nil {
 		return "", launchError("launch_failed", "AI session launch is unavailable")

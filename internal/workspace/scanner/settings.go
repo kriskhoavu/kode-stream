@@ -1,7 +1,5 @@
 package scanner
 
-// Package scanner discovers and parses Workspace sources.
-
 import (
 	"bytes"
 	"errors"
@@ -18,23 +16,15 @@ import (
 
 const SourceStructureSettingsFile = "workspace-settings.yaml"
 
-// RepositorySettingsDir holds Kode Stream's own files at the workspace root.
-// Its workspace-settings.yaml holds the card rules of every source of the
-// repository; a rule belongs to the source its fields.source names, by the
-// source's path or its last part. A source that no rule there names reads
-// workspace-settings.yaml inside the source itself.
+// A source that no rule in workspace-settings.yaml names reads the file inside the source.
 const RepositorySettingsDir = ".kode-stream"
 
-// RepositorySettingsPath is the repository's settings file, relative to the
-// workspace root.
 const RepositorySettingsPath = RepositorySettingsDir + "/" + SourceStructureSettingsFile
 
 func sourceSettingsFile(source string) string {
 	return filepath.ToSlash(filepath.Join(filepath.Clean(source), SourceStructureSettingsFile))
 }
 
-// cardNamesSource says whether a rule of the repository's file belongs to
-// source.
 func cardNamesSource(card models.SourceStructureCard, source string) bool {
 	name := strings.TrimSpace(card.Fields.Source)
 	source = filepath.ToSlash(filepath.Clean(source))
@@ -49,8 +39,6 @@ func decodeSourceStructureSettings(data []byte) (models.SourceStructureSettings,
 	return settings, err
 }
 
-// splitCards parts the rules of the repository's file into those of source
-// and the others.
 func splitCards(settings models.SourceStructureSettings, source string) (own, others []models.SourceStructureCard) {
 	for _, card := range settings.Cards {
 		if cardNamesSource(card, source) {
@@ -62,8 +50,6 @@ func splitCards(settings models.SourceStructureSettings, source string) (own, ot
 	return own, others
 }
 
-// readRepositorySettings reads the repository's file from the workspace at
-// workspaceRoot. A missing file is empty settings.
 func readRepositorySettings(workspaceRoot string) (models.SourceStructureSettings, bool, error) {
 	data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(RepositorySettingsPath)))
 	if errors.Is(err, os.ErrNotExist) {
@@ -79,11 +65,6 @@ func readRepositorySettings(workspaceRoot string) (models.SourceStructureSetting
 	return settings, true, nil
 }
 
-// SourceSettingsPath is the file that holds the settings of source in the
-// workspace at workspaceRoot: the repository's file when a rule there names
-// the source, else the file inside the source when it exists, else the
-// repository's file, which saving creates or extends. The second result says
-// whether the source has settings in that file.
 func SourceSettingsPath(workspaceRoot, source string) (string, bool) {
 	repository := filepath.Join(workspaceRoot, filepath.FromSlash(RepositorySettingsPath))
 	if settings, _, err := readRepositorySettings(workspaceRoot); err == nil {
@@ -136,14 +117,10 @@ func BuiltInStructuredSettings() models.SourceStructureSettings {
 	}
 }
 
-// ReadSourceStructureSettings reads the settings of source, a path relative
-// to the workspace at workspaceRoot.
 func ReadSourceStructureSettings(workspaceRoot, source string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
 	return ReadSourceStructureSettingsFromReader(NewFilesystemSourceReader(workspaceRoot), source)
 }
 
-// ReadSourceStructureSettingsFromReader reads the settings of root, a source
-// path relative to the reader, which is rooted at the workspace.
 func ReadSourceStructureSettingsFromReader(reader SourceReader, root string) (models.SourceStructureSettings, bool, []models.ScanWarning) {
 	if data, err := reader.ReadFile(RepositorySettingsPath); err == nil {
 		settings, decodeErr := decodeSourceStructureSettings(data)
@@ -190,10 +167,6 @@ func SourceSettingsModeFromReader(reader SourceReader, root string) string {
 	return "empty"
 }
 
-// WriteSourceStructureSettings saves the settings of source in the workspace
-// at workspaceRoot to the file SourceSettingsPath names. In the repository's
-// file it replaces the source's rules and keeps every other source's, and
-// each saved rule must name the source in fields.source.
 func WriteSourceStructureSettings(workspaceRoot, source string, settings models.SourceStructureSettings) error {
 	if warnings := ValidateSourceStructureSettings(settings); len(warnings) > 0 {
 		return errors.New(warnings[0].Message)
@@ -225,8 +198,7 @@ func marshalSettings(target string, settings models.SourceStructureSettings) err
 	return atomicWriteSettings(target, data)
 }
 
-// ensureSettingsDirectory creates the folders that hold target, refusing a
-// symbolic link on the way so a write cannot leave the workspace.
+// A symbolic link on the way is refused, so a write cannot leave the workspace.
 func ensureSettingsDirectory(target string) error {
 	directory := filepath.Dir(target)
 	var missing []string
@@ -271,8 +243,6 @@ func atomicWriteSettings(target string, data []byte) error {
 	return atomicfile.Replace(target, ".workspace-settings-*", data, mode)
 }
 
-// ReadSourceStructureSettingsFile reads the file at path as it is, to restore
-// it if a save fails.
 func ReadSourceStructureSettingsFile(path string) ([]byte, os.FileMode, bool, error) {
 	info, err := os.Lstat(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -295,9 +265,6 @@ func RestoreSourceStructureSettings(path string, data []byte, existed bool) erro
 	return atomicWriteSettings(path, data)
 }
 
-// RemoveSourceStructureSettings removes the settings of source: its rules
-// from the repository's file, deleting the file when no other source's rule
-// is left, or else the file inside the source.
 func RemoveSourceStructureSettings(workspaceRoot, source string) error {
 	target, exists := SourceSettingsPath(workspaceRoot, source)
 	if !exists {

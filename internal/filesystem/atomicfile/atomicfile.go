@@ -1,5 +1,4 @@
-// Package atomicfile replaces a file through a synced temporary file beside
-// it, so a reader sees the old content or the new, never a part of either.
+// Package atomicfile replaces a file through a synced temporary file, so a reader never sees a partial write.
 package atomicfile
 
 import (
@@ -7,8 +6,6 @@ import (
 	"path/filepath"
 )
 
-// Hooks inject failures between the steps of WriteTemp and SyncRename, for
-// tests.
 type Hooks struct {
 	AfterWrite         func() error
 	AfterSync          func() error
@@ -24,9 +21,6 @@ func run(hook func() error) error {
 	return hook()
 }
 
-// WriteTemp writes data with mode to a synced, closed temporary file in dir,
-// named by pattern. It returns the temporary path whenever it created one, so
-// the caller removes it on every path.
 func WriteTemp(dir, pattern string, mode os.FileMode, data []byte, hooks Hooks) (string, error) {
 	temporary, err := os.CreateTemp(dir, pattern)
 	if err != nil {
@@ -52,13 +46,10 @@ func WriteTemp(dir, pattern string, mode os.FileMode, data []byte, hooks Hooks) 
 	return path, run(hooks.AfterClose)
 }
 
-// SyncDir makes a rename inside dir durable.
 func SyncDir(dir string) error {
 	return SyncRename(dir, Hooks{})
 }
 
-// SyncRename makes a completed rename inside dir durable, running the rename
-// and directory hooks. An error means the caller restores what it replaced.
 func SyncRename(dir string, hooks Hooks) error {
 	if err := run(hooks.AfterRename); err != nil {
 		return err
@@ -78,13 +69,10 @@ func SyncRename(dir string, hooks Hooks) error {
 	return directory.Close()
 }
 
-// Replace writes data to path with mode through a temporary file named by
-// pattern, renames it into place and syncs the directory.
 func Replace(path, pattern string, data []byte, mode os.FileMode) error {
 	return ReplaceWith(path, pattern, data, mode, os.Rename)
 }
 
-// ReplaceWith is Replace with the rename step supplied by the caller.
 func ReplaceWith(path, pattern string, data []byte, mode os.FileMode, rename func(string, string) error) error {
 	dir := filepath.Dir(path)
 	temporary, err := WriteTemp(dir, pattern, mode, data, Hooks{})

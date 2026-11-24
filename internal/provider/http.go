@@ -12,9 +12,7 @@ import (
 	"strings"
 )
 
-// These limits apply before provider responses are decoded or exposed through
-// the Cloud snapshot API.  They deliberately bound a single request rather
-// than relying on a provider's pagination defaults.
+// Each request is bounded here, not by a provider's pagination defaults.
 const (
 	MaxResponseBytes = 2 << 20
 	MaxFileBytes     = 1 << 20
@@ -24,8 +22,6 @@ const (
 	MaxPathDepth     = 32
 )
 
-// LimitError is deliberately typed so transports can distinguish an upstream
-// capacity boundary from an unavailable provider.
 type LimitError struct{ Resource string }
 
 func (e *LimitError) Error() string { return "provider " + e.Resource + " exceeds the supported limit" }

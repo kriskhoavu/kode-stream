@@ -212,9 +212,7 @@ func setYAMLValue(node *yaml.Node, key string, value any) {
 	}
 }
 
-// atomicWritePlan publishes a complete next generation and preserves the
-// existing mode. Plan files are user source documents, so a direct WriteFile
-// is never an acceptable publication path.
+// Plan files are user source documents, so they are only ever replaced atomically.
 func atomicWritePlan(path string, data []byte) error {
 	mode := os.FileMode(0o644)
 	if info, err := os.Stat(path); err == nil {
@@ -239,8 +237,7 @@ func compactPlanMetadata(root string, meta *planYAML) {
 	if inferredTitle := scanner.InferPlanTitle(root, identifier); inferredTitle != "" && meta.Plan.Title == inferredTitle {
 		meta.Plan.Title = ""
 	}
-	// ticket/service are documented legacy aliases. Preserve them so metadata
-	// saves never rewrite a valid legacy plan into a lossy representation.
+	// ticket and service are legacy aliases. Keep them so a save never rewrites a legacy plan lossily.
 	meta.Documents = compactDocumentOverrides(root, meta.Documents)
 	if len(meta.VerificationTests.SelectedSpecs) == 0 && strings.TrimSpace(meta.VerificationTests.Environment) == "" && meta.VerificationTests.DisplayMode == "" {
 		meta.VerificationTests = models.VerificationTestSelection{}

@@ -33,9 +33,7 @@ func discoverProviderCapabilities(providerID, workspacePath string) ([]Capabilit
 	return discoverProviderCapabilitiesContext(context.Background(), providerID, workspacePath)
 }
 
-// discoverProviderCapabilitiesContext deliberately looks only one directory level
-// deep. Capability roots are an input boundary: entries must be regular files below
-// the resolved root and metadata is read through a bounded reader.
+// Capability roots are an input boundary: one level deep, regular files only, read through a bounded reader.
 func discoverProviderCapabilitiesContext(ctx context.Context, providerID, workspacePath string) ([]CapabilityDescriptor, []CapabilityDescriptor) {
 	roots := providerCapabilityRoots(providerID, workspacePath)
 	skills := []CapabilityDescriptor{}

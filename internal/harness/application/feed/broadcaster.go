@@ -1,5 +1,3 @@
-// Package feed fans harness events out to in-process subscribers: the
-// dashboard's event streams and the notifier.
 package feed
 
 import (
@@ -8,9 +6,7 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// Subscription receives events until it is cancelled or falls behind. When a
-// subscriber's buffer is full the broadcaster closes Behind and drops it; the
-// subscriber then refetches its snapshot instead of missing events silently.
+// A full buffer closes Behind and drops the subscriber, which then refetches its snapshot.
 type Subscription struct {
 	Events <-chan domain.Event
 	Behind <-chan struct{}
@@ -61,7 +57,6 @@ func (b *Broadcaster) Subscribe(buffer int) *Subscription {
 	}}
 }
 
-// Publish never blocks: a subscriber that cannot take the event is dropped.
 func (b *Broadcaster) Publish(event domain.Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

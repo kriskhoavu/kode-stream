@@ -197,10 +197,7 @@ func (s *Service) removeArtifactRoot(workspaceID, jobID string) error {
 	return s.removeArtifact(target)
 }
 
-// cleanupOrphanArtifacts establishes the restart contract: job state is
-// process-local, so an owned verification generation found at startup has no
-// runnable owner and is safely removed. Only direct, non-symlinked child
-// directories under each registered workspace's owned root are eligible.
+// Job state is process-local, so an owned verification generation found at startup has no owner.
 func (s *Service) cleanupOrphanArtifacts() {
 	workspaces, err := s.registry.List()
 	if err != nil {

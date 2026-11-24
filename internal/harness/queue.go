@@ -10,9 +10,7 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// atomic runs fn in one transaction and publishes the events it stored only
-// after the commit, so a subscriber never sees an event for a rolled-back
-// change.
+// Events publish only after the commit, so no subscriber sees a rolled-back change.
 func (s *Service) atomic(ctx context.Context, fn func(tx domain.Repository, record func(domain.Event) error) error) error {
 	var stored []domain.Event
 	err := s.repository.Atomic(ctx, func(tx domain.Repository) error {
@@ -35,8 +33,6 @@ func (s *Service) atomic(ctx context.Context, fn func(tx domain.Repository, reco
 	return err
 }
 
-// Sort scores every discovered and ranked task, moves discovered ones to
-// ranked, resolves dependencies to task ids, and saves what changed.
 func (s *Service) Sort(ctx context.Context) error {
 	if !s.Supported() {
 		return domain.ErrUnsupported
@@ -107,8 +103,6 @@ func (s *Service) Sort(ctx context.Context) error {
 	return nil
 }
 
-// updateTask applies change to a task the caller loaded at expectedRevision.
-// A task in a terminal state never changes.
 func (s *Service) updateTask(ctx context.Context, id string, expectedRevision int64, change func(*domain.Task) error, events func(domain.Task) []domain.Event) (domain.Task, error) {
 	if err := s.mutable(); err != nil {
 		return domain.Task{}, err
@@ -148,11 +142,7 @@ func (s *Service) updateTask(ctx context.Context, id string, expectedRevision in
 	return saved, nil
 }
 
-// rescore recomputes a task's score by the rules at once, so a pin or a
-// priority change moves it in the queue without waiting for the sorter.
-//
-// The settings are read before any transaction opens: SQLite has one
-// connection, so a read beside an open transaction would wait for itself.
+// SQLite has one connection, so the settings are read before the transaction opens.
 func (s *Service) rescore(settings domain.Settings, task *domain.Task) {
 	score, reasons := s.rules.Score(*task, settings, s.now())
 	task.Score = score
@@ -170,8 +160,7 @@ func (s *Service) PinTask(ctx context.Context, id string, pinned bool, expectedR
 	})
 }
 
-// maxPriorityOverride bounds a hand-set priority, so it reorders without
-// outweighing a pin.
+// A hand-set priority stays below a pin's weight.
 const maxPriorityOverride = 500
 
 func (s *Service) SetPriority(ctx context.Context, id string, override float64, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
@@ -188,8 +177,6 @@ func (s *Service) SetPriority(ctx context.Context, id string, override float64, 
 	})
 }
 
-// SetTaskQuestions records, for one task, whether its agents may stop and
-// ask a person; nil follows the workspace and the settings again.
 func (s *Service) SetTaskQuestions(ctx context.Context, id string, ask *bool, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
 	return s.updateTask(ctx, id, expectedRevision, func(task *domain.Task) error {
 		if domain.TaskTerminal(task.State) {
@@ -202,9 +189,6 @@ func (s *Service) SetTaskQuestions(ctx context.Context, id string, ask *bool, ex
 	})
 }
 
-// StartTask records a person's start approval. The dispatcher takes the task
-// on its next cycle; with autoStart off this is the only way work begins.
-// Replaying the same idempotency key returns the task unchanged.
 func (s *Service) StartTask(ctx context.Context, id string, expectedRevision int64, idempotencyKey string, actor domain.Actor, channel domain.Channel) (domain.Task, error) {
 	if err := s.mutable(); err != nil {
 		return domain.Task{}, err
@@ -247,8 +231,6 @@ func (s *Service) StartTask(ctx context.Context, id string, expectedRevision int
 		}
 		expect := domain.Expect{State: string(task.State), Revision: task.Revision}
 		task.StartRequested = true
-		// A stopped task goes back to the queue; its next run starts fresh,
-		// beside the runs it already had.
 		if task.State == domain.TaskDiscovered || task.State == domain.TaskCancelled {
 			task.State = domain.TaskRanked
 			task.Note = ""
@@ -276,7 +258,6 @@ func (s *Service) StartTask(ctx context.Context, id string, expectedRevision int
 	return saved, nil
 }
 
-// PollNow asks the sources at once, for one workspace or all of them.
 func (s *Service) PollNow(ctx context.Context, workspaceID string) ([]SourceHealth, error) {
 	if err := s.mutable(); err != nil {
 		return nil, err
@@ -305,8 +286,6 @@ func (s *Service) PollNow(ctx context.Context, workspaceID string) ([]SourceHeal
 	return out, nil
 }
 
-// SetRolePaused pauses or resumes one worker. A paused role finishes what it
-// holds and claims nothing new.
 func (s *Service) SetRolePaused(ctx context.Context, key domain.RoleKey, paused bool, actor domain.Actor) (RoleHealth, error) {
 	if err := s.mutable(); err != nil {
 		return RoleHealth{}, err
@@ -375,9 +354,6 @@ func boundedText(value string, limit int) string {
 
 var _ queue.Ranker = queue.RuleRanker{}
 
-// MoveBefore sets a task's hand-set priority so that it ranks just above
-// another task, the way dragging a card above another does. The override is
-// bounded, so a pinned neighbour may stay above.
 func (s *Service) MoveBefore(ctx context.Context, id, beforeID string, expectedRevision int64, actor domain.Actor) (domain.Task, error) {
 	if !s.Supported() {
 		return domain.Task{}, domain.ErrUnsupported
@@ -398,8 +374,6 @@ func (s *Service) MoveBefore(ctx context.Context, id, beforeID string, expectedR
 	return s.SetPriority(ctx, id, override, expectedRevision, actor)
 }
 
-// CreateTaskInput is what a card hands the harness: the ticket's key, title
-// and body. Nothing in it is trusted further than the Finder trusts a source.
 type CreateTaskInput struct {
 	WorkspaceID    string
 	Key            string
@@ -410,11 +384,6 @@ type CreateTaskInput struct {
 	IdempotencyKey string
 }
 
-// CreateTask puts a ticket in the queue from a card rather than from the
-// Finder, ranked at once, and, when asked, starts it the way Start does: as a
-// start gate decided by the person who asked. A ticket already in the queue is
-// taken as it is; one the harness finished or a person dismissed never
-// reopens, as with the Finder.
 func (s *Service) CreateTask(ctx context.Context, input CreateTaskInput, actor domain.Actor, channel domain.Channel) (domain.Task, error) {
 	if err := s.mutable(); err != nil {
 		return domain.Task{}, err

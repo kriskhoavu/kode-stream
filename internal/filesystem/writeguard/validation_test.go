@@ -1,7 +1,5 @@
 package writeguard
 
-// Package writeguard validates guarded writes.
-
 import (
 	"strings"
 	"testing"

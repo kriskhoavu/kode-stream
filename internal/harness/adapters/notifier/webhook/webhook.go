@@ -1,5 +1,3 @@
-// Package webhook posts harness events to chat-bot, signed with
-// HMAC-SHA256 so the bot can tell them from anyone else's.
 package webhook
 
 import (
@@ -27,7 +25,6 @@ func New(url, secret string) *Notifier {
 	return &Notifier{URL: url, Secret: secret, HTTPClient: &http.Client{Timeout: 10 * time.Second}}
 }
 
-// Signature is the X-Harness-Signature value for body.
 func Signature(secret string, body []byte) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write(body)

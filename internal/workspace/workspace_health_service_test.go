@@ -1,7 +1,5 @@
 package workspace
 
-// Health service contract tests.
-
 import (
 	"errors"
 	"os"

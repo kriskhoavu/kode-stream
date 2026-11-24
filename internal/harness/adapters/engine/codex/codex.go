@@ -1,7 +1,4 @@
-// Package codex runs the Codex CLI headless for one agent run:
-// `codex exec --json` in the run's worktree with the brief on stdin. Codex
-// has no turn limit, no spending limit and no tool allow-list; its sandbox
-// stands in for the permission mode, and Detect says what is missing.
+// Package codex runs the Codex CLI headless. Its sandbox stands in for the permission mode.
 package codex
 
 import (
@@ -21,10 +18,8 @@ import (
 
 const ID = "codex"
 
-// DefaultEnv lists the variables Codex needs beyond PATH and HOME.
 var DefaultEnv = []string{"CODEX_HOME", "OPENAI_API_KEY", "OPENAI_BASE_URL", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "SSL_CERT_FILE"}
 
-// Unsupported lists what this adapter cannot pass to Codex.
 var Unsupported = []string{"maxTurns", "maxBudgetUsd", "allowedTools", "disallowedTools", "sessionId"}
 
 type Engine struct {
@@ -53,7 +48,6 @@ func (e *Engine) Detect(ctx context.Context) ports.Detection {
 	return detection
 }
 
-// Sandbox maps a permission mode onto Codex's sandbox.
 func Sandbox(permissionMode string) string {
 	if permissionMode == "plan" {
 		return "read-only"
@@ -118,8 +112,7 @@ type event struct {
 	} `json:"error"`
 }
 
-// Line counts every completed tool step (a command or a file change) as a
-// turn, and keeps the last agent message as the final text.
+// Codex reports no turns, so each completed command or file change counts as one.
 func (p *parser) Line(raw []byte, emit func(ports.EngineEvent)) {
 	var line event
 	if json.Unmarshal(raw, &line) != nil {

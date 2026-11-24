@@ -15,7 +15,6 @@ func TestTaskStateMachineRefusesReopeningTerminalStates(t *testing.T) {
 			t.Fatalf("%s not terminal", terminal)
 		}
 	}
-	// A stopped run leaves its task open: it may start again, be dismissed, or close at its source.
 	if TaskTerminal(TaskCancelled) || !TaskStartable(TaskCancelled) {
 		t.Fatal("a cancelled task is final")
 	}

@@ -283,8 +283,7 @@ func (s *KnowledgeService) ensureCheckoutFresh(ctx context.Context, workspace mo
 		return nil
 	}
 	return s.withWorkspaceMutation(ctx, workspace.ID, func(actionContext context.Context) error {
-		// A competing explicit action may have published a fresh index while this
-		// read waited for the mutation boundary, so verify again before rebuilding.
+		// Another action may have published a fresh index while this read waited, so check again.
 		currentBranch, branchErr := s.checkout.CurrentBranch(workspace.Path)
 		if branchErr != nil {
 			return branchErr

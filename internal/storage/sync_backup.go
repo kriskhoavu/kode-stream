@@ -32,8 +32,7 @@ func backupDatabaseTarget(paths system.Paths, databasePath, direction string, no
 		}
 		_ = os.Remove(backupDatabase)
 	}
-	// A corrupt/non-SQLite target is still operator data. Preserve its exact
-	// bytes (and journals) so a failed repair remains reversible.
+	// A corrupt target is still operator data. Keep its bytes and journals, so a failed repair can be undone.
 	for _, suffix := range []string{"", "-wal", "-shm"} {
 		source := databasePath + suffix
 		if err := copyIfExists(source, filepath.Join(backupPath, filepath.Base(source))); err != nil {

@@ -179,8 +179,6 @@ func TestEmbeddedLaunchObserverFailureCancelsAndRetryWorksForItemAndWorkspace(t 
 	manager := NewTerminalManager(Config{})
 	t.Cleanup(func() { _ = manager.Close() })
 	base := NewFileSessionRecordRepository(filepath.Join(t.TempDir(), "records.yaml"))
-	// reserve succeeds; running-state observer fails; terminal cancellation and
-	// failed-record compensation follow, then the same key can be retried.
 	records := &failNthRecordRepository{SessionRecordRepository: base, failRunningAt: 2}
 	service.ConfigureEmbedded(manager).ConfigureSessionRecords(records, gitadapter.New())
 	itemInput := EmbeddedInput{Provider: "test-ai", ContextMode: "card_context", ExpectedWorkspaceID: workspace.ID, ExpectedBranch: item.Branch, IdempotencyKey: "item-retry"}

@@ -8,9 +8,6 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// CancelRun stops a run: its CLI processes end, its stage and task are
-// cancelled, and waiting approvals are superseded. The worktree is kept for
-// the retention period.
 func (s *Service) CancelRun(ctx context.Context, runID, reason string, expectedRevision *int64, actor domain.Actor) (domain.Run, error) {
 	if err := s.mutable(); err != nil {
 		return domain.Run{}, err
@@ -54,8 +51,6 @@ func (s *Service) CancelRun(ctx context.Context, runID, reason string, expectedR
 	return cancelled, nil
 }
 
-// cancelInTx cancels the step's run, task, stage, queued and running agent
-// runs and waiting approvals, and saves them.
 func (s *Service) cancelInTx(st *step, reason string) error {
 	if !domain.StageTerminal(st.stage.State) {
 		st.stage.State = domain.StageCancelled
@@ -63,7 +58,7 @@ func (s *Service) cancelInTx(st *step, reason string) error {
 		st.stage.FailureReason = reason
 	}
 	st.run.State, st.run.FinishedAt, st.run.FailureReason = domain.RunCancelled, &st.now, reason
-	// The start request was spent on this run; starting again asks anew.
+	// The start request was spent on this run. Starting again asks anew.
 	st.task.State, st.task.NeedsYou, st.task.Note, st.task.StartRequested, st.task.WaitingFor = domain.TaskCancelled, false, reason, false, ""
 	agentRuns, err := st.tx.ListAgentRuns(st.ctx, domain.AgentRunFilter{RunID: st.run.ID, States: []domain.AgentRunState{domain.AgentQueued, domain.AgentRunning, domain.AgentInterrupted}, Limit: 1000})
 	if err != nil {
@@ -92,7 +87,6 @@ func (s *Service) cancelInTx(st *step, reason string) error {
 	return st.save()
 }
 
-// killRun stops the CLI processes of a run.
 func (s *Service) killRun(runID string) {
 	s.mu.Lock()
 	var handles []ports.Handle

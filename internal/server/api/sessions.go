@@ -9,14 +9,9 @@ import (
 	appaisession "kode-stream/internal/ai"
 )
 
-// maxSessionDiffBytes bounds a single file diff response, matching the byte
-// bound the workspace tree reader already applies to a file's content.
 const maxSessionDiffBytes int64 = 1 << 20
 
-// discardResponseWriter swallows a handler's response so authorizeWorkspace
-// (which writes a 404 on denial) can be reused as a pure read predicate when
-// filtering workspaces for the cross-workspace session list, instead of
-// duplicating its authorization rule.
+// Lets authorizeWorkspace, which writes a 404 on denial, act as a read-only predicate.
 type discardResponseWriter struct {
 	header http.Header
 }
@@ -32,10 +27,6 @@ func (d *discardResponseWriter) Write(body []byte) (int, error) { return len(bod
 
 func (d *discardResponseWriter) WriteHeader(int) {}
 
-// sessionsController serves the cross-workspace session list and a single
-// session's changes and file diffs. It embeds *aiController to reuse
-// authorizeWorkspace rather than duplicating its Cloud-denial-looks-like-404
-// rule.
 type sessionsController struct {
 	*aiController
 }
@@ -141,10 +132,7 @@ func (a *sessionsController) deleteSession(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// authorizeSession resolves the session's workspace and applies the same
-// Cloud-denial-looks-like-404 rule authorizeWorkspace already gives every
-// other AI session endpoint. A session that does not exist gets the same
-// 404 a denied workspace would, so a session ID is not an oracle either.
+// A missing session answers the same 404 as a denied workspace, so a session ID is not an oracle.
 func (a *sessionsController) authorizeSession(w http.ResponseWriter, r *http.Request, sessionID string) bool {
 	workspaceID, err := a.aiSessions.SessionRecordWorkspace(sessionID)
 	if err != nil {

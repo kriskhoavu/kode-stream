@@ -1,8 +1,4 @@
-// Package claudecode runs Claude Code headless for one agent run:
-// `claude -p --output-format stream-json` in the run's worktree, the brief on
-// stdin, the CLI's own --max-budget-usd as the only cost stop. It parses the
-// JSON lines into turns, usage, cost and the session id, and keeps no text
-// beyond a 200-character progress summary and the final answer.
+// Package claudecode runs Claude Code headless. The CLI's own --max-budget-usd is the only cost stop.
 package claudecode
 
 import (
@@ -23,7 +19,6 @@ import (
 
 const ID = "claudecode"
 
-// DefaultEnv lists the variables Claude Code needs beyond PATH and HOME.
 var DefaultEnv = []string{"CLAUDE_CONFIG_DIR", "ANTHROPIC_API_KEY", "ANTHROPIC_BASE_URL", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "AWS_PROFILE", "AWS_REGION", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "SSL_CERT_FILE"}
 
 type Engine struct {
@@ -54,8 +49,7 @@ func (e *Engine) Detect(ctx context.Context) ports.Detection {
 	return detection
 }
 
-// Args builds the argv after the binary. Tools are passed one argument each
-// so that a rule such as `Bash(git diff:*)` keeps its space.
+// Each tool is its own argument, so a rule such as `Bash(git diff:*)` keeps its space.
 func Args(invocation ports.Invocation) []string {
 	args := []string{"-p", "--output-format", "stream-json", "--verbose"}
 	if invocation.Model != "" {
@@ -100,8 +94,6 @@ func (e *Engine) Start(ctx context.Context, invocation ports.Invocation) (ports.
 	return process.Start(ctx, spec, &parser{})
 }
 
-// TranscriptRef is where Claude Code writes the session's transcript; "" when
-// the adapter was built without a locator.
 func (e *Engine) TranscriptRef(worktreePath, sessionID string) string {
 	if e.TranscriptPath == nil {
 		return ""
@@ -110,7 +102,6 @@ func (e *Engine) TranscriptRef(worktreePath, sessionID string) string {
 	return ref
 }
 
-// parser reads Claude Code's stream-json lines.
 type parser struct {
 	result   ports.Result
 	finished bool

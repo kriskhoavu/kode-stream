@@ -73,9 +73,6 @@ func (h failureHooks) atomic() atomicfile.Hooks {
 	return atomicfile.Hooks{AfterWrite: h.afterWrite, AfterSync: h.afterSync, AfterClose: h.afterClose, AfterRename: h.afterRename, AfterDirectorySync: h.afterDirectory}
 }
 
-// ReplaceExisting atomically replaces a regular file. It bounds the existing
-// read before allocation, preserves permissions, fsyncs the file and parent,
-// and revalidates the target immediately before publication.
 func ReplaceExisting(root, relative string, content []byte, expectedHash string, maxBytes int64) (Result, error) {
 	return replaceExisting(root, relative, content, expectedHash, maxBytes, failureHooks{})
 }
@@ -127,8 +124,6 @@ func replaceExisting(root, relative string, content []byte, expectedHash string,
 	return Result{Path: full, Hash: hash(content), Mode: initial.Mode().Perm()}, nil
 }
 
-// readExisting reads a regular, non-symlink file no larger than maxBytes,
-// bounding the read before it allocates.
 func readExisting(full string, maxBytes int64) (os.FileInfo, []byte, error) {
 	initial, err := os.Lstat(full)
 	if err != nil {
@@ -158,8 +153,6 @@ func readExisting(full string, maxBytes int64) (os.FileInfo, []byte, error) {
 	return initial, current, nil
 }
 
-// requireUnchanged refuses publication when the target or its parent changed
-// since the target was read.
 func requireUnchanged(full string, initial os.FileInfo, directory, realDirectory string) error {
 	currentInfo, err := os.Lstat(full)
 	if err != nil || !os.SameFile(initial, currentInfo) || currentInfo.Mode()&os.ModeSymlink != 0 {

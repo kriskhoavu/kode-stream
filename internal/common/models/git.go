@@ -42,9 +42,7 @@ type GitStatus struct {
 	Upstream    string `json:"upstream,omitempty" yaml:"upstream,omitempty"`
 	Ahead       int    `json:"ahead" yaml:"ahead"`
 	Behind      int    `json:"behind" yaml:"behind"`
-	// FetchedAt dates the remote-tracking ref that Ahead and Behind are measured
-	// against. Zero means nothing has fetched since the repository was cloned, so
-	// those counts describe a remote state of unknown age.
+	// Zero means nothing has fetched since the clone, so Ahead and Behind have an unknown age.
 	FetchedAt  time.Time   `json:"fetchedAt,omitzero" yaml:"fetchedAt,omitempty"`
 	Dirty      bool        `json:"dirty" yaml:"dirty"`
 	Conflicted bool        `json:"conflicted" yaml:"conflicted"`
@@ -68,8 +66,7 @@ type GitCommitInput struct {
 }
 
 type GitOperationInput struct {
-	// Confirm is retained only for Knowledge's explicit pull confirmation;
-	// Git HTTP operation routes decode a separate empty request shape.
+	// Only Knowledge's pull confirmation uses Confirm. Git routes decode an empty request.
 	Confirm bool `json:"confirm,omitempty" yaml:"confirm,omitempty"`
 }
 

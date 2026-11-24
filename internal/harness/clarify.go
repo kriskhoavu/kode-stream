@@ -9,10 +9,6 @@ import (
 	"kode-stream/internal/harness/domain"
 )
 
-// readinessOpen reports whether a planner in stage still judges whether its
-// ticket says enough to plan from: the ticket is in a ready status, nobody in
-// Kode Stream has answered for it yet, and its reporter has not been waited
-// for MaxClarifyRounds times.
 func readinessOpen(settings domain.Settings, task domain.Task, stage domain.Stage) bool {
 	if stage.Kind != domain.StagePlan || !settings.ReadyCheck(task) {
 		return false
@@ -30,9 +26,6 @@ func readinessOpen(settings domain.Settings, task domain.Task, stage domain.Stag
 	return replies < domain.MaxClarifyRounds
 }
 
-// needsInfo handles a planner that found its ticket does not say enough:
-// while the readiness check is open the run waits for the reporter; after it
-// the planner's questions go to a person, as any other stop does.
 func (st *step) needsInfo(agentRun domain.AgentRun) {
 	if readinessOpen(st.settings, st.task, st.stage) {
 		st.clarify(agentRun)
@@ -46,9 +39,6 @@ func (st *step) needsInfo(agentRun domain.AgentRun) {
 	}
 }
 
-// clarify parks the Plan stage until the ticket's reporter answers. It does
-// not need the person working on the ticket: the gate holds the problem, the
-// questions and a comment they may post on the ticket.
 func (st *step) clarify(agentRun domain.AgentRun) {
 	report := agentRun.Report
 	asked := questions(report)
@@ -67,9 +57,7 @@ func (st *step) clarify(agentRun domain.AgentRun) {
 	st.events = append(st.events, domain.Event{Kind: domain.EventApprovalRequested, TaskID: st.task.ID, RunID: st.run.ID, StageID: st.stage.ID, ApprovalID: approval.ID, Payload: payload(map[string]any{"gate": approval.Gate, "summary": approval.Summary, "sourceKey": st.task.Source.Key, "title": st.task.Title, "questions": asked, "reporter": reporter})})
 }
 
-// clarifyDraft is the comment a person may post on the ticket to ask its
-// reporter: it mentions them, says what the planner understood and lists the
-// questions. The harness never posts it.
+// The harness never posts this comment. A person may.
 func clarifyDraft(task domain.Task, problem string, asked []string) string {
 	var b strings.Builder
 	greeting := "Hi"
@@ -91,9 +79,6 @@ func clarifyDraft(task domain.Task, problem string, asked []string) string {
 	return b.String()
 }
 
-// applyClarify answers a clarify gate. A reply on the ticket, or a person
-// continuing with what they know, sends the planner out again; dismissing
-// stops the run.
 func (s *Service) applyClarify(st *step, approval domain.Approval, input DecideInput) error {
 	if st.stage.State != domain.StageAwaitingApproval || st.run.State != domain.RunRunning {
 		return domain.IllegalTransitionError{Entity: "stage", From: string(st.stage.State), To: "clarified"}
@@ -113,8 +98,6 @@ func (s *Service) applyClarify(st *step, approval domain.Approval, input DecideI
 	return st.save()
 }
 
-// answerFromSource sends a planner out again wherever its ticket's reporter,
-// or anyone other than the assignee, commented after the run began waiting.
 func (s *Service) answerFromSource(ctx context.Context) {
 	approvals, err := s.repository.ListApprovals(ctx, domain.ApprovalFilter{States: []domain.ApprovalState{domain.ApprovalRequested}, Limit: 1000})
 	if err != nil {
@@ -141,8 +124,6 @@ func (s *Service) answerFromSource(ctx context.Context) {
 	}
 }
 
-// replyAfter is the first comment on task written after approval was
-// requested by someone other than its assignee.
 func replyAfter(task domain.Task, approval domain.Approval) (domain.Comment, bool) {
 	for _, comment := range task.Comments {
 		if !comment.CreatedAt.After(approval.RequestedAt) {

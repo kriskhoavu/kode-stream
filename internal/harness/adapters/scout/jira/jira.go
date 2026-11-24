@@ -1,5 +1,3 @@
-// Package jira lists a workspace's Jira issues by the JQL its harness settings
-// name, through the workspace's own Jira connection and token.
 package jira
 
 import (
@@ -21,11 +19,9 @@ type Scout struct{ client Searcher }
 
 func New(client Searcher) *Scout { return &Scout{client: client} }
 
-// jiraTime is how Jira writes a timestamp.
 const jiraTime = "2006-01-02T15:04:05.000-0700"
 
-// mention is Jira's wiki markup that mentions a person in a comment: an
-// account id on Jira Cloud, a user name on Server and Data Center.
+// Jira Cloud mentions an account id. Server and Data Center mention a user name.
 func mention(connection models.JiraConnection, id string) string {
 	id = strings.TrimSpace(id)
 	if id == "" || strings.ContainsAny(id, "[]~|") {

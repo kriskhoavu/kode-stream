@@ -226,8 +226,6 @@ func (s *KnowledgeService) withWorkspaceMutation(ctx context.Context, workspaceI
 		return err
 	}
 	if s.mutation == nil {
-		// Partial fixtures retain safe behavior; production wiring always supplies
-		// the shared Git mutation capability.
 		return action(ctx)
 	}
 	return s.mutation.WithWorkspaceMutationContext(ctx, workspaceID, action)
@@ -242,8 +240,7 @@ func (s *KnowledgeService) recordAudit(workspaceID, operation, path string, star
 }
 
 func (s *KnowledgeService) recordCommittedRefreshAudit(workspaceID, operation string, started time.Time) {
-	// The workspace mutation is authoritative here. The index refresh failed,
-	// but command output and the underlying error can contain sensitive details.
+	// The audit keeps no command output or error, because either can hold sensitive details.
 	s.appendAudit(workspaceID, operation, "", started, models.AuditStatusSuccess, "Knowledge action completed; knowledge index refresh failed. Rescan to recover.")
 }
 

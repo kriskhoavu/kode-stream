@@ -8,10 +8,7 @@ import (
 	"testing"
 )
 
-// Both fields once shared the `json:"displayId"` tag. encoding/json drops every
-// conflicting same-level tagged field rather than reporting the clash, so each
-// ref decoded with an empty name and an empty SHA and every ResolveRef missed.
-// Asserting the values, not just the count, is what makes that visible.
+// encoding/json drops fields that share a tag. Assert values, not counts, to catch it.
 func TestBitbucketRefsDecodeBranchAndTagNamesWithCommits(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -43,8 +40,6 @@ func TestBitbucketRefsDecodeBranchAndTagNamesWithCommits(t *testing.T) {
 	}
 }
 
-// ResolveRef is the caller that made the empty names load-bearing: a commit-pinned
-// snapshot cannot resolve a branch whose name decoded as "".
 func TestBitbucketResolveRefFindsABranchByName(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/branches") {

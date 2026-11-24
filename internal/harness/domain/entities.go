@@ -1,5 +1,3 @@
-// Package domain holds the harness's entities, state machines, policy,
-// settings and the repository port that persists them.
 package domain
 
 import (
@@ -14,10 +12,7 @@ const (
 	SourceJira      SourceKind = "jira"
 	SourceGitHub    SourceKind = "github"
 	SourceBitbucket SourceKind = "bitbucket"
-	// SourceLocal reads tasks from Markdown files in a folder, for trying the
-	// pipeline without an issue tracker; its hand-off pushes and opens no
-	// pull request.
-	SourceLocal SourceKind = "local"
+	SourceLocal     SourceKind = "local"
 )
 
 type TaskState string
@@ -33,7 +28,7 @@ const (
 	TaskCancelled  TaskState = "cancelled"
 )
 
-// Source is where a task came from. Every field is untrusted.
+// Every field of Source is untrusted.
 type Source struct {
 	Kind      SourceKind `json:"kind"`
 	Key       string     `json:"key"`
@@ -45,18 +40,15 @@ type Source struct {
 	UpdatedAt *time.Time `json:"updatedAt,omitempty"`
 	Milestone string     `json:"milestone,omitempty"`
 	Epic      string     `json:"epic,omitempty"`
-	// Reporter is who opened the issue, where the source names one.
-	Reporter *Person `json:"reporter,omitempty"`
+	Reporter  *Person    `json:"reporter,omitempty"`
 }
 
-// Person is someone at a task's source, as the source names them. Mention is
-// the source's own markup that mentions them in a comment, where it has one.
 type Person struct {
 	Name    string `json:"name"`
 	Mention string `json:"mention,omitempty"`
 }
 
-// Comment is one comment on a task's issue. Every field is untrusted.
+// Every field of Comment is untrusted.
 type Comment struct {
 	ID        string    `json:"id"`
 	Author    string    `json:"author"`
@@ -64,13 +56,11 @@ type Comment struct {
 	Body      string    `json:"body"`
 }
 
-// MaxTaskComments and MaxCommentBytes bound the comments kept on a task.
 const (
 	MaxTaskComments = 10
 	MaxCommentBytes = 4 << 10
 )
 
-// MaxTaskBodyBytes bounds the untrusted task body kept on a task.
 const MaxTaskBodyBytes = 16 << 10
 
 type Task struct {
@@ -85,28 +75,22 @@ type Task struct {
 	PriorityOverride float64   `json:"priorityOverride"`
 	Pinned           bool      `json:"pinned"`
 	NeedsYou         bool      `json:"needsYou"`
-	// WaitingFor names who the task's run waits for at a clarify gate,
-	// rather than the person working on it.
-	WaitingFor     string `json:"waitingFor,omitempty"`
-	StartRequested bool   `json:"startRequested"`
-	// AskQuestions overrides, for this task, whether an agent may stop and
-	// ask a person; nil follows the workspace, then the settings.
-	AskQuestions     *bool    `json:"askQuestions,omitempty"`
-	Note             string   `json:"note,omitempty"`
-	RunID            string   `json:"runId,omitempty"`
-	Attempts         int      `json:"attempts"`
-	DependsOn        []string `json:"dependsOn"`
-	DependsOnKeys    []string `json:"dependsOnKeys,omitempty"`
-	EstimatedMinutes int      `json:"estimatedMinutes,omitempty"`
-	// Comments are the issue's latest comments, oldest first.
-	Comments     []Comment `json:"comments,omitempty"`
-	MissedPolls  int       `json:"missedPolls,omitempty"`
-	Revision     int64     `json:"revision"`
-	DiscoveredAt time.Time `json:"discoveredAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
+	WaitingFor       string    `json:"waitingFor,omitempty"`
+	StartRequested   bool      `json:"startRequested"`
+	AskQuestions     *bool     `json:"askQuestions,omitempty"`
+	Note             string    `json:"note,omitempty"`
+	RunID            string    `json:"runId,omitempty"`
+	Attempts         int       `json:"attempts"`
+	DependsOn        []string  `json:"dependsOn"`
+	DependsOnKeys    []string  `json:"dependsOnKeys,omitempty"`
+	EstimatedMinutes int       `json:"estimatedMinutes,omitempty"`
+	Comments         []Comment `json:"comments,omitempty"`
+	MissedPolls      int       `json:"missedPolls,omitempty"`
+	Revision         int64     `json:"revision"`
+	DiscoveredAt     time.Time `json:"discoveredAt"`
+	UpdatedAt        time.Time `json:"updatedAt"`
 }
 
-// Candidate is what a scout found for one issue.
 type Candidate struct {
 	WorkspaceID      string
 	Source           Source
@@ -117,7 +101,6 @@ type Candidate struct {
 	Comments         []Comment
 }
 
-// NewID returns a prefixed random identifier such as "run-3f9a0c1d2e4b".
 func NewID(prefix string) string {
 	var buf [6]byte
 	_, _ = rand.Read(buf[:])

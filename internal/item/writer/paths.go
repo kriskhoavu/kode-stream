@@ -33,9 +33,7 @@ func safeItemPath(workspace models.WorkspaceConfig, item models.ItemDetail) (str
 	return safeItemPathForRelative(workspace, item.ItemPath)
 }
 
-// safeItemPathForRelative revalidates configured sources at each write
-// boundary. A source symlink can change after registration, so lexical joins
-// are deliberately not treated as an authority to write.
+// A source symlink can change after registration, so each write resolves the source again.
 func safeItemPathForRelative(workspace models.WorkspaceConfig, relative string) (string, error) {
 	clean := filepath.ToSlash(filepath.Clean(strings.TrimSpace(relative)))
 	var selected string
@@ -51,10 +49,7 @@ func safeItemPathForRelative(workspace models.WorkspaceConfig, relative string) 
 	}
 	resolved, err := sourceguard.ResolveOne(workspace.Path, selected)
 	if err != nil {
-		// A configured source may be intentionally empty on a new workspace.
-		// Create only its lexical path below the resolved workspace root, then
-		// immediately resolve it through sourceguard; an existing symlink is
-		// never followed as an authority to create outside the workspace.
+		// Create only the lexical path below the root, then resolve it. An existing symlink is never followed.
 		if !strings.Contains(err.Error(), "does not exist") {
 			return "", err
 		}

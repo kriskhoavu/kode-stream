@@ -165,9 +165,7 @@ func inferDocument(path string) models.ItemDocument {
 			doc.Label = strings.Title(titleFromIdentifier(name))
 		}
 	case strings.HasPrefix(lower, "design/"), strings.HasPrefix(lower, "solution/"):
-		// Both folders carry the technical design role: `solution/` is the
-		// current feature-planning layout, `design/` the earlier one that
-		// stays valid for existing plans and for UI/UX design documents.
+		// solution/ is the current design layout. design/ stays valid for existing plans and UI/UX documents.
 		doc.Role = "design"
 		name := stripDocumentSequence(path, strings.SplitN(lower, "/", 2)[0])
 		doc.Track = inferDocumentTrack(name)

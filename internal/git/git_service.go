@@ -69,10 +69,7 @@ func (s *Service) withMutation(ctx context.Context, workspacePath string, action
 	return s.git.WithWorkspaceMutation(workspacePath, action)
 }
 
-// WithWorkspaceMutationContext exposes the established workspace mutation
-// boundary to cohesive services that need to perform a multi-step operation.
-// The context passed to action is marked as already holding the lock so the
-// service's own mutation methods can safely participate without re-locking.
+// The action's context holds the lock, so the service's own mutations do not lock again.
 func (s *Service) WithWorkspaceMutationContext(ctx context.Context, workspaceID string, action func(context.Context) error) error {
 	workspace, err := s.workspace(workspaceID)
 	if err != nil {

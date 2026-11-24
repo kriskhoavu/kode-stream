@@ -9,14 +9,12 @@ import (
 )
 
 type DashboardSource struct {
-	WorkspaceID string   `json:"workspaceId"`
-	Kind        string   `json:"kind"`
-	Enabled     bool     `json:"enabled"`
-	Query       string   `json:"query"`
-	Labels      []string `json:"labels,omitempty"`
-	TokenEnvVar string   `json:"tokenEnvVar,omitempty"`
-	// CheckReady and ReadyStatuses are a Jira source's readiness check: nil
-	// CheckReady means off, and empty ReadyStatuses means READY.
+	WorkspaceID   string     `json:"workspaceId"`
+	Kind          string     `json:"kind"`
+	Enabled       bool       `json:"enabled"`
+	Query         string     `json:"query"`
+	Labels        []string   `json:"labels,omitempty"`
+	TokenEnvVar   string     `json:"tokenEnvVar,omitempty"`
 	CheckReady    *bool      `json:"checkReady,omitempty"`
 	ReadyStatuses []string   `json:"readyStatuses,omitempty"`
 	LastCheckedAt *time.Time `json:"lastCheckedAt,omitempty"`
@@ -24,8 +22,6 @@ type DashboardSource struct {
 	LastError     string     `json:"lastError,omitempty"`
 }
 
-// DashboardWorkspace is one workspace's overrides. A nil or empty field
-// follows the settings.
 type DashboardWorkspace struct {
 	WorkspaceID          string                               `json:"workspaceId"`
 	Enabled              *bool                                `json:"enabled,omitempty"`
@@ -54,11 +50,8 @@ type DashboardSettings struct {
 	Slots         map[string]int    `json:"slots"`
 	Paused        map[string]bool   `json:"paused"`
 	Sources       []DashboardSource `json:"sources"`
-	// Workspaces holds each workspace's own choices over these settings. A
-	// save that omits it keeps the stored ones.
-	Workspaces []DashboardWorkspace `json:"workspaces"`
-	// ModelPolicy is the models a new workspace starts with. Once
-	// WorkspaceModels is set, a save leaves it as it is.
+	// A save that omits Workspaces keeps the stored ones.
+	Workspaces       []DashboardWorkspace                `json:"workspaces"`
 	ModelPolicy      map[domain.Role]DashboardRolePolicy `json:"modelPolicy"`
 	WorkspaceModels  bool                                `json:"workspaceModels"`
 	ExpectedRevision *int64                              `json:"expectedRevision,omitempty"`
@@ -112,9 +105,7 @@ func (s *Service) DashboardSettings(ctx context.Context) (DashboardSettings, err
 	return view, nil
 }
 
-// SaveDashboardSettings lays the dashboard's settings over the stored ones:
-// what the dashboard does not show (scope, verification commands, tool
-// lists, ranker, intervals) keeps its stored value.
+// Settings the dashboard does not show keep their stored values.
 func (s *Service) SaveDashboardSettings(ctx context.Context, view DashboardSettings, actor domain.Actor) (DashboardSettings, error) {
 	if err := s.mutable(); err != nil {
 		return DashboardSettings{}, err
@@ -154,8 +145,6 @@ func (s *Service) SaveDashboardSettings(ctx context.Context, view DashboardSetti
 	if view.Workspaces != nil {
 		applyWorkspaces(&settings, view.Workspaces)
 	}
-	// Models are each workspace's own once moved; before that, the defaults'
-	// still decide the workspaces that set none.
 	if !settings.WorkspaceModels {
 		for role, policy := range view.ModelPolicy {
 			current, ok := settings.ModelPolicy.Roles[role]
@@ -175,9 +164,6 @@ func (s *Service) SaveDashboardSettings(ctx context.Context, view DashboardSetti
 	return s.DashboardSettings(ctx)
 }
 
-// applySources sets each workspace's sources from the dashboard's list. A
-// workspace's other settings are kept; a source it no longer lists is
-// removed.
 func applySources(settings *domain.Settings, sources []DashboardSource) error {
 	listed := map[string]map[string]DashboardSource{}
 	order := []string{}
@@ -231,8 +217,6 @@ func applySources(settings *domain.Settings, sources []DashboardSource) error {
 	return nil
 }
 
-// applyWorkspaces sets each listed workspace's overrides; a workspace it
-// does not list keeps its own.
 func applyWorkspaces(settings *domain.Settings, workspaces []DashboardWorkspace) {
 	for _, view := range workspaces {
 		if strings.TrimSpace(view.WorkspaceID) == "" {
@@ -256,7 +240,6 @@ func applyWorkspaces(settings *domain.Settings, workspaces []DashboardWorkspace)
 	}
 }
 
-// cleanCommands drops blank test commands and trims the rest.
 func cleanCommands(commands []string) []string {
 	out := []string{}
 	for _, command := range commands {

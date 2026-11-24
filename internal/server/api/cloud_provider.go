@@ -10,8 +10,6 @@ import (
 	"kode-stream/internal/provider"
 )
 
-// cloudProviderStore keeps administrator-owned provider endpoints separate
-// from opaque, user-owned connection material.
 type cloudProviderStore struct {
 	registry    *cloudProviderRegistry
 	connections *cloudConnectionStore
@@ -153,8 +151,7 @@ func (a remoteSnapshotAdapter) Resolve(ctx context.Context, session cloudSession
 	return workspace, integration, nil
 }
 
-// ResolvePinned deliberately does not resolve SelectedRef. A remote snapshot is
-// an immutable review generation, not a live branch view.
+// A remote snapshot is an immutable review generation, so SelectedRef is not resolved.
 func (a remoteSnapshotAdapter) ResolvePinned(ctx context.Context, session cloudSession, workspace models.WorkspaceConfig) (models.WorkspaceConfig, provider.GitProviderIntegration, error) {
 	if strings.TrimSpace(workspace.ResolvedCommitSHA) == "" {
 		return models.WorkspaceConfig{}, nil, fmt.Errorf("remote snapshot has no immutable commit pin")

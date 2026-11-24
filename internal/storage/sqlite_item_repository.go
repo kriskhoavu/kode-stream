@@ -145,8 +145,6 @@ func (r *SQLiteItemRepository) Query(q itemindex.Query) ([]models.ItemSummary, e
 	return out, nil
 }
 
-// VisitContext streams item summaries directly from the SQL cursor. Search uses this
-// seam so cancellation does not first allocate every indexed item.
 func (r *SQLiteItemRepository) VisitContext(ctx context.Context, q itemindex.Query, visit func(models.ItemSummary) bool) error {
 	where := []string{"1=1"}
 	args := []any{}

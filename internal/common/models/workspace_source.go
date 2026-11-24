@@ -9,7 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// SourceSurface is a page a workspace source can show on.
 type SourceSurface string
 
 const (
@@ -17,18 +16,12 @@ const (
 	SourceSurfaceKnowledge  SourceSurface = "knowledge"
 )
 
-// WorkspaceSource is one directory of a workspace and the pages it shows on.
-// Only sources shown in Workstream feed the board; Knowledge reads every
-// source shown there. A bare string parses as the path with the named
-// defaults: a source named `plans` is Workstream only, one named `wiki` is
-// Knowledge only, anything else is both.
+// A bare string is a path with defaults: plans shows in Workstream, wiki in Knowledge, others in both.
 type WorkspaceSource struct {
 	Path    string          `json:"path" yaml:"path"`
 	ShownIn []SourceSurface `json:"shownIn" yaml:"shownIn"`
 }
 
-// DefaultShownIn returns the pages a source of this path shows on when it
-// says nothing itself.
 func DefaultShownIn(sourcePath string) []SourceSurface {
 	switch path.Base(strings.TrimSuffix(strings.ReplaceAll(strings.TrimSpace(sourcePath), "\\", "/"), "/")) {
 	case "plans":
@@ -40,12 +33,10 @@ func DefaultShownIn(sourcePath string) []SourceSurface {
 	}
 }
 
-// NewWorkspaceSource builds a source with the defaults for its path.
 func NewWorkspaceSource(sourcePath string) WorkspaceSource {
 	return WorkspaceSource{Path: sourcePath, ShownIn: DefaultShownIn(sourcePath)}
 }
 
-// SourceList builds sources from bare paths, each with its defaults.
 func SourceList(paths ...string) []WorkspaceSource {
 	sources := make([]WorkspaceSource, 0, len(paths))
 	for _, sourcePath := range paths {
@@ -54,7 +45,6 @@ func SourceList(paths ...string) []WorkspaceSource {
 	return sources
 }
 
-// ShowsIn reports whether the source shows on the surface.
 func (s WorkspaceSource) ShowsIn(surface SourceSurface) bool {
 	shownIn := s.ShownIn
 	if len(shownIn) == 0 {
@@ -68,8 +58,6 @@ func (s WorkspaceSource) ShowsIn(surface SourceSurface) bool {
 	return false
 }
 
-// Normalized returns the source with its surfaces deduplicated, in the
-// canonical order, and defaulted when empty. An unknown surface is an error.
 func (s WorkspaceSource) Normalized() (WorkspaceSource, error) {
 	if len(s.ShownIn) == 0 {
 		return WorkspaceSource{Path: s.Path, ShownIn: DefaultShownIn(s.Path)}, nil
@@ -97,7 +85,6 @@ type workspaceSourceRecord struct {
 	ShownIn []SourceSurface `json:"shownIn,omitempty" yaml:"shownIn,omitempty"`
 }
 
-// MarshalJSON always writes the object form with the surfaces filled.
 func (s WorkspaceSource) MarshalJSON() ([]byte, error) {
 	shownIn := s.ShownIn
 	if len(shownIn) == 0 {
@@ -106,7 +93,6 @@ func (s WorkspaceSource) MarshalJSON() ([]byte, error) {
 	return json.Marshal(workspaceSourceRecord{Path: s.Path, ShownIn: shownIn})
 }
 
-// UnmarshalJSON accepts a bare string or the object form.
 func (s *WorkspaceSource) UnmarshalJSON(data []byte) error {
 	trimmed := strings.TrimSpace(string(data))
 	if strings.HasPrefix(trimmed, "\"") {
@@ -125,7 +111,6 @@ func (s *WorkspaceSource) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// MarshalYAML always writes the object form with the surfaces filled.
 func (s WorkspaceSource) MarshalYAML() (any, error) {
 	shownIn := s.ShownIn
 	if len(shownIn) == 0 {
@@ -134,7 +119,6 @@ func (s WorkspaceSource) MarshalYAML() (any, error) {
 	return workspaceSourceRecord{Path: s.Path, ShownIn: shownIn}, nil
 }
 
-// UnmarshalYAML accepts a bare string or the object form.
 func (s *WorkspaceSource) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind == yaml.ScalarNode {
 		var sourcePath string
@@ -159,17 +143,14 @@ func fromRecord(record workspaceSourceRecord) WorkspaceSource {
 	return WorkspaceSource{Path: record.Path, ShownIn: record.ShownIn}
 }
 
-// SourcePaths lists every source's path, in order.
 func (w WorkspaceConfig) SourcePaths() []string {
 	return sourcePaths(w.Sources)
 }
 
-// SourcesShownIn lists the paths of the sources shown on the surface.
 func (w WorkspaceConfig) SourcesShownIn(surface SourceSurface) []string {
 	return sourcesShownIn(w.Sources, surface)
 }
 
-// SourcePaths lists every source's path, in order.
 func (w WorkspaceInput) SourcePaths() []string {
 	return sourcePaths(w.Sources)
 }

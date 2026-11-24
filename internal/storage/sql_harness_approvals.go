@@ -24,7 +24,6 @@ func (r *SQLHarnessRepository) InsertApproval(ctx context.Context, approval doma
 	return err
 }
 
-// approvalRecord keeps the fields the API never shows.
 type approvalRecord struct {
 	domain.Approval
 	IdempotencyKey string `json:"idempotencyKey,omitempty"`

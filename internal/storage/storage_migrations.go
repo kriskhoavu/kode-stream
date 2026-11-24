@@ -282,8 +282,6 @@ func postgresMigrations() []Migration {
 
 }
 
-// harnessReviewStageSQL renames the pull request approval to Review: its
-// stage kind, its gate and a run that waits at it.
 const harnessReviewStageSQL = `UPDATE harness_stages SET kind = 'review', data_json = REPLACE(data_json, '"kind":"pr_approval"', '"kind":"review"') WHERE kind = 'pr_approval';
 UPDATE harness_approvals SET gate = 'review', data_json = REPLACE(data_json, '"gate":"draft_pr"', '"gate":"review"') WHERE gate = 'draft_pr';
 UPDATE harness_runs SET data_json = REPLACE(data_json, '"currentStageKind":"pr_approval"', '"currentStageKind":"review"') WHERE data_json LIKE '%"currentStageKind":"pr_approval"%';`
@@ -358,8 +356,7 @@ INSERT INTO migration_repairs (migration_version, repair_name, affected_rows) SE
 INSERT INTO orphaned_scan_warnings_v7 SELECT * FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);
 DELETE FROM scan_warnings WHERE workspace_id NOT IN (SELECT id FROM workspaces);`
 
-// harnessCoreDDL is the harness schema for both drivers. Timestamps are
-// fixed-width UTC text so they sort and compare the same way in each.
+// Timestamps are fixed-width UTC text, so they sort and compare the same in both drivers.
 func harnessCoreDDL(serial, real, bigint string) string {
 	return `CREATE TABLE IF NOT EXISTS harness_tasks (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, source_kind TEXT NOT NULL, source_key TEXT NOT NULL, state TEXT NOT NULL, score ` + real + ` NOT NULL DEFAULT 0, pinned INTEGER NOT NULL DEFAULT 0, run_id TEXT NOT NULL DEFAULT '', revision ` + bigint + ` NOT NULL, data_json TEXT NOT NULL, discovered_at TEXT NOT NULL, updated_at TEXT NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS harness_tasks_source ON harness_tasks (source_kind, source_key);

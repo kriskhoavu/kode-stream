@@ -1,12 +1,5 @@
 package git
 
-// Since-commit readers: bounded, read-only queries that describe what a
-// checkout has done since a session's launch commit. Every method here
-// validates its ref arguments before use and resolves them with
-// `git rev-parse --verify --end-of-options <ref>^{commit}` (or, for
-// CommitExists, `git cat-file -e`) so a bad or missing commit fails with a
-// typed error instead of an ambiguous git exit status.
-
 import (
 	"bufio"
 	"bytes"
@@ -21,13 +14,8 @@ import (
 	"unicode/utf8"
 )
 
-// maxNameStatusEntries bounds the file list NameStatusSince returns, mirroring
-// the cap TreeWalkBounded applies to review trees: a stable limit and a
-// truncated flag beat a partial list with unknown omissions.
 const maxNameStatusEntries = 500
 
-// ErrUnknownCommit reports that a ref did not resolve to a real commit in the
-// workspace. Err carries the underlying git failure.
 type ErrUnknownCommit struct {
 	Ref string
 	Err error
@@ -39,17 +27,12 @@ func (e *ErrUnknownCommit) Error() string {
 
 func (e *ErrUnknownCommit) Unwrap() error { return e.Err }
 
-// NameStatusEntry describes one path changed since a commit, or currently
-// untracked. Status is one of A, M, D, R, C, or ? (untracked); OldPath is set
-// only for R and C.
 type NameStatusEntry struct {
 	Path    string
 	Status  string
 	OldPath string
 }
 
-// NameStatusSince lists paths changed between commit and the working tree
-// (staged and unstaged), plus untracked files, capped at maxNameStatusEntries.
 func (g *GitAdapter) NameStatusSince(workspacePath, commit string) ([]NameStatusEntry, bool, error) {
 	return g.NameStatusSinceContext(context.Background(), workspacePath, commit)
 }
@@ -60,11 +43,7 @@ func (g *GitAdapter) NameStatusSinceContext(ctx context.Context, workspacePath, 
 		return nil, false, err
 	}
 
-	// Stream both commands' NUL-delimited output rather than buffering it:
-	// a workspace with an enormous number of changed or untracked paths must
-	// truncate at maxNameStatusEntries, not fail with ErrOutputLimit. Ask
-	// for one more than the cap so we can tell "exactly at the cap" apart
-	// from "more entries exist beyond it".
+	// Stream, so a huge change list truncates instead of failing. Ask for one more to detect truncation.
 	budget := maxNameStatusEntries + 1
 	entries, err := g.streamNameStatusSince(ctx, workspacePath, sha, budget)
 	if err != nil {
@@ -86,10 +65,6 @@ func (g *GitAdapter) NameStatusSinceContext(ctx context.Context, workspacePath, 
 	return entries, truncated, nil
 }
 
-// streamNameStatusSince runs `git diff --name-status -M -z` against sha and
-// parses its NUL-delimited records (status\0path\0, or Rnnn\0old\0new\0 for a
-// rename/copy) as they arrive, stopping as soon as limit entries have been
-// collected instead of buffering the whole diff.
 func (g *GitAdapter) streamNameStatusSince(ctx context.Context, dir, sha string, limit int) ([]NameStatusEntry, error) {
 	return g.streamNULEntries(ctx, dir, limit, func(next func() (string, bool)) ([]NameStatusEntry, bool) {
 		status, ok := next()
@@ -119,11 +94,7 @@ func (g *GitAdapter) streamNameStatusSince(ctx context.Context, dir, sha string,
 	}, "diff", "--name-status", "-M", "-z", sha, "--")
 }
 
-// streamUntrackedSince runs `git status --porcelain=v1 -z --untracked-files=all`
-// and streams its NUL-delimited records for untracked ("??") entries only,
-// stopping once limit entries have been collected. A rename/copy record's old-
-// path continuation field is consumed and skipped so it can never be mistaken
-// for an unrelated untracked record.
+// A rename record's old-path field is skipped, so it never reads as an untracked record.
 func (g *GitAdapter) streamUntrackedSince(ctx context.Context, dir string, limit int) ([]NameStatusEntry, error) {
 	if limit <= 0 {
 		return []NameStatusEntry{}, nil
@@ -144,8 +115,6 @@ func (g *GitAdapter) streamUntrackedSince(ctx context.Context, dir string, limit
 			return []NameStatusEntry{{Status: "?", Path: record[3:]}}, true
 		}
 		if x == 'R' || x == 'C' || y == 'R' || y == 'C' {
-			// Consume (and discard) the rename/copy continuation field so it
-			// is never parsed as its own record.
 			if _, ok := next(); !ok {
 				return nil, false
 			}
@@ -154,13 +123,6 @@ func (g *GitAdapter) streamUntrackedSince(ctx context.Context, dir string, limit
 	}, "status", "--porcelain=v1", "-z", "--untracked-files=all")
 }
 
-// streamNULEntries runs git with args, reading its NUL-delimited stdout
-// incrementally rather than buffering it. produce is called repeatedly with a
-// next() accessor over the token stream; it returns the (possibly empty) set
-// of entries the tokens it consumed represent, and false once the stream is
-// exhausted. Reading stops, and the process is killed, as soon as limit
-// entries have been produced -- a large listing truncates instead of erroring
-// or consuming unbounded memory.
 func (g *GitAdapter) streamNULEntries(
 	ctx context.Context,
 	dir string,
@@ -211,8 +173,7 @@ func (g *GitAdapter) streamNULEntries(
 	scanErr := scanner.Err()
 
 	if truncatedByLimit {
-		// Stop reading immediately: killing the process avoids buffering an
-		// arbitrarily large remainder we would only discard.
+		// Kill the process instead of buffering a large remainder this reader would discard.
 		_ = cmd.Process.Kill()
 		_ = cmd.Wait()
 		return entries, nil
@@ -256,8 +217,6 @@ var (
 	shortStatDeleteRe = regexp.MustCompile(`(\d+) deletions?\(-\)`)
 )
 
-// ShortStatSince reports additions, deletions, and the changed-file count
-// between commit and the working tree (staged and unstaged changes included).
 func (g *GitAdapter) ShortStatSince(workspacePath, commit string) (additions, deletions, files int, err error) {
 	return g.ShortStatSinceContext(context.Background(), workspacePath, commit)
 }
@@ -290,10 +249,6 @@ func firstInt(re *regexp.Regexp, text string) int {
 	return value
 }
 
-// DiffFileSince returns the diff of one path between commit and the working
-// tree, bounded by maxBytes with a truncated flag. relPath must pass the same
-// tree-path validation the adapter already applies and must not start with
-// ':' or '-'.
 func (g *GitAdapter) DiffFileSince(ctx context.Context, workspacePath, commit, relPath string, maxBytes int64) (string, bool, error) {
 	if maxBytes <= 0 {
 		return "", false, ErrBlobLimit
@@ -312,23 +267,17 @@ func (g *GitAdapter) DiffFileSince(ctx context.Context, workspacePath, commit, r
 	return g.boundedDiff(ctx, workspacePath, maxBytes, "diff", "--no-ext-diff", "-M", sha, "--", clean)
 }
 
-// boundedDiff runs a git diff and returns at most maxBytes of it, with a
-// truncated flag, instead of failing on a large diff.
 func (g *GitAdapter) boundedDiff(ctx context.Context, workspacePath string, maxBytes int64, args ...string) (string, bool, error) {
 	if maxBytes <= 0 {
 		return "", false, ErrBlobLimit
 	}
-	// Cap the command just above the caller's bound: a diff at or under
-	// maxBytes always comes back whole, and one that overflows is reported
-	// as ErrOutputLimit rather than silently discarded.
+	// Cap the command just above the bound: a diff at or under maxBytes comes back whole.
 	out, err := g.runContextLimited(ctx, workspacePath, maxBytes+1, args...)
 	if err != nil {
 		if !errors.Is(err, ErrOutputLimit) {
 			return "", false, err
 		}
-		// runContextLimited discards everything it read on overflow, so
-		// re-run the same diff capturing exactly the first maxBytes -- the
-		// caller gets a usable truncated diff instead of an error.
+		// runContextLimited discards everything on overflow, so run again and keep the first maxBytes.
 		partial, rerunErr := g.runTruncated(ctx, workspacePath, maxBytes, args...)
 		if rerunErr != nil {
 			return "", false, rerunErr
@@ -341,9 +290,6 @@ func (g *GitAdapter) boundedDiff(ctx context.Context, workspacePath string, maxB
 	return string(out), false, nil
 }
 
-// runTruncated runs git with args, capturing at most maxBytes of stdout. It
-// never fails on overflow -- unlike runContextLimited/limitedBuffer, excess
-// output is silently discarded rather than turning into ErrOutputLimit.
 func (g *GitAdapter) runTruncated(ctx context.Context, dir string, maxBytes int64, args ...string) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -368,9 +314,6 @@ func (g *GitAdapter) runTruncated(ctx context.Context, dir string, maxBytes int6
 	return stdout.buf.Bytes(), nil
 }
 
-// truncatingWriter keeps only the first limit bytes written to it and never
-// returns an error on overflow, unlike limitedBuffer whose job is to abort
-// the command instead.
 type truncatingWriter struct {
 	buf   bytes.Buffer
 	limit int64
@@ -388,8 +331,7 @@ func (w *truncatingWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// truncateUTF8 trims s to at most limit bytes without splitting a multi-byte
-// rune, so a diff cut off mid-character never yields invalid UTF-8.
+// Trims on a rune boundary, so a cut diff stays valid UTF-8.
 func truncateUTF8(s string, limit int64) string {
 	if limit < 0 {
 		limit = 0
@@ -404,8 +346,6 @@ func truncateUTF8(s string, limit int64) string {
 	return s[:cut]
 }
 
-// RevListCount reports the number of commits reachable from to but not from
-// from (`git rev-list --count from..to`).
 func (g *GitAdapter) RevListCount(workspacePath, from, to string) (int, error) {
 	return g.RevListCountContext(context.Background(), workspacePath, from, to)
 }
@@ -430,25 +370,11 @@ func (g *GitAdapter) RevListCountContext(ctx context.Context, workspacePath, fro
 	return count, nil
 }
 
-// CommitExists reports whether commit resolves to a real commit object. It
-// returns nil when it does, and a typed *ErrUnknownCommit when it does not.
 func (g *GitAdapter) CommitExists(workspacePath, commit string) error {
 	return g.CommitExistsContext(context.Background(), workspacePath, commit)
 }
 
-// CommitExistsContext checks that commit both exists and names a commit
-// object, using the bare (unpeeled) forms of `git cat-file -e <commit>` and
-// `git cat-file -t <commit>` -- deliberately not the `<commit>^{commit}`
-// peel expression the rest of this file uses, because peeling makes git fail
-// ref resolution itself on a missing object (`fatal: Not a valid object
-// name`, exit 128), which is indistinguishable by exit code from a corrupt
-// repository or any other resolution failure. The bare `-e` form instead
-// exits 1 -- cleanly, with no stderr -- exactly when the object is simply
-// absent, so that is the only case (together with the object existing but
-// not being a commit) that becomes a typed *ErrUnknownCommit; every other
-// outcome (a corrupt repository, a missing git binary, a timeout, a process
-// that could not even start) is returned unchanged so the caller can tell it
-// apart from a merely-absent commit.
+// Bare cat-file -e exits 1 only for a missing object. A peeled ref fails with exit 128, like a corrupt repository.
 func (g *GitAdapter) CommitExistsContext(ctx context.Context, workspacePath, commit string) error {
 	clean, err := validateRef(commit)
 	if err != nil {
@@ -460,7 +386,6 @@ func (g *GitAdapter) CommitExistsContext(ctx context.Context, workspacePath, com
 	}
 	switch exitCode {
 	case 0:
-		// falls through to the type check below
 	case 1:
 		return &ErrUnknownCommit{Ref: clean, Err: fmt.Errorf("object %q does not exist", clean)}
 	default:
@@ -476,13 +401,7 @@ func (g *GitAdapter) CommitExistsContext(ctx context.Context, workspacePath, com
 	return nil
 }
 
-// runExitCode runs `git <args...>` in dir and reports its exit code without
-// treating a non-zero exit as an error in itself: err is non-nil only when
-// the process could not be run or judged at all (a context cancellation or
-// timeout, or git failing to start), never merely because it exited
-// non-zero. Callers that need to tell "exited 1" apart from "exited 128"
-// apart from "could not run git at all" use this instead of
-// runContextLimited, which collapses all three into one opaque error.
+// err is set only when git could not run, so callers can tell exit 1 from exit 128.
 func (g *GitAdapter) runExitCode(ctx context.Context, dir string, args ...string) (int, error) {
 	if err := ctx.Err(); err != nil {
 		return 0, err
@@ -512,9 +431,7 @@ func (g *GitAdapter) runExitCode(ctx context.Context, dir string, args ...string
 	return 0, errors.New(message)
 }
 
-// validateRef enforces the shared ref-argument shape: non-empty and never
-// starting with '-' or ':', so a ref can never be mistaken for a git option
-// or a pathspec magic prefix.
+// A leading '-' or ':' would read as a git option or a pathspec magic prefix.
 func validateRef(ref string) (string, error) {
 	trimmed := strings.TrimSpace(ref)
 	if trimmed == "" {
@@ -526,10 +443,6 @@ func validateRef(ref string) (string, error) {
 	return trimmed, nil
 }
 
-// resolveCommitContext validates ref and resolves it to a commit SHA with
-// `git rev-parse --verify --end-of-options <ref>^{commit}`. A ref that fails
-// to resolve returns a typed *ErrUnknownCommit wrapping the underlying git
-// failure.
 func (g *GitAdapter) resolveCommitContext(ctx context.Context, workspacePath, ref string) (string, error) {
 	clean, err := validateRef(ref)
 	if err != nil {

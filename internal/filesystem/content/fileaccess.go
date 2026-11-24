@@ -1,7 +1,5 @@
 package fileaccess
 
-// Package fileaccess provides bounded content access.
-
 import (
 	"crypto/sha256"
 	"encoding/base64"

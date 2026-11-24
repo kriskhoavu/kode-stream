@@ -63,8 +63,7 @@ taxonomy:
 	}
 }
 
-// Every defect degrades to detection and reports why. A broken configuration
-// must never blank a Wiki.
+// A broken configuration must never blank a wiki.
 func TestReadTaxonomySettingsDegradesOnFileLevelDefects(t *testing.T) {
 	tests := []struct {
 		name string
@@ -142,9 +141,6 @@ func TestReadTaxonomySettingsWarningsCarryTheSettingsFilePath(t *testing.T) {
 	}
 }
 
-// A curator listing tiers explicitly is correcting detection, so the declared
-// list replaces the detected one. Merging would make a wrongly detected tier
-// impossible to remove.
 func TestApplyTaxonomySettingsReplacesDetectedTiers(t *testing.T) {
 	detected := DetectTaxonomy(referenceWikiPaths())
 	if !detected.Tiers["reference"] {
@@ -190,9 +186,6 @@ func TestDetectTaxonomyRecordsBucketsSeen(t *testing.T) {
 	}
 }
 
-// The ordering between editing settings and creating the directory is not ours
-// to dictate, so a declared bucket missing from the tree warns rather than
-// failing.
 func TestApplyTaxonomySettingsWarnsWhenDeclaredBucketIsAbsent(t *testing.T) {
 	detected := DetectTaxonomy(referenceWikiPaths())
 

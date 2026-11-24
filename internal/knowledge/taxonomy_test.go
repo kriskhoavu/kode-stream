@@ -12,9 +12,6 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-// referenceWikiPaths mirrors the shapes of the reference Wiki Root: tiers
-// recurring inside `domains`, an area nested in an area under `master-data`,
-// a bucket whose tiers carry no area, and a bucket with no tier at all.
 func referenceWikiPaths() []string {
 	return []string{
 		"index.md",
@@ -61,9 +58,7 @@ func TestDetectTaxonomyFindsRecurringTierNames(t *testing.T) {
 	}
 }
 
-// offer and master-data each appear under two buckets. Counting parents across
-// the whole tree would reach the threshold and promote them to tiers; counting
-// within a single bucket must not.
+// offer and master-data appear in two buckets, which must not make them tiers.
 func TestDetectTaxonomyIgnoresNamesRecurringOnlyAcrossBuckets(t *testing.T) {
 	taxonomy := DetectTaxonomy(referenceWikiPaths())
 
@@ -86,8 +81,6 @@ func TestDetectTaxonomyOnEmptyPathSet(t *testing.T) {
 	}
 }
 
-// A wiki early in its life has no name recurring within a bucket, so detection
-// declines rather than guessing a tier from a single example.
 func TestDetectTaxonomyDeclinesWithoutRepeatedEvidence(t *testing.T) {
 	taxonomy := DetectTaxonomy([]string{
 		"index.md",
@@ -131,9 +124,6 @@ func TestClassifyResolvesStructuralShapes(t *testing.T) {
 	}
 }
 
-// `concepts` earns tier status from the evidence inside `domains`. The tier set
-// is global once learned, so it is recognised in `platform` too, where it
-// appears under a single parent.
 func TestClassifyAppliesGloballyLearnedTierInsideAnyBucket(t *testing.T) {
 	taxonomy := DetectTaxonomy(referenceWikiPaths())
 
@@ -143,8 +133,6 @@ func TestClassifyAppliesGloballyLearnedTierInsideAnyBucket(t *testing.T) {
 	}
 }
 
-// A layout deeper than the reference wiki must degrade into a longer area
-// rather than silently dropping a path component.
 func TestClassifyFoldsSegmentsAfterTierIntoArea(t *testing.T) {
 	taxonomy := DetectTaxonomy(referenceWikiPaths())
 
@@ -163,9 +151,6 @@ func TestClassifyNormalisesPathSeparatorsAndPrefixes(t *testing.T) {
 	}
 }
 
-// writeReferenceWiki lays out the reference wiki shapes on disk: tiers
-// recurring inside `domains`, an area nested in an area, a bucket whose tier
-// carries no area, and a bucket with no tier.
 func writeReferenceWiki(t *testing.T, root string) {
 	t.Helper()
 	for _, page := range referenceWikiPaths() {
@@ -228,7 +213,6 @@ func TestDetectorClassifiesPagesIntoBucketAreaAndTier(t *testing.T) {
 	}
 }
 
-// PM-040 must not disturb the field the browser tree and graph filter read.
 func TestDetectorLeavesDomainUnchanged(t *testing.T) {
 	root := t.TempDir()
 	writeReferenceWiki(t, root)
@@ -259,7 +243,6 @@ func TestDetectorAppliesSettingsOverrideToTiers(t *testing.T) {
 	}
 }
 
-// A broken settings file must never blank a wiki.
 func TestDetectorIndexesEveryPageWhenSettingsAreMalformed(t *testing.T) {
 	root := t.TempDir()
 	writeReferenceWiki(t, root)

@@ -36,27 +36,18 @@ type Intervals struct {
 }
 
 type JiraSourceSettings struct {
-	Enabled bool   `json:"enabled"`
-	JQL     string `json:"jql"`
-	Max     int    `json:"max"`
-	// CheckReady turns the readiness check on; nil means off. With it on, a ticket in one of ReadyStatuses starts on its own, and its planner
-	// first judges whether the ticket says enough to plan from.
-	CheckReady *bool `json:"checkReady,omitempty"`
-	// ReadyStatuses are the Jira statuses that mean a ticket is ready to
-	// work on; empty means DefaultReadyStatuses.
+	Enabled    bool   `json:"enabled"`
+	JQL        string `json:"jql"`
+	Max        int    `json:"max"`
+	CheckReady *bool  `json:"checkReady,omitempty"`
+	// Empty ReadyStatuses means DefaultReadyStatuses.
 	ReadyStatuses []string `json:"readyStatuses,omitempty"`
 }
 
-// DefaultReadyStatuses is the Jira status a ticket is ready in, unless a
-// workspace names its own.
 var DefaultReadyStatuses = []string{"READY"}
 
-// MaxReadyStatuses bounds how many ready statuses a workspace names.
 const MaxReadyStatuses = 10
 
-// Ready reports whether the readiness check applies to a ticket in status:
-// Jira is on, the check is on, and status is one of the ready ones, in any
-// case.
 func (j *JiraSourceSettings) Ready(status string) bool {
 	if j == nil || !j.Enabled || j.CheckReady == nil || !*j.CheckReady {
 		return false
@@ -84,8 +75,6 @@ type GitHubSourceSettings struct {
 	TokenEnvVar string   `json:"tokenEnvVar"`
 }
 
-// LocalSourceSettings names a folder of task files, one Markdown file per
-// task. A relative Dir is read from the workspace's checkout.
 type LocalSourceSettings struct {
 	Enabled bool   `json:"enabled"`
 	Dir     string `json:"dir"`
@@ -101,34 +90,24 @@ type BitbucketSourceSettings struct {
 }
 
 type WorkspaceSettings struct {
-	WorkspaceID       string `json:"workspaceId"`
-	MaxConcurrentRuns int    `json:"maxConcurrentRuns"`
-	// AskQuestions overrides, for this workspace, whether an agent may stop
-	// and ask a person; nil follows the settings.
+	WorkspaceID          string   `json:"workspaceId"`
+	MaxConcurrentRuns    int      `json:"maxConcurrentRuns"`
 	AskQuestions         *bool    `json:"askQuestions,omitempty"`
 	VerificationCommands []string `json:"verificationCommands"`
-	// Scope lists the path prefixes a builder may change; empty allows any
-	// path that is not protected.
-	Scope     []string                 `json:"scope"`
-	Jira      *JiraSourceSettings      `json:"jira,omitempty"`
-	GitHub    *GitHubSourceSettings    `json:"github,omitempty"`
-	Bitbucket *BitbucketSourceSettings `json:"bitbucket,omitempty"`
-	Local     *LocalSourceSettings     `json:"local,omitempty"`
-	// The overrides below lay this workspace's own choices over the
-	// settings'; nil or empty follows the settings.
-	Enabled       *bool                  `json:"enabled,omitempty"`
-	AutoStart     *bool                  `json:"autoStart,omitempty"`
-	RequireReview *bool                  `json:"requireReview,omitempty"`
-	Models        map[Role]RoleModel     `json:"models,omitempty"`
-	Procedure     map[Role]ProcedureStep `json:"procedure,omitempty"`
-	// ProcedureMoved records that the repository's harness.yaml, if it had
-	// one, was moved into Procedure, so it is never read again.
-	ProcedureMoved bool `json:"procedureMoved,omitempty"`
+	// Empty Scope allows any path that is not protected.
+	Scope          []string                 `json:"scope"`
+	Jira           *JiraSourceSettings      `json:"jira,omitempty"`
+	GitHub         *GitHubSourceSettings    `json:"github,omitempty"`
+	Bitbucket      *BitbucketSourceSettings `json:"bitbucket,omitempty"`
+	Local          *LocalSourceSettings     `json:"local,omitempty"`
+	Enabled        *bool                    `json:"enabled,omitempty"`
+	AutoStart      *bool                    `json:"autoStart,omitempty"`
+	RequireReview  *bool                    `json:"requireReview,omitempty"`
+	Models         map[Role]RoleModel       `json:"models,omitempty"`
+	Procedure      map[Role]ProcedureStep   `json:"procedure,omitempty"`
+	ProcedureMoved bool                     `json:"procedureMoved,omitempty"`
 }
 
-// RoleModel is a workspace's choice of CLI and model for one role. An empty
-// field follows the settings. It holds no tool permissions: those stay the
-// settings' alone.
 type RoleModel struct {
 	Engine              string `json:"engine,omitempty"`
 	Model               string `json:"model,omitempty"`
@@ -136,8 +115,6 @@ type RoleModel struct {
 	MaxTurns            int    `json:"maxTurns,omitempty"`
 }
 
-// ProcedureStep is the repository's own skill, and the track of it, that a
-// role follows in a workspace.
 type ProcedureStep struct {
 	Skill string `json:"skill" yaml:"skill"`
 	Track string `json:"track,omitempty" yaml:"track,omitempty"`
@@ -148,7 +125,6 @@ var (
 	trackName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 _-]{0,39}$`)
 )
 
-// ValidateProcedure checks a role's skill and track.
 func ValidateProcedure(role Role, step ProcedureStep) error {
 	if !validRole(role) {
 		return Invalid("unknown role %q in procedure", role)
@@ -162,8 +138,6 @@ func ValidateProcedure(role Role, step ProcedureStep) error {
 	return nil
 }
 
-// For is the settings one workspace runs with: the settings, with that
-// workspace's own choices laid over them.
 func (s Settings) For(workspaceID string) Settings {
 	workspace, ok := s.Workspace(workspaceID)
 	if !ok {
@@ -189,8 +163,7 @@ func (s Settings) For(workspaceID string) Settings {
 				if model.Model != "" {
 					policy.Model = model.Model
 				}
-				// Once models are the workspace's own, an empty hard model
-				// means it has none, not that it follows anything.
+				// Once models are the workspace's own, an empty hard model means it has none.
 				if s.WorkspaceModels || model.HighDifficultyModel != "" {
 					policy.HighDifficultyModel = model.HighDifficultyModel
 				}
@@ -205,11 +178,6 @@ func (s Settings) For(workspaceID string) Settings {
 	return out
 }
 
-// OwnModels gives each listed workspace a model for every role, so the
-// workspace holds its own and nothing global decides them. The first time,
-// a workspace's choices are completed from the settings' models, which are
-// then set back to Kode Stream's defaults; after that a workspace that lacks
-// a role starts from those defaults. It reports whether anything changed.
 func (s *Settings) OwnModels(workspaceIDs []string) bool {
 	first := !s.WorkspaceModels
 	source := DefaultModelPolicy().Roles
@@ -242,8 +210,6 @@ func (s *Settings) OwnModels(workspaceIDs []string) bool {
 			if model.Model == "" {
 				model.Model = from.Model
 			}
-			// Before the move an empty hard model followed the settings';
-			// after it, a role the workspace already holds keeps its choice.
 			if model.HighDifficultyModel == "" && (first || !had) {
 				model.HighDifficultyModel = from.HighDifficultyModel
 			}
@@ -282,33 +248,23 @@ type RankerSettings struct {
 }
 
 type Settings struct {
-	Enabled   bool `json:"enabled"`
-	AutoStart bool `json:"autoStart"`
-	// RequireReview stops a run whose tests passed at Review, where a person
-	// tries the change before it is handed off. On unless turned off.
+	Enabled       bool `json:"enabled"`
+	AutoStart     bool `json:"autoStart"`
 	RequireReview bool `json:"requireReview"`
-	// AskQuestions lets an agent stop its round and ask a person when its
-	// report is blocked or lists open questions; nil means yes. A workspace
-	// or a task may override it.
-	AskQuestions  *bool               `json:"askQuestions,omitempty"`
-	Slots         Slots               `json:"slots"`
-	Intervals     Intervals           `json:"intervals"`
-	Paused        map[RoleKey]bool    `json:"paused"`
-	Workspaces    []WorkspaceSettings `json:"workspaces"`
-	ModelPolicy   ModelPolicy         `json:"modelPolicy"`
-	Ranker        RankerSettings      `json:"ranker"`
-	RetentionDays int                 `json:"retentionDays"`
-	// WorkspaceModels records that each workspace holds its own models,
-	// copied from the defaults once; ModelPolicy's engines and models are
-	// then only what a new workspace starts with.
-	WorkspaceModels bool       `json:"workspaceModels,omitempty"`
-	Revision        int64      `json:"revision"`
-	UpdatedAt       *time.Time `json:"updatedAt,omitempty"`
+	// Nil AskQuestions means yes. A workspace or a task may override it.
+	AskQuestions    *bool               `json:"askQuestions,omitempty"`
+	Slots           Slots               `json:"slots"`
+	Intervals       Intervals           `json:"intervals"`
+	Paused          map[RoleKey]bool    `json:"paused"`
+	Workspaces      []WorkspaceSettings `json:"workspaces"`
+	ModelPolicy     ModelPolicy         `json:"modelPolicy"`
+	Ranker          RankerSettings      `json:"ranker"`
+	RetentionDays   int                 `json:"retentionDays"`
+	WorkspaceModels bool                `json:"workspaceModels,omitempty"`
+	Revision        int64               `json:"revision"`
+	UpdatedAt       *time.Time          `json:"updatedAt,omitempty"`
 }
 
-// QuestionGate reports whether an agent working on task may stop and ask a
-// person: the task's own choice first, then its workspace's, then the
-// settings', and yes when none says.
 func (s Settings) QuestionGate(task Task) bool {
 	if task.AskQuestions != nil {
 		return *task.AskQuestions
@@ -322,9 +278,6 @@ func (s Settings) QuestionGate(task Task) bool {
 	return true
 }
 
-// ReadyCheck reports whether task is a Jira ticket in one of its workspace's
-// ready statuses with the readiness check on: such a task starts on its own,
-// and its planner first judges whether the ticket says enough to plan from.
 func (s Settings) ReadyCheck(task Task) bool {
 	if task.Source.Kind != SourceJira {
 		return false
@@ -342,7 +295,6 @@ func (s Settings) Workspace(id string) (WorkspaceSettings, bool) {
 	return WorkspaceSettings{}, false
 }
 
-// Limits on settings a person can change.
 const (
 	maxSlotsPerPool      = 8
 	maxConcurrentRuns    = 8
@@ -357,8 +309,6 @@ const (
 	DefaultPolicyMaxUSD  = 25.0
 )
 
-// DefaultSettings: disabled, Start is a human approval, Review is on, one
-// slot per pool.
 func DefaultSettings() Settings {
 	return Settings{
 		Enabled:       false,

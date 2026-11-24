@@ -1,7 +1,5 @@
 package models
 
-// Package models contains compatibility contracts pending domain ownership.
-
 import (
 	"encoding/json"
 	"testing"

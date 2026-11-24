@@ -16,12 +16,7 @@ import (
 	"kode-stream/internal/common/models"
 )
 
-// Claude Code keeps each conversation as a JSONL transcript under
-// <config dir>/projects/<encoded working directory>/<session id>.jsonl. These
-// readers find the conversations held in a workspace's root, so a card can show
-// the ones that worked on it and resume one in an embedded terminal. They read
-// on request and store nothing: a transcript holds prompts and output, which
-// never enter a session record.
+// Transcripts hold prompts and output, so these readers read on request and store nothing.
 
 const (
 	claudeTranscriptWindow   = 14 * 24 * time.Hour
@@ -33,7 +28,6 @@ const (
 
 var ErrClaudeTranscriptsUnavailable = errors.New("claude transcripts are read in Local mode only")
 
-// ClaudeTranscript is a conversation's safe metadata: no prompt or output.
 type ClaudeTranscript struct {
 	SessionID    string    `json:"sessionId"`
 	Branch       string    `json:"branch,omitempty"`
@@ -43,7 +37,6 @@ type ClaudeTranscript struct {
 	ItemIDs      []string  `json:"itemIds"`
 }
 
-// ClaudeTurn is one user or assistant text turn of a transcript tail.
 type ClaudeTurn struct {
 	Role string    `json:"role"`
 	Text string    `json:"text"`
@@ -84,8 +77,7 @@ func claudeConfigDir() (string, error) {
 	return filepath.Join(home, ".claude"), nil
 }
 
-// claudeProjectDirName encodes a working directory the way Claude Code names
-// its project directory: every rune that is not an ASCII letter or digit is '-'.
+// Claude Code replaces every rune that is not an ASCII letter or digit with '-'.
 func claudeProjectDirName(path string) string {
 	var name strings.Builder
 	for _, r := range path {
@@ -98,9 +90,6 @@ func claudeProjectDirName(path string) string {
 	return name.String()
 }
 
-// ClaudeTranscriptPath is where Claude Code writes the transcript of the
-// session sessionID started in workingDir. Callers store this path, never
-// the transcript.
 func ClaudeTranscriptPath(workingDir, sessionID string) (string, error) {
 	configDir, err := claudeConfigDir()
 	if err != nil {
@@ -130,10 +119,6 @@ func (s *Service) claudeProject(workspaceID string) (models.WorkspaceConfig, str
 	return workspace, filepath.Join(configDir, "projects", claudeProjectDirName(workspace.Path)), nil
 }
 
-// ClaudeTranscripts lists the workspace's recent Claude conversations, newest
-// first, each with the items on branch whose path or identifier it mentions.
-// Conversations kode-stream started itself are left out: their session record
-// already represents them.
 func (s *Service) ClaudeTranscripts(workspaceID, branch string) ([]ClaudeTranscript, error) {
 	workspace, projectDir, err := s.claudeProject(workspaceID)
 	if err != nil {
@@ -192,8 +177,6 @@ func (s *Service) ClaudeTranscripts(workspaceID, branch string) ([]ClaudeTranscr
 	return transcripts, nil
 }
 
-// ClaudeTranscriptTail returns the last limit user and assistant text turns of
-// one of the workspace's conversations, read now and kept nowhere.
 func (s *Service) ClaudeTranscriptTail(workspaceID, sessionID string, limit int) ([]ClaudeTurn, error) {
 	path, err := s.claudeTranscriptPath(workspaceID, sessionID)
 	if err != nil {
@@ -202,10 +185,7 @@ func (s *Service) ClaudeTranscriptTail(workspaceID, sessionID string, limit int)
 	return ReadClaudeTranscriptTail(path, limit)
 }
 
-// ReadClaudeTranscriptTail returns the last limit user and assistant text
-// turns of the transcript at path, read now and kept nowhere. A file that
-// does not exist yet reads as no turns, since Claude Code creates it on its
-// first turn.
+// Claude Code creates the file on its first turn, so a missing file reads as no turns.
 func ReadClaudeTranscriptTail(path string, limit int) ([]ClaudeTurn, error) {
 	if limit <= 0 || limit > ClaudeTranscriptMaxTail {
 		limit = ClaudeTranscriptMaxTail
@@ -228,8 +208,6 @@ func ReadClaudeTranscriptTail(path string, limit int) ([]ClaudeTurn, error) {
 	return turns, nil
 }
 
-// claudeTranscriptPath resolves a conversation of the workspace, refusing an ID
-// that is not a UUID or a transcript held in another directory.
 func (s *Service) claudeTranscriptPath(workspaceID, sessionID string) (string, error) {
 	workspace, projectDir, err := s.claudeProject(workspaceID)
 	if err != nil {
@@ -257,8 +235,7 @@ func (s *Service) claudeTranscriptPath(workspaceID, sessionID string) (string, e
 	return path, nil
 }
 
-// claudeConversationsWithRecords names the conversations kode-stream launched
-// or resumed: a Claude session record is embedded-<conversation>[-<suffix>].
+// A Claude session record ID is embedded-<conversation>[-<suffix>].
 func (s *Service) claudeConversationsWithRecords(workspaceID string) (map[string]bool, error) {
 	known := map[string]bool{}
 	if s.records == nil {
@@ -323,11 +300,7 @@ func transcriptText(content json.RawMessage) string {
 	return strings.Join(parts, "\n\n")
 }
 
-// authoredText is what the user or Claude wrote in a line: the user's prompts,
-// Claude's replies, and the inputs of the tools Claude called, such as a file
-// it read or edited. Tool output, injected context, and metadata are left out:
-// a search result or git status that happens to list a plan's files says
-// nothing about whether the conversation worked on it.
+// Tool output is left out: a search result that lists a plan's files says nothing about the work.
 func authoredText(line claudeTranscriptLine) []byte {
 	if (line.Type != "user" && line.Type != "assistant") || line.IsMeta || line.Message == nil {
 		return nil

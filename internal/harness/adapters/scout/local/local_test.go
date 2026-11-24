@@ -47,7 +47,6 @@ func TestPollReadsEachTaskFileAsOneTask(t *testing.T) {
 		t.Fatalf("second = %#v", second)
 	}
 
-	// An absolute folder is read as it is.
 	settings.Local.Dir = tasks
 	if candidates, err := scout.Poll(context.Background(), models.WorkspaceConfig{ID: "sandbox", Path: "/elsewhere"}, settings); err != nil || len(candidates) != 2 {
 		t.Fatalf("absolute: %d candidates, err=%v", len(candidates), err)

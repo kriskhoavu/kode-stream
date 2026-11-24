@@ -10,12 +10,7 @@ import (
 
 const claudeActivityMaxText = 600
 
-// ReadClaudeTranscriptActivity is ReadClaudeTranscriptTail with the model's
-// work between its words: each tool call as a "tool" turn naming the tool and
-// what it was given, and each thinking block as a "thinking" turn. Tool output
-// stays out, since a page or command result says nothing about what the model
-// decided. The harness Live tab reads this so a person can follow an agent that
-// has no terminal.
+// Tool output stays out: it says nothing about what the model decided.
 func ReadClaudeTranscriptActivity(path string, limit int) ([]ClaudeTurn, error) {
 	if limit <= 0 || limit > ClaudeTranscriptMaxTail {
 		limit = ClaudeTranscriptMaxTail
@@ -38,8 +33,6 @@ func ReadClaudeTranscriptActivity(path string, limit int) ([]ClaudeTurn, error) 
 	return turns, nil
 }
 
-// transcriptActivity returns a line's turns in order: thinking, text and tool
-// calls as the model wrote them, or the person's text.
 func transcriptActivity(line claudeTranscriptLine) []ClaudeTurn {
 	if (line.Type != "user" && line.Type != "assistant") || line.IsSidechain || line.IsMeta || line.Message == nil {
 		return nil
@@ -88,8 +81,6 @@ func transcriptActivity(line claudeTranscriptLine) []ClaudeTurn {
 	return turns
 }
 
-// toolCallText is one line for a tool call: the tool, then the argument a
-// person would ask about first (a path, a command, a pattern), else the input.
 func toolCallText(name string, input json.RawMessage) string {
 	var fields map[string]json.RawMessage
 	if json.Unmarshal(input, &fields) != nil || len(fields) == 0 {

@@ -45,7 +45,6 @@ type DashboardStatus struct {
 	Hint             string            `json:"hint,omitempty"`
 }
 
-// rolePolicyOf names the agent role whose policy a pool shows.
 var rolePolicyOf = map[domain.RoleKey]domain.Role{
 	domain.RoleKeyPlanner:  domain.RolePlanner,
 	domain.RoleKeyReviewer: domain.RoleCodeReviewer,
@@ -90,7 +89,6 @@ func (s *Service) DashboardStatus(ctx context.Context) (DashboardStatus, error) 
 	return view, nil
 }
 
-// DashboardRoleHealth reports one role after a pause or resume.
 func DashboardRoleHealth(health RoleHealth) DashboardRole {
 	return DashboardRole{Role: DashboardRoleOf(health.Role), Paused: health.Paused, Working: health.Busy, Slots: health.Slots, LastRunAt: health.LastActivityAt, LastError: health.LastError}
 }

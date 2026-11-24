@@ -9,8 +9,6 @@ import (
 	"kode-stream/internal/filesystem/pathguard"
 )
 
-// Launch opens an item's AI session in an external terminal. Every attempt,
-// launched or refused, is audited.
 func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult, err error) {
 	started := time.Now()
 	workspaceID := ""
@@ -19,7 +17,7 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 		return LaunchResult{}, launchError("launch_failed", "AI session launch is unavailable")
 	}
 	item, workspace, err := s.launchTarget(itemID)
-	workspaceID = item.WorkspaceID // audited even when the workspace lookup fails
+	workspaceID = item.WorkspaceID // Set before the error check, so a failed lookup is still audited.
 	if err != nil {
 		return LaunchResult{}, err
 	}
@@ -48,7 +46,6 @@ func (s *Service) Launch(itemID string, input LaunchInput) (result LaunchResult,
 	return LaunchResult{Accepted: true, Provider: providerID, Terminal: terminalID, ContextMode: contextMode, Surface: "external", PresetID: presetID, SessionID: sessionID, StartedAt: s.launch.now().UTC()}, nil
 }
 
-// auditLaunch records a launch: launched, blocked by a check, or failed.
 func (s *Service) auditLaunch(itemID, workspaceID string, started time.Time, err error) {
 	if s.launch == nil || s.launch.audit == nil {
 		return
@@ -67,7 +64,6 @@ func (s *Service) auditLaunch(itemID, workspaceID string, started time.Time, err
 	})
 }
 
-// launchTarget finds the item and its workspace.
 func (s *Service) launchTarget(itemID string) (models.ItemDetail, models.WorkspaceConfig, error) {
 	item, found, err := s.launch.index.Get(itemID)
 	if err != nil {
@@ -86,8 +82,6 @@ func (s *Service) launchTarget(itemID string) (models.ItemDetail, models.Workspa
 	return item, workspace, nil
 }
 
-// launchContextMode checks the mode, and that a card-context session's item
-// is an editable working-tree item inside its workspace.
 func launchContextMode(mode string, item models.ItemDetail, workspace models.WorkspaceConfig) (string, error) {
 	contextMode := strings.TrimSpace(mode)
 	if contextMode != "workspace_only" && contextMode != "card_context" {
@@ -104,7 +98,6 @@ func launchContextMode(mode string, item models.ItemDetail, workspace models.Wor
 	return contextMode, nil
 }
 
-// launchTools finds the chosen provider and terminal, enabled and installed.
 func (s *Service) launchTools(providerID, terminalID string) (LaunchTemplate, LaunchTemplate, error) {
 	settings, err := s.Settings()
 	if err != nil {

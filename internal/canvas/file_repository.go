@@ -324,12 +324,7 @@ func (r *FileRepository) load() (Snapshot, error) {
 	return state, ValidateSnapshot(state)
 }
 
-// decodeCanvasSnapshot decodes strictly first. When strict decoding fails, it
-// retries leniently and, if the only explanation is placements whose entity
-// kind this build does not know (written by a newer or abandoned build), drops
-// those placements with a warning instead of refusing the whole store. Any
-// other unknown field still fails, so the strict contract is kept for the
-// data this build owns.
+// An unknown placement kind from another build is dropped with a warning. Any other unknown field still fails.
 func decodeCanvasSnapshot(data []byte) (Snapshot, error) {
 	var state Snapshot
 	strict := yaml.NewDecoder(bytes.NewReader(data))

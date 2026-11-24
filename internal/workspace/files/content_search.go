@@ -1,7 +1,5 @@
 package workspacefiles
 
-// Package workspacefiles provides bounded workspace file operations.
-
 import (
 	"bytes"
 	"context"
@@ -108,8 +106,6 @@ func (a *Access) searchContentRoot(ctx context.Context, workspace models.Workspa
 
 type searchDirectory struct{ path, full string }
 
-// contentRootSearch walks one search root breadth first, within the budget
-// shared by every root of a request.
 type contentRootSearch struct {
 	ctx       context.Context
 	access    *Access
@@ -135,8 +131,6 @@ func (s *contentRootSearch) run() error {
 	return nil
 }
 
-// visitDirectory searches a directory's files in natural order and queues
-// its subdirectories. stop means the budget ran out.
 func (s *contentRootSearch) visitDirectory(current searchDirectory) (bool, error) {
 	entries, err := os.ReadDir(current.full)
 	if err != nil {
@@ -192,8 +186,6 @@ func (s *contentRootSearch) visitEntry(path string, isDir, ignored bool) (bool, 
 	return s.searchFile(path, full, info, ignored)
 }
 
-// searchFile reads one regular file within the budget and appends its
-// matching lines. stop means the budget ran out.
 func (s *contentRootSearch) searchFile(path, full string, info os.FileInfo, ignored bool) (bool, error) {
 	budget, response := s.budget, s.response
 	if budget.FilesVisited >= budget.MaxFiles {
@@ -253,9 +245,7 @@ func readStableContentFile(path string, before os.FileInfo) ([]byte, bool, error
 	return data, changed, nil
 }
 
-// contentLineMatches never constructs matches beyond remaining. It scans the stable
-// byte copy a line at a time, retaining rune columns without making a second full-file
-// string/slice representation.
+// Scans the byte copy a line at a time, so no second full-file copy is made.
 func contentLineMatches(ctx context.Context, content []byte, query string, caseSensitive bool, maxSnippet, remaining int) ([]models.WorkspaceContentSearchResult, bool, error) {
 	if remaining <= 0 {
 		return nil, true, nil

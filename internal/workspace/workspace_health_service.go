@@ -1,7 +1,5 @@
 package workspace
 
-// This package owns health checks and their application workflow.
-
 import (
 	"fmt"
 	"os"

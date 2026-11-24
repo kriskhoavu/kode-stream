@@ -12,9 +12,6 @@ import (
 	gitadapter "kode-stream/internal/git"
 )
 
-// fakeSessionRecordRepository is an in-memory SessionRecordRepository fake
-// used to build large or precisely ordered session lists without a real file
-// repository per record.
 type fakeSessionRecordRepository struct {
 	records []SessionRecord
 }
@@ -83,11 +80,7 @@ func globalTestService(t *testing.T, workspaces map[string]models.WorkspaceConfi
 	return service
 }
 
-// liveGlobalTestService is like globalTestService, but also configures an
-// embedded terminal manager and starts a real (short-lived) process under
-// liveSessionID *before* wiring the session records, so that ID's record
-// reconciles as genuinely live instead of being marked interrupted -- the
-// same order server.go wires ConfigureEmbedded before ConfigureSessionRecords.
+// The process starts before the session records are wired, so its record reconciles as live.
 func liveGlobalTestService(t *testing.T, workspace models.WorkspaceConfig, records *fakeSessionRecordRepository, index *fakeItemIndex, git *fakeChangeGit, liveSessionID string) *Service {
 	t.Helper()
 	dataDir := t.TempDir()
@@ -216,10 +209,6 @@ func TestSessionRecordsAcrossWorkspacesComputesChangesCountForActiveOnly(t *test
 	}
 }
 
-// TestSessionRecordsAcrossWorkspacesResolvesBranchOncePerWorkspace confirms
-// CurrentBranch is called once per workspace that has session rows, not once
-// per row: a workspace with several sessions must not pay for the same Git
-// lookup repeatedly.
 func TestSessionRecordsAcrossWorkspacesResolvesBranchOncePerWorkspace(t *testing.T) {
 	now := time.Now().UTC()
 	workspace := models.WorkspaceConfig{ID: "ws-1", Name: "WS", Path: t.TempDir()}
@@ -247,10 +236,6 @@ func TestSessionRecordsAcrossWorkspacesResolvesBranchOncePerWorkspace(t *testing
 	}
 }
 
-// TestSessionRecordsAcrossWorkspacesRowSurvivesPerRowGitFailure confirms a
-// Git failure while annotating one active row's changes count (via
-// SessionChanges) does not drop that row or fail the whole list -- it simply
-// leaves ChangesCount nil for that row.
 func TestSessionRecordsAcrossWorkspacesRowSurvivesPerRowGitFailure(t *testing.T) {
 	now := time.Now().UTC()
 	workspace := models.WorkspaceConfig{ID: "ws-1", Name: "WS", Path: t.TempDir()}
@@ -303,7 +288,6 @@ func TestSessionRecordsAcrossWorkspacesOrdersNewestFirstAndTruncates(t *testing.
 	if len(rows) != maxGlobalSessionRows {
 		t.Fatalf("len(rows)=%d, want %d", len(rows), maxGlobalSessionRows)
 	}
-	// Newest first: the highest-numbered (latest StartedAt) session leads.
 	if rows[0].Record.ID != fmt.Sprintf("s-%03d", total-1) {
 		t.Fatalf("rows[0]=%#v", rows[0])
 	}

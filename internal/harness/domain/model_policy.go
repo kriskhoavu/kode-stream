@@ -18,8 +18,6 @@ type PolicyMax struct {
 	PerAgentRunUSD float64 `json:"perAgentRunUsd"`
 }
 
-// ModelPolicy is a local CLI launch setting, like ai_settings: which CLI and
-// model alias each role runs with. It holds no keys and no provider routing.
 type ModelPolicy struct {
 	Roles           map[Role]RolePolicy `json:"roles"`
 	DisallowedTools []string            `json:"disallowedTools"`
@@ -29,7 +27,6 @@ type ModelPolicy struct {
 
 var readOnlyTools = []string{"Read", "Grep", "Glob"}
 
-// AlwaysDisallowedTools are refused for every role, whatever the settings say.
 var AlwaysDisallowedTools = []string{"Bash(git commit:*)", "Bash(git push:*)", "Bash(git checkout:*)", "Bash(git switch:*)", "Bash(git reset:*)", "Bash(rm -rf:*)"}
 
 func DefaultModelPolicy() ModelPolicy {
@@ -57,8 +54,7 @@ func DefaultModelPolicy() ModelPolicy {
 	}
 }
 
-// Normalize fills missing roles from the defaults and caps every knob by max.
-// The always-disallowed tools are added back if a person removed them.
+// A person cannot remove the always-disallowed tools.
 func (p ModelPolicy) Normalize() (ModelPolicy, error) {
 	defaults := DefaultModelPolicy()
 	if p.Max.MaxTurns == 0 {
@@ -166,8 +162,6 @@ func mergeTools(base, required []string) []string {
 	return out
 }
 
-// ModelFor picks the model a role runs with, honouring the coder's
-// difficulty override.
 func (p ModelPolicy) ModelFor(role Role, difficulty string) string {
 	policy := p.Roles[role]
 	if difficulty == "high" && policy.HighDifficultyModel != "" {
@@ -176,7 +170,6 @@ func (p ModelPolicy) ModelFor(role Role, difficulty string) string {
 	return policy.Model
 }
 
-// BudgetFor is the CLI's own --max-budget-usd for one agent run.
 func (p ModelPolicy) BudgetFor() float64 {
 	if p.PerAgentRunUSD > 0 && p.PerAgentRunUSD <= p.Max.PerAgentRunUSD {
 		return p.PerAgentRunUSD

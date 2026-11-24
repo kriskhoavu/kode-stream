@@ -88,7 +88,6 @@ func (s *StorageSyncService) Sync(ctx context.Context, request StorageSyncReques
 	return result, nil
 }
 
-// validateSync checks a request may run here, and returns its direction.
 func (s *StorageSyncService) validateSync(request StorageSyncRequest) (string, error) {
 	direction := strings.ToLower(strings.TrimSpace(request.Direction))
 	if direction != SyncDataDirToDatabase && direction != SyncDatabaseToDataDir {
@@ -113,8 +112,6 @@ func (s *StorageSyncService) validateSync(request StorageSyncRequest) (string, e
 	return direction, nil
 }
 
-// syncToDatabase stages the data directory as a database beside the target,
-// backs the target up and moves the stage into its place.
 func (s *StorageSyncService) syncToDatabase(ctx context.Context, result *StorageSyncResult) (storageSnapshot, error) {
 	snapshot, err := readDataDirSnapshot(s.paths)
 	if err != nil {
@@ -159,8 +156,6 @@ func (s *StorageSyncService) syncToDatabase(ctx context.Context, result *Storage
 	return snapshot, nil
 }
 
-// syncToDataDir stages the database as data files, backs the data
-// directory up and publishes the stage over it.
 func (s *StorageSyncService) syncToDataDir(ctx context.Context, result *StorageSyncResult) (storageSnapshot, error) {
 	snapshot, err := s.readDatabaseSnapshot()
 	if err != nil {

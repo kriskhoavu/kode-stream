@@ -163,8 +163,6 @@ func TestCloudPostgresPublicationCredentialsAndRevisionsAreAtomicAcrossAPIInstan
 		routes.ServeHTTP(response, request)
 		return response
 	}
-	// A publication bearer is consumed by the shared database, not by one API
-	// process's in-memory state.
 	if response := publish(first, firstRoutes, "connect-a", "publication-once", "Once"); response.Code != http.StatusCreated {
 		t.Fatalf("first publication=%d %s", response.Code, response.Body.String())
 	}
@@ -172,9 +170,7 @@ func TestCloudPostgresPublicationCredentialsAndRevisionsAreAtomicAcrossAPIInstan
 		t.Fatalf("cross-instance replay=%d %s", response.Code, response.Body.String())
 	}
 
-	// Two separately authenticated publications for revision zero race across
-	// controller instances. PostgreSQL CAS permits one create and rejects the
-	// stale contender without emitting a success audit event.
+	// PostgreSQL CAS lets one create win and rejects the stale contender without a success audit.
 	responses := make(chan *httptest.ResponseRecorder, 2)
 	start := make(chan struct{})
 	for _, attempt := range []struct {

@@ -1,7 +1,5 @@
 package itemwriter
 
-// Package itemwriter persists and refreshes Item domain files.
-
 import (
 	"errors"
 	"os"
@@ -503,7 +501,6 @@ func initGitRepo(t *testing.T, root string) {
 
 func TestCreateItemReusesEmptyLeftoverDirectory(t *testing.T) {
 	root := t.TempDir()
-	// A manual deletion of the item's contents can leave the directory behind.
 	leftover := filepath.Join(root, "items", "platform", "PM-002")
 	if err := os.MkdirAll(leftover, 0o755); err != nil {
 		t.Fatal(err)

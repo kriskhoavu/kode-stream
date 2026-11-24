@@ -23,10 +23,8 @@ const (
 	progressEvery  = time.Second
 )
 
-// workLoopNames are the loops woken whenever work may have appeared.
 var workLoopNames = []string{loopDispatcher, string(domain.RoleKeyPlanner), string(domain.RoleKeyReviewer), string(domain.RoleKeyCoder), string(domain.RoleKeyQAFixer), loopStages}
 
-// agentProcess is one running CLI and the run it belongs to.
 type agentProcess struct {
 	runID  string
 	pool   domain.RoleKey
@@ -43,8 +41,7 @@ func (s *Service) workLoops() []scheduler.Loop {
 	return append(loops, s.stageLoops(worker)...)
 }
 
-// cancelAgentProcesses stops every CLI this service started. Their rows stay
-// running; the next start interrupts and re-queues them.
+// Their rows stay running. The next start interrupts and re-queues them.
 func (s *Service) cancelAgentProcesses() {
 	s.mu.Lock()
 	cancel := s.workCancel
@@ -56,8 +53,6 @@ func (s *Service) cancelAgentProcesses() {
 	}
 }
 
-// cancelPausedRole leaves a paused role's running agent runs to finish:
-// pausing stops new claims, never work in flight.
 func (s *Service) cancelPausedRole(domain.RoleKey) {}
 
 func (s *Service) workContext() context.Context {
@@ -69,11 +64,6 @@ func (s *Service) workContext() context.Context {
 	return s.workCtx
 }
 
-// --- dispatcher ---
-
-// dispatchCycle starts at most one run per workspace per cycle, taking each
-// workspace's best startable task while it has fewer running runs than its
-// maxConcurrentRuns. Workspaces take turns.
 func (s *Service) dispatchCycle(ctx context.Context) error {
 	settings := s.settingsNow(ctx)
 	if !settings.Enabled || s.worktrees == nil || len(settings.Workspaces) == 0 {
@@ -120,9 +110,6 @@ func (s *Service) nextStartable(ctx context.Context, settings domain.Settings, w
 		return domain.Task{}, false, err
 	}
 	for _, task := range tasks {
-		// A ticket in a ready status starts on its own: its planner first judges
-		// whether the ticket says enough, and nothing is built before a person
-		// approves the plan.
 		if !settings.AutoStart && !task.StartRequested && !settings.ReadyCheck(task) {
 			continue
 		}
@@ -154,9 +141,6 @@ func branchFor(key, runID string) string {
 	return "harness/" + slug + "-" + strings.TrimPrefix(runID, "run-")[:6]
 }
 
-// startRun prepares the worktree, then creates the run, its plan stage and
-// the first planner agent run in one transaction with the task's move to
-// running.
 func (s *Service) startRun(ctx context.Context, settings domain.Settings, task domain.Task) error {
 	workspace, found, err := s.workspaces.Get(task.WorkspaceID)
 	if err != nil {
@@ -217,7 +201,6 @@ func (s *Service) startRun(ctx context.Context, settings domain.Settings, task d
 	return nil
 }
 
-// noteTask records why a start failed and hands the task back to a person.
 func (s *Service) noteTask(ctx context.Context, task domain.Task, note string) {
 	expect := domain.Expect{State: string(task.State), Revision: task.Revision}
 	task.Note, task.NeedsYou, task.StartRequested, task.UpdatedAt = note, true, false, s.now()
@@ -231,8 +214,6 @@ func (s *Service) newAgentRun(run domain.Run, stage domain.Stage, role domain.Ro
 	policy := settings.ModelPolicy.Roles[role]
 	return domain.AgentRun{ID: domain.NewID("agr"), RunID: run.ID, StageID: stage.ID, Role: role, Engine: policy.Engine, Model: settings.ModelPolicy.ModelFor(role, run.Difficulty), State: domain.AgentQueued, Round: stage.Round, Attempt: 1, Reminder: reminder, WorktreePath: run.WorktreePath, QueuedAt: s.now()}
 }
-
-// --- role loops ---
 
 func (s *Service) roleCycle(ctx context.Context, pool domain.RoleKey) error {
 	settings := s.settingsNow(ctx)
@@ -273,9 +254,7 @@ func failureText(result ports.Result) string {
 	case "timeout":
 		reason = "ran past its time limit"
 	case "", "success":
-		// The CLI ended without a stop reason of its own: a non-zero exit, or
-		// a run cut short. Its last words say why ("Not logged in"), so they
-		// are the reason; the exit code is the fallback.
+		// The CLI's last words say why it ended ("Not logged in"). The exit code is the fallback.
 		reason = "failed"
 		if last := strings.TrimSpace(result.FinalText); last != "" {
 			reason = "stopped: " + boundedText(last, 200)
@@ -292,10 +271,6 @@ func failureText(result ports.Result) string {
 	return boundedText(reason, 600)
 }
 
-// heartbeat extends a running agent run's lease. It reports false when the
-// row is no longer running, such as after a cancel.
-// recordSession stores the session the CLI was started with and where its
-// transcript will be, on the running row; a row that moved meanwhile is left.
 func (s *Service) recordSession(ctx context.Context, agentRunID, sessionID, transcriptRef string) {
 	current, err := s.repository.GetAgentRun(ctx, agentRunID)
 	if err != nil || current.State != domain.AgentRunning {
@@ -321,8 +296,6 @@ func (s *Service) heartbeat(ctx context.Context, agentRunID string, lease time.D
 	return err == nil || !errors.Is(err, domain.ErrStateMoved)
 }
 
-// finishAgentRun records the end of a running agent run and moves its stage
-// on. A row that left running meanwhile (a cancel) is left as it is.
 func (s *Service) finishAgentRun(ctx context.Context, agentRunID string, apply func(*domain.AgentRun)) {
 	for attempt := 0; attempt < 3; attempt++ {
 		current, err := s.repository.GetAgentRun(ctx, agentRunID)
@@ -347,8 +320,6 @@ func (s *Service) finishAgentRun(ctx context.Context, agentRunID string, apply f
 	}
 }
 
-// briefInput gathers what a brief needs: the task, the run, the plan and
-// the findings the producer must address.
 func (s *Service) briefInput(ctx context.Context, run domain.Run, stage domain.Stage, task domain.Task, agentRun domain.AgentRun, settings domain.Settings) brief.Input {
 	input := brief.Input{Role: agentRun.Role, Task: brief.TaskInfo{Key: task.Source.Key, Title: task.Title, URL: task.Source.URL, Body: task.Body, Comments: task.Comments}, Branch: run.Branch, BaseCommit: run.BaseCommit, Round: stage.Round, MaxRounds: stage.MaxRounds, Difficulty: run.Difficulty, PlanPath: run.PlanPath, Reminder: agentRun.Reminder}
 	if workspace, found, err := s.workspaces.Get(run.WorkspaceID); err == nil && found {
@@ -373,7 +344,6 @@ func (s *Service) briefInput(ctx context.Context, run domain.Run, stage domain.S
 			}
 		}
 	} else {
-		// A person's requests have round 0; a checker holds the work to them.
 		for _, finding := range stage.Findings {
 			if finding.Round == 0 {
 				input.Requests = append(input.Requests, finding)

@@ -1,7 +1,5 @@
 package workspacefiles
 
-// Package workspacefiles provides bounded workspace file operations.
-
 import (
 	"bytes"
 	"errors"

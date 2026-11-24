@@ -57,10 +57,8 @@ type Status struct {
 	Hint             string         `json:"hint,omitempty"`
 }
 
-// StorageHint is the recovery hint for unsupported storage.
 const StorageHint = "Switch Storage to SQLite in Settings and restart Kode Stream."
 
-// CloudHint is the recovery hint for Cloud mode.
 const CloudHint = "The harness runs coding CLIs on this machine, so it is available in Local mode only."
 
 func (s *Service) Status(ctx context.Context) (Status, error) {
@@ -149,9 +147,6 @@ func startOfDay(now time.Time) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
-// decorateRole and sourceHealth read the orchestrator's in-memory health;
-// engineStatus reads the engines' detection. Each is filled by a later part
-// of the service and returns empty data until then.
 func (s *Service) decorateRole(health RoleHealth) RoleHealth {
 	s.mu.Lock()
 	orchestrator := s.orchestrator
@@ -177,8 +172,7 @@ func (s *Service) sourceHealth() []SourceHealth {
 	return out
 }
 
-// engineStatus detects each engine at most once a minute: detection runs the
-// CLI's --version.
+// Detection runs each CLI's --version, so it runs at most once a minute.
 func (s *Service) engineStatus(ctx context.Context) []EngineStatus {
 	s.mu.Lock()
 	if s.detections != nil && s.now().Sub(s.detectedAt) < time.Minute {

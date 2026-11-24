@@ -1,7 +1,5 @@
 package git
 
-// Git infrastructure contract tests.
-
 import (
 	"context"
 	"encoding/json"
@@ -379,8 +377,6 @@ func gitRun(t *testing.T, root string, args ...string) {
 	}
 }
 
-// Ahead/behind counts are measured against the last-fetched remote-tracking ref,
-// so the UI needs to know how old that measurement is before presenting it.
 func TestStatusReportsWhenTheRemoteRefWasLastFetched(t *testing.T) {
 	remote := newGitRepo(t)
 	writeGitFile(t, remote, "README.md", "seed\n")
@@ -414,8 +410,7 @@ func TestStatusReportsWhenTheRemoteRefWasLastFetched(t *testing.T) {
 	}
 }
 
-// A worktree keeps .git as a file pointing at the real git dir, so FETCH_HEAD
-// must be located through git rather than assumed to sit under <root>/.git.
+// A worktree keeps .git as a file, so FETCH_HEAD must be located through git.
 func TestStatusReportsFetchTimeFromAWorktree(t *testing.T) {
 	remote := newGitRepo(t)
 	writeGitFile(t, remote, "README.md", "seed\n")
@@ -430,8 +425,6 @@ func TestStatusReportsFetchTimeFromAWorktree(t *testing.T) {
 	gitRun(t, local, "config", "user.email", "kode-stream@example.test")
 	gitRun(t, local, "fetch", "origin")
 
-	// Branch from the remote-tracking ref so the worktree has an upstream, which
-	// is what makes a fetch age meaningful in the first place.
 	linked := filepath.Join(cloneRoot, "linked")
 	gitRun(t, local, "worktree", "add", "-b", "linked", linked, "origin/main")
 
@@ -444,9 +437,7 @@ func TestStatusReportsFetchTimeFromAWorktree(t *testing.T) {
 	}
 }
 
-// time.Time is a struct, so `omitempty` does not drop a zero one: without
-// `omitzero` the API ships "0001-01-01T00:00:00Z", which a client reads as a
-// real timestamp and renders as a fetch that happened two millennia ago.
+// omitempty does not drop a zero time.Time. Without omitzero the API ships year 1.
 func TestGitStatusOmitsAnUnknownFetchTimeFromItsJSON(t *testing.T) {
 	encoded, err := json.Marshal(models.GitStatus{WorkspaceID: "ws", Branch: "main", Upstream: "origin/main"})
 	if err != nil {
@@ -464,9 +455,7 @@ func TestGitStatusOmitsAnUnknownFetchTimeFromItsJSON(t *testing.T) {
 	}
 }
 
-// --path-format=absolute needs Git 2.31, and a repository can legitimately report
-// a relative common dir, so the fetch time must be located without depending on
-// either. Resolving against the workspace covers both.
+// --path-format=absolute needs Git 2.31, and a common dir may be relative.
 func TestStatusReportsFetchTimeWhenTheCommonDirIsRelative(t *testing.T) {
 	remote := newGitRepo(t)
 	writeGitFile(t, remote, "README.md", "seed\n")
@@ -492,8 +481,6 @@ func TestStatusReportsFetchTimeWhenTheCommonDirIsRelative(t *testing.T) {
 	}
 }
 
-// Status is called on request paths that can be cancelled; the fetch-age probe
-// must not keep forking git after the caller has gone away.
 func TestStatusContextStopsProbingFetchTimeWhenCancelled(t *testing.T) {
 	remote := newGitRepo(t)
 	writeGitFile(t, remote, "README.md", "seed\n")

@@ -152,7 +152,7 @@ func TestCanvasServiceOnlyProjectsPlanTicketRoots(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(projection.Nodes) != 3 { // workspace plus two tickets
+	if len(projection.Nodes) != 3 {
 		t.Fatalf("nodes=%#v", projection.Nodes)
 	}
 	for _, node := range projection.Nodes {
@@ -184,10 +184,6 @@ func TestCanvasServiceReturnsForbiddenReferencesWithoutEntityDetails(t *testing.
 	}
 }
 
-// Item IDs migrated to the versioned stablePlanID scheme without migrating the
-// canvas placements that referenced them, so every pre-migration placement was
-// orphaned: it projected as stale while the same plan was reported unplaced and
-// then auto-placed again, leaving two nodes for one path.
 func TestCanvasServiceRebindsPlacementsAfterItemIDMigration(t *testing.T) {
 	repository, reg, items, git, workspaceConfig, initialItems, _ := canvasServiceFixture(t)
 	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
@@ -197,7 +193,6 @@ func TestCanvasServiceRebindsPlacementsAfterItemIDMigration(t *testing.T) {
 	}
 	placedPosition := findProjectedNode(t, projection, planNodeID(initialItems[0].ID)).Position
 
-	// Re-index the same paths under new IDs, exactly as the scheme change did.
 	migrated := make([]models.ItemDetail, 0, len(initialItems))
 	for _, item := range initialItems {
 		item.ID = "v2-" + item.ID
@@ -234,8 +229,7 @@ func TestCanvasServiceRebindsPlacementsAfterItemIDMigration(t *testing.T) {
 	}
 }
 
-// A placement whose path no longer exists at all is genuinely orphaned and must
-// still surface as stale so it can be recovered or removed deliberately.
+// A placement whose path is gone must still show as stale, so it can be recovered or removed.
 func TestCanvasServiceKeepsDeletedPlanPlacementsStale(t *testing.T) {
 	repository, reg, items, git, workspaceConfig, initialItems, _ := canvasServiceFixture(t)
 	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)
@@ -326,9 +320,6 @@ func stringsTrim(value string) string {
 	return value
 }
 
-// A commit on the branch moves every item's commit at once, so comparing it
-// against the one recorded at placement time marked the whole canvas stale for
-// unrelated work. Plan nodes now follow the current checkout unconditionally.
 func TestCanvasServiceKeepsPlanNodesResolvedAcrossCommitDrift(t *testing.T) {
 	repository, reg, items, git, workspaceConfig, initialItems, _ := canvasServiceFixture(t)
 	service := NewService(repository, reg, items, git, nil, nil, models.RuntimeModeLocal, models.AppStateDatastoreDataDir, nil)

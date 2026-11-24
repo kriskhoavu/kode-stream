@@ -11,7 +11,6 @@ import (
 	"kode-stream/internal/harness/ports"
 )
 
-// agentExecution is one claimed agent run on its way to its end.
 type agentExecution struct {
 	s        *Service
 	ctx      context.Context
@@ -23,7 +22,6 @@ type agentExecution struct {
 	task     domain.Task
 }
 
-// agentOutcome is what the harness learned after the CLI exited.
 type agentOutcome struct {
 	result     ports.Result
 	report     domain.Report
@@ -35,9 +33,6 @@ type agentOutcome struct {
 	gate       *domain.GateRun
 }
 
-// execute runs one claimed agent run to its end. It stores the CLI's usage,
-// cost, session id and transcript path, and the bounded report; never the
-// brief or the transcript.
 func (s *Service) execute(agentRun domain.AgentRun, settings domain.Settings, pool domain.RoleKey) {
 	ctx := s.workContext()
 	defer func() {
@@ -65,8 +60,7 @@ func (s *Service) execute(agentRun domain.AgentRun, settings domain.Settings, po
 	execution.watch(handle)
 	result := handle.Wait()
 	if ctx.Err() != nil {
-		// The service is stopping: leave the row running for the next start
-		// to interrupt and re-queue.
+		// The service is stopping. The next start interrupts and re-queues the running row.
 		return
 	}
 	execution.finish(execution.conclude(result))
@@ -79,8 +73,6 @@ func (e *agentExecution) fail(reason string) {
 	})
 }
 
-// load reads the run, stage and task the agent works for; a non-empty
-// result is why it cannot.
 func (e *agentExecution) load() string {
 	var err error
 	if e.run, err = e.s.repository.GetRun(e.ctx, e.agentRun.RunID); err != nil {
@@ -95,7 +87,6 @@ func (e *agentExecution) load() string {
 	return ""
 }
 
-// start writes the brief and starts the CLI; a non-empty reason is why it did not start.
 func (e *agentExecution) start() (ports.Handle, ports.Engine, ports.Invocation, string) {
 	engine, ok := e.s.engines[e.agentRun.Engine]
 	if !ok {
@@ -117,9 +108,6 @@ func (e *agentExecution) start() (ports.Handle, ports.Engine, ports.Invocation, 
 	return handle, engine, invocation, ""
 }
 
-// announce records the session and tells the dashboard the agent started.
-// The session id is the harness's own and the transcript path follows from
-// it, so the dashboard can read the agent while it works.
 func (e *agentExecution) announce(engine ports.Engine, invocation ports.Invocation) {
 	transcriptRef := ""
 	if locator, ok := engine.(ports.TranscriptLocator); ok {
@@ -129,8 +117,6 @@ func (e *agentExecution) announce(engine ports.Engine, invocation ports.Invocati
 	e.s.emit(e.ctx, domain.Event{Kind: domain.EventAgentStarted, TaskID: e.run.TaskID, RunID: e.run.ID, StageID: e.stage.ID, AgentRunID: e.agentRun.ID, Payload: payload(map[string]any{"role": e.agentRun.Role, "engine": e.agentRun.Engine, "model": e.agentRun.Model, "round": e.agentRun.Round, "attempt": e.agentRun.Attempt})})
 }
 
-// watch relays the CLI's progress and keeps the lease alive until its
-// events end; a lost lease cancels the CLI.
 func (e *agentExecution) watch(handle ports.Handle) {
 	heartbeat := time.NewTicker(heartbeatEvery)
 	defer heartbeat.Stop()
@@ -158,8 +144,6 @@ func (e *agentExecution) watch(handle ports.Handle) {
 	}
 }
 
-// conclude reads the report and, for work that produces or approves a
-// change, checks, measures or commits it.
 func (e *agentExecution) conclude(result ports.Result) agentOutcome {
 	outcome := agentOutcome{result: result}
 	outcome.report, outcome.reportErr = brief.ReadReport(e.run.WorktreePath, result.FinalText, e.agentRun.Role)
@@ -176,7 +160,6 @@ func (e *agentExecution) conclude(result ports.Result) agentOutcome {
 	return outcome
 }
 
-// finish stores the outcome on the agent run.
 func (e *agentExecution) finish(outcome agentOutcome) {
 	result := outcome.result
 	e.s.finishAgentRun(e.ctx, e.agentRun.ID, func(current *domain.AgentRun) {
