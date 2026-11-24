@@ -11,32 +11,30 @@ lastVerified: never
 
 ## Execution Policy
 <!-- chunkId: e2e-testing-index-policy -->
-<!-- keywords: playwright, browser, runtime, evidence -->
+<!-- keywords: playwright, fresh context, fixtures, secrets -->
 
-[open] Does the current implementation still satisfy the execution policy behavior described below? This section has not yet been reverified.
+[open] Have these journeys passed against a supplied disposable runtime? None has been run since it was written.
 
-Run journeys with Playwright MCP in a fresh context using runtime-supplied non-production fixtures. Keep credentials and
-environment-specific secrets out of durable documentation.
+Run each journey with Playwright MCP in a fresh browser context, against non-production fixtures supplied at run time. Keep credentials and environment secrets out of the wiki and the evidence. Chrome DevTools may diagnose a failed step but never runs the journey.
 
 ## Pages
 <!-- chunkId: e2e-testing-index-pages -->
-<!-- keywords: pages, journey, canvas, branch review -->
+<!-- keywords: journey list, canvas, branch review, quality -->
 
-[open] Does the current implementation still satisfy the pages behavior described below? This section has not yet been reverified.
+- [[e2e-testing-workspace-branch-review-checkout]]: review, import and checkout.
+- [[e2e-testing-workspace-terminal-canvas]]: Canvas, launch safety, verification freshness and Focus.
+- [[e2e-testing-quality-coverage]]: E2E coverage, results, evidence and agent handoff.
 
-- [[e2e-testing-workspace-branch-review-checkout]] validates review and checkout.
-- [[e2e-testing-workspace-terminal-canvas]] validates the spatial workbench.
-- [[e2e-testing-quality-coverage]] validates E2E coverage discovery, results, evidence, and agent handoff.
-- [[workspace-index]] holds the behavior and reference counterparts.
+Behavior and reference pages: [[workspace-index]].
 
 ## Not written yet
 <!-- chunkId: e2e-testing-index-not-written -->
-<!-- keywords: session focus, navigator interaction, cloud coverage -->
+<!-- keywords: card agents, harness board, cloud coverage -->
 
-[open] Which additional completed plans supply reusable browser journeys?
+[open] Which features still need a reusable browser journey, such as card agents or the harness board?
 
 ## Open questions
 <!-- chunkId: e2e-testing-index-open-questions -->
 <!-- keywords: runtime fixtures, execution evidence, validation date -->
 
-[open] Have these journeys passed against a supplied disposable runtime? This migration does not execute browser tests.
+[open] Who supplies the disposable runtime and fixtures for a scheduled run?

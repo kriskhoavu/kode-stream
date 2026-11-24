@@ -14,105 +14,62 @@ lastVerified: never
 
 ## Goal And Preconditions
 <!-- chunkId: e2e-testing-workspace-terminal-canvas-goal -->
-<!-- keywords: goal, local workspace, branch, provider, verification -->
+<!-- keywords: local workspace, branch fixtures, provider, smoke verification -->
 
-[open] Does the current implementation still satisfy the goal and preconditions behavior described below? This section has not yet been reverified.
+[open] Can the current build complete this journey? It has not run against a supplied runtime.
 
-Validate [[workspace-terminal-canvas-workflows]] in a non-production Local environment. Supply a base URL, authentication
-reference, isolated writable Git workspace with an indexed plan, matching and mismatch branch fixtures, authenticated
-test-safe terminal provider, deterministic smoke verification, and reversible fingerprint-relevant mutation.
-
-Use Playwright MCP in a fresh context. Do not substitute another browser provider. Confirm safe writes before execution;
-never record credentials or terminal content.
+This journey checks [[workspace-terminal-canvas-workflows]] in a non-production Local environment. Supply a base URL, an authentication reference, a writable Git workspace with an indexed plan, matching and mismatching branch fixtures, a test-safe terminal provider, a deterministic smoke verification and a reversible change that alters the fingerprint. Follow the [[e2e-testing-index]] execution policy. Never record terminal content.
 
 ## Arrange And Restore
 <!-- chunkId: e2e-testing-workspace-terminal-canvas-arrange -->
-<!-- keywords: arrange, restore, workspace, plan, session -->
+<!-- keywords: drag, saved positions, silent placement, reload -->
 
-[open] Does the current implementation still satisfy the arrange and restore behavior described below? This section has not yet been reverified.
+1. Open **Agent Space**, choose the **Canvas** view and wait for **Fit view**.
+2. Move the workspace node. Wait for **Saved**. Assert the plan did not move.
+3. Move the plan and reload. Assert both positions restore with current labels and Git state.
+4. Run the supplied plan scan and refresh. Assert the new plan appears without moving saved nodes or any notice.
+5. After a launch, move the session node and reload. Assert placement and lifecycle restore.
 
-1. Open **Canvas** for the supplied workspace and branch; wait for **Fit view**.
-2. Move the workspace; wait for **Saved** and assert the plan stayed fixed.
-3. Move the plan, reload, and assert both positions restore with current labels and Git state.
-4. Trigger the supplied safe plan scan, refresh Canvas, and assert the new plan appears without moving saved nodes or
-   showing a placement action, count, or notification.
-5. After launch, move the session, reload without restarting the backend, and assert its placement and lifecycle restore.
-
-These placement operations are isolated safe writes and never mutate repository entities. Capture initial, moved, and
-restored layouts without terminal content.
+Placement changes are safe writes and never touch repository content.
 
 ## Launch And Branch Safety
 <!-- chunkId: e2e-testing-workspace-terminal-canvas-launch -->
-<!-- keywords: launch terminal, idempotency, mismatch, interrupted, process -->
+<!-- keywords: launch terminal, idempotency, mismatch, interrupted -->
 
-[open] Does the current implementation still satisfy the launch and branch safety behavior described below? This section has not yet been reverified.
+1. Select the plan. Assert **Launch terminal**, **Run smoke verification** and **Open full view** show as allowed. Choose **Launch terminal**.
+2. Assert the new session node is placed and expanded, with its terminal inside Canvas and the Workbench closed.
+3. While **Launching…** shows, activate again if enabled. Assert at most one record and one process.
+4. Select another node and return. Assert the terminal state did not change and nothing relaunched. Collapse and expand with the top-right action. Assert terminal input and scroll never drag the node.
+5. Close the terminal. Assert the node collapses without cancelling. Reopen it, then use **Cancel process**. Assert the placement remains.
+6. Use the mismatch fixture. Assert **Checkout changed** with expected and current context, and no new session.
+7. Restart the app. Assert the orphaned record shows as interrupted with no false reconnect.
 
-1. Select the plan, confirm **Launch terminal**, **Run smoke verification**, and **Open full view** are present as
-   capabilities allow, then choose **Launch terminal**.
-2. Wait for the new session node to be placed and expanded; assert its interactive terminal is inside the Canvas and the
-   right Workbench is closed.
-3. While **Launching…** is visible, activate again only if enabled; assert at most one record and process.
-4. Select another node and return; assert selection does not change terminal disclosure and no relaunch occurs. Use the
-   session's top-right action to collapse and expand it. Interacting with terminal input and scrolling must not drag the
-   session node.
-5. Close the terminal and assert the node collapses without cancellation; reopen it with the top-right action, then use the explicit
-   **Cancel process** control and assert the placement remains.
-6. Use the supplied mismatch fixture, attempt the intentionally stale action, and assert **Checkout changed** appears
-   with expected/current context and no new session.
-7. Verify an application restart changes an orphaned running record to interrupted and expands into lifecycle detail
-   without a false reconnect.
-
-Branch manipulation and process launch are safe writes only in the supplied isolated fixture. Stop this section at the
-first failed assertion and follow the documented cleanup.
+Stop at the first failed assertion and clean up.
 
 ## Git, Verification, And Accessibility
 <!-- chunkId: e2e-testing-workspace-terminal-canvas-verification -->
-<!-- keywords: git, verification, stale, search, keyboard -->
+<!-- keywords: freshness, stale pass, keyboard move, reduced motion -->
 
-[open] Does the current implementation still satisfy the git, verification, and accessibility behavior described below? This section has not yet been reverified.
-
-1. Assert workspace branch, HEAD, clean/dirty/conflicted text, and changed-file count.
-2. Run smoke verification from the plan and assert result, freshness, and abbreviated revisions are separate.
-3. Apply the supplied reversible mutation; wait for refresh and assert the previous pass becomes stale and historical.
-4. Use **Search Canvas nodes**, focus the plan, press an arrow key, and assert only it moves and **Saved** is announced.
-5. Remove the session placement without cancellation, refresh and assert it stays hidden, cancel a reset preview, and
-   revisit with reduced motion enabled.
-
-Capture current/stale verification and visible keyboard focus. Diagnostics may use Chrome DevTools only after Playwright
-execution; Chrome is never the execution provider.
+1. Assert the workspace node shows branch, HEAD, clean, dirty or conflicted state, and changed-file count.
+2. Run smoke verification. Assert result, freshness and short revisions show separately.
+3. Apply the reversible change. Assert the pass turns stale and historical.
+4. Use **Search Canvas nodes**, focus the plan and press an arrow key. Assert only it moves and **Saved** is announced.
+5. Remove the session placement without cancelling and refresh. Assert it stays hidden. Cancel a reset preview. Revisit with reduced motion on.
 
 ## Focus And Session Surfaces
 <!-- chunkId: e2e-testing-workspace-terminal-canvas-session-focus -->
-<!-- keywords: focus toggle, hidden nodes, list mode, checkout changes -->
+<!-- keywords: focus toggle, sessions view, checkout changes, open on board -->
 
-[open] Can the current build complete the PM-042 journey across the global Sessions page and checkout-scoped Workbench tab with two isolated workspaces, deterministic edits, and native terminal keyboard interaction? Historical evidence covered only one throwaway workspace.
-
-1. Start live sessions for plans in two isolated Local workspaces, open **Canvas** for one workspace, and activate **Focus**.
-2. Assert only active plans, their live sessions, and their connecting edges remain; confirm dragging is unavailable and saved positions are unchanged after Focus is disabled.
-3. Select the workspace node, open its **Sessions** tab, verify records are grouped by plan for the current checkout, switch between Terminal and Changes, and inspect one bounded file diff.
-4. Stop the selected session through the confirmation flow and assert the live-only filter relaxes while the selected record remains visible.
-5. Choose **Open on board** and assert the existing session node is selected. Activate Focus and assert the stopped session leaves the focused set without altering the restored layout.
-6. Open the top-level **Sessions** page and assert both authorized workspaces are grouped without leaking inaccessible workspace records.
-
-Treat session launch, cancellation, and repository edits as isolated safe writes. Use Playwright MCP in a fresh context, and retain only screenshots and safe identifiers as evidence.
+1. Start live sessions on two plans and turn on **Focus**.
+2. Assert only active plans, their sessions and their edges remain, and dragging is off. Turn Focus off and assert the saved positions are unchanged.
+3. Open the **Sessions** view. Assert records are grouped by plan for the checkout. Switch between Terminal and Changes, and open one file diff.
+4. Stop the selected session through its confirmation. Assert the live-only filter relaxes and the record stays visible.
+5. Choose **Open on board**. Assert the existing session node is selected.
 
 ## Cleanup And Result
 <!-- chunkId: e2e-testing-workspace-terminal-canvas-cleanup -->
-<!-- keywords: cleanup, cancel, revert, evidence, result -->
+<!-- keywords: cancel, revert, evidence, result -->
 
-[open] Does the current implementation still satisfy the cleanup and result behavior described below? This section has not yet been reverified.
+Cancel created processes, revert the reversible change and restore the original branch through guarded controls. Record passed, failed, blocked and not-run sections with safe evidence references in the ticket-local result.
 
-Cancel created processes through the normal control, revert the isolated mutation, and restore the original test branch
-through guarded controls. Record passed, failed, blocked, and not-run sections plus safe evidence references in the
-ticket-local latest result. The current PM-037 result is not run because runtime inputs were not supplied.
-
-## Coverage Deltas And Limits
-<!-- chunkId: e2e-testing-workspace-terminal-canvas-limits -->
-<!-- keywords: coverage, local, cloud agent, snapshot, limits -->
-
-[open] Does the current implementation still satisfy the coverage deltas and limits behavior described below? This section has not yet been reverified.
-
-PM-037 introduces this journey. It covers only Local content and execution. Cloud Agent execution, Agentless Remote
-Snapshot Canvas UX, groups, custom links, multiple canvases, and collaboration need separate capability delivery and
-future journey deltas. PM-042 adds Focus, global and checkout-scoped session browsing, and checkout-derived changes. See
-[[workspace-terminal-canvas]], [[workspace-session-focus]], and [[workspace-session-focus-reference]].
+The journey covers Local content and execution only. See [[workspace-terminal-canvas]] and [[workspace-session-focus]].

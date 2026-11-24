@@ -1,11 +1,10 @@
 # Deployment Adapter Class Diagrams
 
-Kode Stream does not use a single `DeploymentMode` base interface. The diagrams below show the smaller abstractions that
-vary by deployment concern.
+Kode Stream has no single `DeploymentMode` interface. Each deployment concern varies behind its own small abstraction.
 
 ## Runtime And Storage
 
-`RuntimeConfig` supplies policy to storage configuration. `StorageProvider` is the concrete persistence seam.
+`RuntimeConfig` supplies policy to storage configuration. `StorageProvider` is the persistence seam.
 
 ```mermaid
 classDiagram
@@ -46,8 +45,7 @@ classDiagram
 
 ## Cloud Workspace Access
 
-The API selects the command adapter from a workspace's `AccessMode`. Agent-Backed and Remote Snapshot workspaces have
-different command boundaries.
+The API picks the command adapter from a workspace's `AccessMode`.
 
 ```mermaid
 classDiagram
@@ -83,8 +81,7 @@ classDiagram
 
 ## Chrome Extension Surface
 
-The extension is a frontend transport adaptation. It chooses the local API origin; it does not implement a server-side
-runtime or workspace-access adapter.
+The extension only chooses the local API origin. It has no server-side runtime or workspace-access adapter.
 
 ```mermaid
 classDiagram

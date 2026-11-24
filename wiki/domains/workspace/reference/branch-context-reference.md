@@ -13,9 +13,9 @@ lastVerified: never
 
 ## Context Matrix
 <!-- chunkId: workspace-branch-context-reference-context-matrix -->
-<!-- keywords: route, source, editable, execution, branch -->
+<!-- keywords: route, source, editable, execution -->
 
-[open] Does the current implementation still satisfy the context matrix behavior described below? This section has not yet been reverified.
+[open] Does the code still match this page? It is plan-derived and not yet checked.
 
 | Surface                        | Branch source                 | Content source  | Mutable or executable   |
 |--------------------------------|-------------------------------|-----------------|-------------------------|
@@ -23,14 +23,9 @@ lastVerified: never
 | Branch Review                  | Requested non-checkout branch | Pinned Git tree | Never                   |
 | Agentless Remote Snapshot      | Provider snapshot contract    | Remote provider | Provider-dependent      |
 
-Local Branch Review does not replace Agentless Remote Snapshot provider behavior. Canvas continues to store layouts by
-workspace and checkout branch; see [[workspace-terminal-canvas-reference]].
-
 ## API Contracts
 <!-- chunkId: workspace-branch-context-reference-apis -->
-<!-- keywords: endpoint, checkout, review, import, commit -->
-
-[open] Does the current implementation still satisfy the api contracts behavior described below? This section has not yet been reverified.
+<!-- keywords: endpoint, expectedCommit, snapshot item, request body -->
 
 | Method | Endpoint                                   | Required request                                                     | Result                     |
 |--------|--------------------------------------------|----------------------------------------------------------------------|----------------------------|
@@ -44,82 +39,42 @@ workspace and checkout branch; see [[workspace-terminal-canvas-reference]].
 | GET    | `/api/items/{id}/content-search`           | Working-tree item ID and query                                       | Checkout content matches   |
 | GET    | `/api/items/{id}/e2e-runbooks`             | Working-tree item ID                                                 | Reusable E2E coverage      |
 
-Snapshot file trees and content are served by the normal item read endpoints because indexed snapshot items retain
-their branch ref and commit. Every snapshot tree operation uses the immutable commit SHA; the branch ref is metadata
-only. Snapshot file endpoints require the displayed commit as `expectedCommit`, reject a missing or mismatching value
-with `409 review_commit_moved`, and then read through the validated item's copied immutable SHA. Snapshot verification
-selection and discovered automation specs also come from `plan.yaml` at that commit;
-snapshot reads never consult checkout or external automation working trees. Mutation endpoints reject those items even
-if a legacy materialization flag is supplied. Operational item detail, diff, and item content search have no snapshot
-mode: they reject a snapshot ID with `409 snapshot_review_only` before returning Item Workspace metadata or invoking
-checkout-backed readers.
-
-E2E runbook discovery is also operational-only. A snapshot ID returns `409 snapshot_review_only` before the service
-can read checkout `plan.yaml`, ticket-local `automation/` files, latest results, or canonical Knowledge coverage. The
-endpoint has no reviewed-commit request contract, so it must not resolve review identities through checkout paths.
+- Snapshot items keep their branch ref and commit, so the normal item file endpoints serve them.
+- Every snapshot tree read uses the commit SHA. The ref is metadata only.
+- Snapshot file endpoints require the displayed commit as `expectedCommit`.
+- Snapshot verification selection and automation specs come from `plan.yaml` at that commit, never from a working tree.
+- Item detail, diff, content search and E2E runbook discovery have no snapshot mode. They reject a snapshot ID before any checkout reader runs.
 
 ## Synchronization Rules
 <!-- chunkId: workspace-branch-context-reference-synchronization -->
-<!-- keywords: canvas, knowledge, index, focus, invalidation -->
+<!-- keywords: mutation lock, index reuse, focus invalidation, request identity -->
 
-[open] Does the current implementation still satisfy the synchronization rules behavior described below? This section has not yet been reverified.
-
-The checkout loader compares branch commit, source configuration, and a working-tree hash before reusing an index.
-Canvas invokes it before resolving the default layout and rejects a legacy `branchKey` that differs from checkout.
-Knowledge records the checkout branch and commit that produced its index and rebuilds after either changes. The frontend
-reloads branch inventory on focus or visibility return and increments its content refresh key when checkout changed.
-In-app checkout switching and reviewed-plan import share one workspace-scoped mutation lock. Import holds it from source
-and destination revalidation through atomic publication and checkout index refresh, so switching cannot interleave.
-Operational checkout loads hold that lock through fingerprinting, scanning, and branch index replacement, preventing a
-scan started before import from overwriting the post-import index. Branch Review also holds the lock across checkout
-validation, commit-pinned scanning, and branch index replacement. A refresh therefore cannot publish snapshot rows for
-a branch that becomes operational during the scan. The review UI disables switching while its initial load or refresh
-is pending. Each review load also has a monotonically increasing identity bound to its workspace, requested branch,
-and checkout context. Only the current request may publish review data, errors, plan selection, or loading completion;
-superseded responses cannot make actions target a branch different from the route and selector. The file tree and
-preview are keyed by both selected item ID and reviewed commit. If refresh advances a branch while the stable item ID
-remains unchanged, the frontend clears and reloads those files so the header, plan metadata, and preview stay on one
-commit. The commit is part of each request URL, so in-flight GET deduplication cannot cross commits. Automatic and
-manual file reads share a request generation; refresh invalidates older generations and late responses cannot replace
-newer preview content or loading state.
-
-Snapshot rows may remain in the shared derived index so Branch Review can reuse branch caches, but ordinary index
-queries exclude them by default. Only the branch-scoped review query opts in. Operational item listing, workspace
-consumers, and global search therefore expose current-checkout rows only, while storage synchronization preserves the
-review cache without making it operational.
-
-Item Workspace treats successful working-tree detail as its authorization to render operational controls. It clears
-the prior plan when the route identity changes and does not request item files or diff until detail succeeds. A stale
-snapshot bookmark therefore shows only a fail-closed message and Back action; it cannot retain metadata or controls
-from the previously open checkout item.
+- The checkout loader reuses an index only when branch commit, source configuration hash and working-tree hash match.
+- Canvas calls the loader before it resolves the default layout.
+- Knowledge records the branch and commit behind its index and rebuilds when either changes.
+- The frontend reloads branch inventory on focus or visibility return.
+- One workspace mutation lock serializes checkout switch, plan import, operational checkout loads and Branch Review scans. A scan cannot overwrite the index that an import just published.
+- The review UI disables switching while a review load runs. Only the newest review request may publish its result.
+- The review file tree and preview are keyed by item ID and commit. The commit is in each request URL, so request deduplication never crosses commits.
+- Snapshot rows stay in the derived index, but ordinary queries exclude them. Only the review query includes them.
+- Item Workspace renders operational controls only after working-tree detail succeeds. A stale snapshot bookmark shows a message and **Back**.
 
 ## Mutation Audit Semantics
 <!-- chunkId: workspace-branch-context-reference-mutation-audit -->
-<!-- keywords: snapshot mutation, audit context, blocked status, workspace history -->
+<!-- keywords: snapshot mutation, blocked status, workspace history -->
 
-[open] Does the current implementation still satisfy the mutation audit semantics behavior described below? This section has not yet been reverified.
+A rejected snapshot file, metadata or status change is audited with workspace, item and path context from the raw index. It records `blocked`, not `failed`, and keeps the original error.
 
-Rejected snapshot file, metadata, and status mutations resolve audit identity directly from the raw item index. This
-lookup supplies only workspace, item, and path context; it does not weaken the operational detail boundary or expose a
-snapshot in Item Workspace. The resulting audit records remain visible in workspace-scoped history and preserve the
-snapshot item ID.
-
-`snapshot_read_only` is an expected safety rejection, so these audit events use `blocked`, not `failed`. The original
-error remains on the event for diagnostics. Other errors retain the existing failed-or-recovery-hint classification.
-
-## Conflict And Compatibility Codes
+## Conflict Codes
 <!-- chunkId: workspace-branch-context-reference-conflicts -->
-<!-- keywords: conflict code, snapshot read-only, branch mismatch, moved commit -->
-
-[open] Does the current implementation still satisfy the conflict and compatibility codes behavior described below? This section has not yet been reverified.
+<!-- keywords: snapshot read-only, branch mismatch, moved commit, http 409 -->
 
 | Condition                                      | Status | Code or behavior               |
 |------------------------------------------------|--------|--------------------------------|
-| Legacy operational load requests other branch  | 409    | `branch_review_required`       |
+| Operational load requests another branch       | 409    | `branch_review_required`       |
 | Snapshot mutation                              | 409    | `snapshot_read_only`           |
-| Snapshot operational detail, diff, or search   | 409    | `snapshot_review_only`         |
-| Snapshot E2E runbook discovery                 | 409    | `snapshot_review_only`         |
-| Legacy Canvas branch differs from checkout     | 409    | `canvas_branch_mismatch`       |
+| Snapshot detail, diff, search or E2E runbooks  | 409    | `snapshot_review_only`         |
+| Canvas branch differs from checkout            | 409    | `canvas_branch_mismatch`       |
 | Review requests current checkout               | 409    | Review must exit to Workstream |
 | Import item belongs to another workspace       | 404    | Item not found                 |
 | Source branch moved before import              | 409    | `review_commit_moved`          |
@@ -127,39 +82,33 @@ error remains on the event for diagnostics. Other errors retain the existing fai
 | Destination checkout changed before import     | 409    | `review_checkout_moved`        |
 | Target item root already exists                | 409    | `import_target_exists`         |
 
-`lastSelectedBranch` remains serialized for compatibility but is not read or written for navigation. Existing branch
-scan rows and Canvas layouts remain reusable derived state.
-
-[legacy] PM-013's operational branch materialization flags and first-edit copy behavior are not compatibility features; callers must use Branch Review and explicit import.
+`lastSelectedBranch` is still serialized but is never read or written for navigation.
 
 ## Safety Invariants
 <!-- chunkId: workspace-branch-context-reference-safety -->
-<!-- keywords: safe path, symlink, reset, overwrite, dirty tree -->
+<!-- keywords: safe path, symlink, atomic rename, staging, rollback -->
 
-[open] Does the current implementation still satisfy the safety invariants behavior described below? This section has not yet been reverified.
-
-Review reads Git objects by immutable commit SHA only. Import accepts structured plans within configured sources,
-requires the item to belong to the workspace named by the route, rejects traversal and symlink escape, revalidates both
-the expected source commit and destination checkout, and rejects the complete target item root when any entry already
-occupies it. Import writes every file into a sibling temporary directory, removes staging on failure, and publishes only
-the complete plan through an atomic rename. If checkout index refresh fails after publication, import removes the new
-target before returning the error. Review and import never reset, clean, stash, checkout, or switch. Only the explicit
-guarded switch action may change the checkout, and it is serialized with import and review refresh for the same
-workspace. File-backed index replacement and deletion restore their complete prior in-memory state if persistence
-fails, preventing a rolled-back filesystem import from remaining visible as a ghost item.
+- Review reads Git objects by commit SHA only.
+- Import accepts structured plans inside configured sources that belong to the route's workspace.
+- Import rejects traversal, symlink escape and any existing entry in the target item root.
+- Import stages files in a sibling temporary directory and publishes with one atomic rename.
+- If the index refresh fails after publication, import removes the new target.
+- Review and import never reset, clean, stash, checkout or switch.
+- A failed file-backed index write restores the prior in-memory state, so no ghost item remains.
 
 ## Not supported
 <!-- chunkId: workspace-branch-context-reference-not-supported -->
-<!-- keywords: capability boundary, exclusions, unsupported action -->
+<!-- keywords: capability boundary, exclusions, materialization flags -->
 
-[open] Which additional unsupported operations should this page name after implementation verification?
+- Mutating a snapshot item, even with a materialization flag.
+- Reviewing the current checkout.
 
 ## Known conflicts
 <!-- chunkId: workspace-branch-context-reference-known-conflicts -->
-<!-- keywords: documentation drift, verification gap, competing description -->
+<!-- keywords: documentation drift, first edit copy, compatibility flags -->
 
-[open] Do the retained plan descriptions disagree with current behavior? Verify the sections above before relying on them.
+- "Branch materialization flags still work for compatibility." They do not. Callers use Branch Review and import.
 
 ## Related pages
 
-See [[workspace-branch-context]], [[workspace-index]], and [[e2e-testing-index]].
+See [[workspace-branch-context]], [[workspace-terminal-canvas-reference]] and [[workspace-index]].

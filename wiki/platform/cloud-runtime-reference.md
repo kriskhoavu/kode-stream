@@ -12,45 +12,63 @@ sourceRef: |
   PM-032 (plan retired) | Release gates
   PM-032 (plan retired) | Component boundary
   PM-034 (plan retired) | Remote Snapshot
-lastVerified: 2026-09-12
+lastVerified: 2026-11-24
 ---
+
+## Cloud Model
+<!-- chunkId: platform-cloud-runtime-reference-cloud-model -->
+<!-- keywords: control plane, postgres, workspace access mode, trust boundary -->
+
+Cloud is a hosted control plane, not a hosted checkout or terminal. It stores workspace metadata, derived indexes, audit events and settings in Postgres. Each workspace picks one access mode.
+
+| Access mode     | Needs a Cloud Agent | Repository source                     | Available now                                                     |
+|-----------------|---------------------|---------------------------------------|-------------------------------------------------------------------|
+| Agent-Backed    | Yes                 | The owner's machine                   | Agent pairing, heartbeat and workspace metadata. Commands return 503 |
+| Remote Snapshot | No                  | A Git provider at a resolved commit   | Commit-pinned metadata, tree and file reads                       |
+
+The Cloud API never receives an Agent-Backed checkout, SSH key, terminal transcript or provider token. Agents connect only to the Cloud API, never to Postgres. Agent-Backed records use `WorkspaceLocation=cloud_agent`. Remote Snapshot records use `cloud_remote_snapshot` and never hold a local path, agent ID, command envelope or credential.
 
 ## Authentication Boundary
 <!-- chunkId: platform-cloud-runtime-reference-authentication-boundary -->
-<!-- keywords: oauth2 proxy, trusted cidr, cloud identity, role -->
+<!-- keywords: oauth2 proxy, trusted cidr, identity headers, role -->
 
-[live] Cloud mode accepts only `oauth2_proxy`, requires non-catch-all trusted proxy CIDRs, and rejects `app_oidc` as unimplemented. Evidence: `internal/system/runtime_config.go:92`, `internal/server/api/cloud_auth.go:142`.
+[live] Cloud mode accepts only `KODE_STREAM_AUTH_MODE=oauth2_proxy`, requires trusted proxy CIDRs that are not catch-all, and rejects `app_oidc` at startup. Evidence: `internal/system/runtime_config.go:118`, `internal/server/api/cloud_auth.go:142`.
 
-Identity headers are accepted only from a request whose remote address belongs to a configured trusted proxy network. Authorization then resolves the authenticated user's role into route capabilities.
+Identity headers count only from a remote address inside a trusted proxy network. The user's role then maps to route capabilities.
 
 ## Agent-backed Workspaces
 <!-- chunkId: platform-cloud-runtime-reference-agent-backed-workspaces -->
-<!-- keywords: cloud agent, heartbeat, workspace metadata, command delivery -->
+<!-- keywords: cloud agent, heartbeat, deep link, command delivery -->
 
-[live] Agent pairing, outbound connection, heartbeat, and workspace metadata publication exist, but workspace command delivery deliberately returns 503 until a durable command lifecycle exists. Evidence: `internal/server/api/cloud_workspace_access.go:25`, `internal/agent/protocol.go:39`.
+[live] Agent pairing, the outbound connection to `/api/agents/channel`, heartbeat and metadata publication work. Workspace command delivery returns 503 until a durable command lifecycle exists. The default dispatcher also reports dispatch as unimplemented. Evidence: `internal/server/api/cloud_workspace_access.go:49`, `internal/agent/protocol.go:39`.
 
-Connected status is a capability prerequisite, not proof that file, Git, terminal, runtime, AI, or verification commands can be dispatched. The default Agent command dispatcher also reports that dispatch is unimplemented.
+"Connected" is a prerequisite, not proof that file, Git, terminal, runtime, AI or verification commands can run.
+
+The Cloud UI pairs an Agent with `kodestream://connect?token=<short-lived-token>`. The Agent uses the token for an authenticated outbound WebSocket. The operator procedure is `deploy/cloud-deployment.md`.
 
 ## Remote Snapshot Workspaces
 <!-- chunkId: platform-cloud-runtime-reference-remote-snapshot-workspaces -->
-<!-- keywords: remote snapshot, commit sha, provider authorization, read only -->
+<!-- keywords: commit sha, provider authorization, read only, encrypted connection -->
 
-[live] Remote Snapshot endpoints provide metadata, tree, and file reads against the workspace's stored commit SHA and reauthorize the provider connection on each call. Evidence: `internal/server/api/gin_routes.go:120`, `internal/server/api/cloud_snapshot.go:38`.
+[live] `/api/workspaces/{id}/snapshot`, `/snapshot/tree` and `/snapshot/files` read metadata, tree and files at the workspace's stored commit SHA. Each call reauthorizes the provider connection. Evidence: `internal/server/api/gin_routes.go:127`, `internal/server/api/cloud_snapshot.go:21`.
 
-The mode exposes repository reads and snapshot selection while withholding mutation and process capabilities. Provider connections can be persisted through encrypted Cloud state, but self-service provider registration and snapshot-backed board/search remain incomplete.
+[live] Provider connections are stored encrypted per user. Evidence: `internal/server/api/cloud_provider.go:64`.
+
+Workspace details show the repository, ref, commit and local-terminal guidance. A provider outage or rate limit has no local fallback. A response never includes a local path, dirty state, agent ID, command envelope or credential.
 
 ## Not supported
 <!-- chunkId: platform-cloud-runtime-reference-not-supported -->
 <!-- keywords: app oidc, command queue, hosted terminal, provider write -->
 
-[live] App-owned OIDC, durable Agent command delivery, hosted repository execution, and provider writes are not supported. Evidence: `internal/system/runtime_config.go:117`, `internal/server/api/cloud_workspace_access.go:48`.
+[live] App-owned OIDC, Agent command delivery, hosted repository execution, provider writes, self-service provider registration and a snapshot-backed board or search. Evidence: `internal/system/runtime_config.go:118`, `internal/server/api/cloud_workspace_access.go:49`.
 
 ## Known conflicts
 <!-- chunkId: platform-cloud-runtime-reference-known-conflicts -->
-<!-- keywords: documentation drift, command availability, oidc claim -->
+<!-- keywords: command availability, oidc claim, connection persistence -->
 
-[live] `docs/domain/cloud/cloud-deployment.md` incorrectly presents `app_oidc` as available, while several Cloud pages describe command-capable Agents beyond the implemented metadata channel. Evidence: `internal/system/runtime_config.go:117`, `internal/server/api/cloud_workspace_access.go:48`.
+- "An Agent-Backed workspace can run file, Git and terminal actions." Its commands return 503.
+- "Encrypted provider connections are future work." They are stored today.
 
 ## Related pages
 
-See [[platform-storage-reference]], [[platform-extension-reference]], and [[workspace-terminal-canvas-reference]].
+See [[platform-storage-reference]] and [[platform-extension-reference]].

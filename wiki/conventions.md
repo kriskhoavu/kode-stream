@@ -14,16 +14,15 @@ lastVerified: never
 <!-- chunkId: wiki-conventions-authority -->
 <!-- keywords: normative source, local mapping, corpus ownership -->
 
-The single normative specification is `wiki/conventions.md` in the main Discovery repository. Read it there; this page
-does not reproduce it.
+The normative standard is `wiki/conventions.md` in the main Discovery repository. This page does not copy it.
 
-Repo-local mapping: workspace checkout, review, Canvas, and sessions belong to the `workspace` domain. Knowledge
-navigation belongs to the `knowledge` domain. Browser validation belongs to the workspace journey. Hosting, storage,
-and distribution are platform concerns. The corresponding valid slug prefixes are `workspace` and `knowledge`.
+Local mapping:
 
-## Pending corpus decision
-<!-- chunkId: wiki-conventions-corpus-decision -->
-<!-- keywords: durable reference, duplicate corpus, migration audit -->
+- `workspace` domain: checkout, review, Canvas, sessions and settings.
+- `knowledge` domain: Knowledge navigation.
+- `e2e-testing/`: browser journeys.
+- `platform/`: hosting, storage, distribution and the harness.
 
-[open] How should overlapping `docs/` reference be consolidated? Its audit is separate from plan retirement; no docs deletion is authorized by this migration alone.
-See [[workspace-index]] and [[e2e-testing-index]].
+The valid local slug prefixes are `workspace` and `knowledge`.
+
+[open] When will the shared lint script accept these prefixes? See [[platform-documentation-audit]]. See [[workspace-index]] and [[e2e-testing-index]].

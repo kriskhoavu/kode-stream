@@ -8,14 +8,12 @@ sourceRef: |
   PM-037 (plan retired) | Backend contracts
   PM-037 (plan retired) | Frontend contracts
   PM-038 (plan retired) | Checkout contracts
-lastVerified: never
+lastVerified: 2026-11-24
 ---
 
 ## Ownership
 <!-- chunkId: workspace-terminal-canvas-reference-ownership -->
-<!-- keywords: ownership, placements, entities, git, process -->
-
-[open] Does the current implementation still satisfy the ownership behavior described below? This section has not yet been reverified.
+<!-- keywords: placements, authority, projection, process manager -->
 
 | Data                                                             | Authority                 | Canvas storage  |
 |------------------------------------------------------------------|---------------------------|-----------------|
@@ -28,63 +26,61 @@ lastVerified: never
 
 ## APIs And Conflicts
 <!-- chunkId: workspace-terminal-canvas-reference-api -->
-<!-- keywords: api, resolve, placements, viewport, conflict -->
+<!-- keywords: resolve, layouts, viewport, optimistic revision -->
 
-[open] Does the current implementation still satisfy the apis and conflicts behavior described below? This section has not yet been reverified.
+[open] Do the endpoint rules below still hold? They come from the retired plan.
 
-`POST /api/canvas/default` resolves the current checkout through the Workstream loader before it creates or projects the
-default workspace/branch layout. A legacy request branch is accepted only when it matches the checkout; otherwise it
-returns `canvas_branch_mismatch`. `GET /api/canvas/layouts/{layoutId}` refreshes the projection. Placement and viewport
-PATCH operations use independent optimistic revisions; a placement conflict affects only reported nodes. References
-cannot cross workspaces or silently rebind stale plans. See [[workspace-branch-context-reference]].
+- `POST /api/canvas/default` resolves the checkout through the Workstream loader, then creates or projects the layout. A request branch that differs from the checkout returns `canvas_branch_mismatch`.
+- `GET /api/canvas/layouts/{layoutId}` refreshes the projection.
+- Placement and viewport PATCH calls use separate optimistic revisions. A placement conflict affects only the reported nodes.
+- References cannot cross workspaces or silently rebind a stale plan.
 
 ## Session Safety
 <!-- chunkId: workspace-terminal-canvas-reference-session -->
-<!-- keywords: session, metadata, process, branch, idempotency -->
+<!-- keywords: idempotency key, branch mismatch, interrupted, binding -->
 
-[open] Does the current implementation still satisfy the session safety behavior described below? This section has not yet been reverified.
+[live] A launch carries workspace, plan, expected branch, observed commit and one idempotency key. Just before start, the server rereads the checkout and returns `terminal_branch_mismatch` on a mismatch. One key starts at most one process. Evidence: `internal/ai/session_record_service.go:247`, `internal/server/api/ai_controller.go:86`.
 
-A launch includes expected workspace, branch, observed commit, and idempotency key. Repeated requests with one key start
-at most one process. Durable records retain bounded identity and lifecycle fields only. Live bindings, channel grants,
-and xterm instances remain in memory; startup reconciliation marks records without bindings interrupted. Selection and
-terminal disclosure are independent: a top-right action persists the placement's collapsed state, while terminal input,
-selection, and scrolling are excluded from node drag and Canvas pan handling. Newly discovered entities are placed
-silently during load or refresh; removed placements remain hidden and are excluded from that automatic placement. See
-[[workspace-terminal-canvas-workflows]].
+- A record holds workspace and plan references, provider, bounded intent, branch, commit, timestamps, state and exit code. It never holds prompts, arguments, environment, grants, input, output, credentials or buffers.
+- Live bindings, channel grants and xterm instances stay in memory. Startup marks a record without a binding `interrupted`.
+- Terminal input, selection and scroll never start a node drag or Canvas pan.
+- New entities are placed silently on load or refresh. Removed placements stay hidden.
 
 ## Verification Freshness
 <!-- chunkId: workspace-terminal-canvas-reference-verification -->
-<!-- keywords: verification, fingerprint, fresh, stale, inconclusive -->
+<!-- keywords: fingerprint, fresh, stale, inconclusive, in-memory jobs -->
 
-[open] Does the current implementation still satisfy the verification freshness behavior described below? This section has not yet been reverified.
+Each run takes a fingerprint at start and at finish. It covers branch, HEAD, index, relevant tracked and untracked content, and the verification configuration.
 
-The fingerprint covers branch, HEAD, index, relevant tracked and untracked worktree content, and verification
-configuration. `fresh` means start, finish, and current fingerprints match; `stale` means current inputs changed;
-`inconclusive` means inputs changed during execution or fingerprinting failed. Verification jobs are in-memory in PM-037.
+| State          | Meaning                                                      |
+|----------------|--------------------------------------------------------------|
+| `fresh`        | Start, finish and current fingerprints match                 |
+| `stale`        | Inputs changed after the run finished                        |
+| `inconclusive` | Inputs changed during the run, or fingerprinting failed      |
+
+Canvas recomputes the current fingerprint on explicit refresh, after verification polling, on window focus and on document visibility. The Workbench shows short verified and current revisions.
+
+[live] Verification jobs live in memory. A restart loses their history. Evidence: `internal/verification/job_store.go:23`.
 
 ## Limits
 <!-- chunkId: workspace-terminal-canvas-reference-limits -->
-<!-- keywords: limits, placements, coordinates, sessions, deferred -->
+<!-- keywords: placements, coordinates, zoom, batch -->
 
-[open] Does the current implementation still satisfy the limits behavior described below? This section has not yet been reverified.
-
-The MVP bounds a layout to 300 placements, a patch to 50 placements, coordinate magnitude to 1,000,000, viewport zoom
-to 0.1–2.0, and safe records to 500 per workspace. Postgres Canvas persistence, Cloud Agent execution, snapshot-backed
-Canvas UX, groups, custom edges, and durable verification history are deferred. Local non-checkout review is provided
-by [[workspace-branch-review-workflows]], not by Canvas.
+[live] A layout holds at most 300 placements. A patch holds at most 50. Coordinates stay within ±1,000,000 and zoom within 0.1–2.0. Evidence: `internal/canvas/repository.go:15`.
 
 ## Not supported
 <!-- chunkId: workspace-terminal-canvas-reference-not-supported -->
-<!-- keywords: capability boundary, exclusions, unsupported action -->
+<!-- keywords: cloud agent, snapshot canvas, custom edges, verification history -->
 
-[open] Which additional unsupported operations should this page name after implementation verification?
+Cloud Agent execution, a snapshot-backed Canvas, server-stored sections, custom edges and durable verification history. Non-checkout review is [[workspace-branch-review-workflows]], not Canvas.
 
 ## Known conflicts
 <!-- chunkId: workspace-terminal-canvas-reference-known-conflicts -->
-<!-- keywords: documentation drift, verification gap, competing description -->
+<!-- keywords: postgres canvas, deferred persistence, record cap -->
 
-[open] Do the retained plan descriptions disagree with current behavior? Verify the sections above before relying on them.
+- "Canvas has no Postgres persistence." It has. SQLite and Postgres both use the SQL Canvas and session-record repositories. Evidence: `internal/storage/storage.go:249`, `internal/storage/storage.go:271`.
+- "Safe records are capped at 500 per workspace." No such cap exists in the code.
 
 ## Related pages
 
-See [[workspace-terminal-canvas]], [[workspace-index]], and [[e2e-testing-index]].
+See [[workspace-terminal-canvas]], [[platform-storage-reference]] and [[workspace-branch-context-reference]].

@@ -16,40 +16,38 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-session-focus-focused-canvas -->
 <!-- keywords: focus mode, active session, virtual layout, saved position -->
 
-[live] Focus shows only plans with live starting or running sessions, those session nodes, and their connecting edges; inactive nodes are hidden and the visible set receives a temporary layout. Evidence: `web/src/features/canvas/CanvasBoard.tsx:92`, `web/src/features/canvas/CanvasBoard.tsx:128`.
+[live] **Focus** on the Canvas toolbar shows only plans with a starting or running session, those session nodes and the edges between them. The visible set gets a temporary layout. Evidence: `web/src/features/canvas/CanvasBoard.tsx:92`.
 
-Focus does not overwrite saved positions or the saved viewport. Dragging is disabled while focused, and leaving Focus restores the full saved Canvas. See [[workspace-terminal-canvas]].
-
-[live] While Focus is active, its control reports the active plan and session counts, shows an automatic-layout hint, and offers **Turn off** when nothing is running. Evidence: `web/src/features/canvas/CanvasBoard.tsx:107`, `web/src/features/canvas/CanvasBoard.tsx:254`.
+Focus never overwrites saved positions or the viewport. Dragging is off while Focus is on. The control shows the active plan and session counts and offers **Turn off** when nothing runs.
 
 ## Session Surfaces
 <!-- chunkId: workspace-session-focus-shared-session-browser -->
-<!-- keywords: sessions view, plan grouping, active filter, terminal changes, harness sessions -->
+<!-- keywords: sessions view, plan grouping, active filter, cancellation -->
 
-[live] Agent Space's Sessions view lists the workspace's sessions for the current checkout, grouped by plan, with live-only filtering, explicit cancellation, and an action that opens the existing session node on Canvas. It lists two kinds: an interactive session shows its terminal and Changes, a harness session its conversation and its run's Changes. See [[workspace-agent-sessions]] for the difference. Evidence: [[workspace-session-focus-reference]].
+[live] Agent Space's Sessions view lists the workspace's sessions for the checkout, grouped by plan, with a live-only filter, cancellation and **Open on board**. [[workspace-agent-sessions]] describes the two kinds. Evidence: [[workspace-session-focus-reference]].
 
-When a selected live session stops, the live-only filter relaxes so the user's current context remains visible.
+When a selected live session stops, the live-only filter relaxes so the selection stays visible.
 
 ## Checkout-derived Changes
 <!-- chunkId: workspace-session-focus-checkout-derived-changes -->
 <!-- keywords: launch commit, git diff, shared checkout, attribution -->
 
-[live] Changes are calculated from each session's launch commit through the current checkout, including tracked and untracked state, and are never stored in the session record. Evidence: `internal/ai/session_changes.go:154`, `internal/git/git_since.go:28`.
+[live] Changes run from a session's launch commit to the current checkout, including uncommitted and untracked files. They are computed on request and never stored. Evidence: `internal/ai/session_changes.go:123`.
 
-This is checkout history, not attribution. Work by another session or person in the same checkout can appear if it occurred after the launch commit.
+This is checkout history, not attribution. Work by another session or person in the same checkout appears too.
 
 ## Not supported
 <!-- chunkId: workspace-session-focus-not-supported -->
-<!-- keywords: worktree isolation, transcript storage, cloud diff, attribution -->
+<!-- keywords: worktree isolation, transcript storage, cloud diff, authorship -->
 
-[live] Session-owned worktrees, transcript or prompt storage, Cloud-provider changes, and per-session authorship attribution are not supported. Evidence: `internal/ai/session_changes.go:126`, `internal/ai/session_changes.go:154`.
+[live] Session-owned worktrees, transcript or prompt storage, Cloud-provider changes and per-session authorship. Evidence: `internal/ai/session_changes.go:98`.
 
 ## Known conflicts
 <!-- chunkId: workspace-session-focus-known-conflicts -->
-<!-- keywords: documentation drift, dim rule, hidden nodes -->
+<!-- keywords: dim rule, hidden nodes, inactive plans -->
 
-[legacy] The original PM-042 narrative proposed dimming inactive Canvas nodes. The delivered component filters them out and lays out only the active subset, and the domain guide now describes that delivered behavior. Evidence: `web/src/features/canvas/CanvasBoard.tsx:128`, `web/src/features/canvas/CanvasBoard.tsx:135`, `docs/domain/terminal/session-focus.md:61`.
+- "Focus dims inactive nodes." It hides them and lays out only the active set.
 
 ## Related pages
 
-See [[workspace-session-focus-reference]], [[workspace-terminal-canvas]], and [[e2e-testing-workspace-terminal-canvas]].
+See [[workspace-session-focus-reference]], [[workspace-terminal-canvas]] and [[e2e-testing-workspace-terminal-canvas]].

@@ -1,63 +1,40 @@
 # Chrome Extension Showcase
 
-Kode Stream can be built as an unpacked Chrome extension for Local mode showcases. The extension bundles the React UI
-and calls the local Kode Stream server for workspace files, Git operations, system dialogs, and guarded writes.
+The unpacked Chrome extension bundles the React UI and calls a local Kode Stream server for files, Git, dialogs and
+guarded writes. Architecture: [Chrome extension](../docs/architecture/chrome-extension/README.md).
 
-## Build
+## Build And Load
 
-From the repository root:
+1. Run `npm run build:extension`. The output is `dist/chrome-extension`, which Git ignores.
+2. Start the server: `kode-stream serve -port 4317`.
+3. Open `chrome://extensions` and enable Developer Mode.
+4. Choose **Load unpacked** and select `dist/chrome-extension`.
+5. Click the extension action to open the UI in a tab.
 
-```bash
-npm run build:extension
-```
+The extension calls `http://127.0.0.1:4317`. For another port, set `localStorage.kodeStreamApiOrigin` in the extension
+page's console and reload.
 
-The unpacked extension is emitted to `dist/chrome-extension`. The directory is ignored by Git and should be rebuilt
-locally when needed.
+## Acceptance
 
-## Load In Chrome
+| Scenario       | Steps                                                  | Expected result                                       |
+|----------------|--------------------------------------------------------|-------------------------------------------------------|
+| Server running | Open the extension while the server runs               | Workspaces load from the local API                    |
+| Server stopped | Stop the server and reload                             | The server-unavailable state shows with **Retry**     |
+| Browse files   | Open a workspace and use the explorer                  | Tree, preview, content search and file loads work     |
+| Edit files     | Edit and save a Markdown file in a source              | Stale-content and guarded-write checks still apply    |
+| Git status     | Refresh Git status after a save                        | The file shows as modified                            |
+| Branches       | Switch to a clean branch                               | The branch list and switch work                       |
 
-Start the local server:
+## Limits
 
-```bash
-kode-stream serve -port 4317
-```
-
-1. Open `chrome://extensions`.
-2. Enable Developer Mode.
-3. Select Load unpacked.
-4. Choose `dist/chrome-extension`.
-5. Click the Kode Stream extension action to open the bundled UI in a Chrome tab.
-
-The extension defaults to `http://127.0.0.1:4317` for API calls. To test another port, open the extension page console,
-set `localStorage.kodeStreamApiOrigin` to the desired origin, and reload the extension page.
-
-## Acceptance Scenarios
-
-| Scenario       | Steps                                                               | Expected Result                                                            |
-|----------------|---------------------------------------------------------------------|----------------------------------------------------------------------------|
-| Server health  | Open the extension while `kode-stream serve -port 4317` is running. | The app loads workspaces from the local API.                               |
-| Server stopped | Stop the local server and reload the extension page.                | The local server unavailable state is shown with a Retry action.           |
-| Browse files   | Open a registered workspace and use Workstream Explorer.            | The tree, Markdown preview, content search, and file load calls work.      |
-| Edit files     | Edit and save a Markdown file in a workspace source.                | Existing stale-content and guarded write behavior is preserved.            |
-| Git status     | Refresh Git status after a save.                                    | Dirty state reflects the modified file.                                    |
-| Branches       | Open the branch selector and switch to a clean branch.              | Branch list and clean branch switch work through the existing Git adapter. |
-
-## V1 Limits
-
-| Limit                | Reason                                                                                          |
-|----------------------|-------------------------------------------------------------------------------------------------|
-| No file URL access   | Workspace files are accessed through the local Kode Stream API, not Chrome `file://` access.    |
-| No downloads access  | The showcase does not create downloads from the extension.                                      |
-| No native messaging  | The user starts `kode-stream serve` explicitly for v1.                                          |
-| No embedded terminal | Embedded AI terminal uses same-origin WebSocket assumptions and needs a separate security pass. |
-| No store publishing  | The extension is distributed for manual local import only.                                      |
+No `file://` access, no downloads, no native messaging (the user starts the server), no embedded terminal (it needs a
+separate security review of its WebSocket assumptions), and no Web Store distribution.
 
 ## Troubleshooting
 
-| Problem                  | Check                                                                                            |
-|--------------------------|--------------------------------------------------------------------------------------------------|
-| Extension shows offline  | Confirm `kode-stream serve -port 4317` is running and `/api/health` responds in a browser tab.   |
-| Wrong local port         | Set `localStorage.kodeStreamApiOrigin` in the extension page and reload.                         |
-| API requests blocked     | Confirm the server runs in Local mode; only Local mode allows `chrome-extension://` origins.     |
-| Blank page after rebuild | Reload the extension from `chrome://extensions` after running `npm run build:extension`.         |
-| Terminal controls absent | This is expected in extension mode for v1. Use the normal localhost UI for embedded AI terminal. |
+| Problem                  | Check                                                                                  |
+|--------------------------|----------------------------------------------------------------------------------------|
+| Extension shows offline  | The server runs on the expected port and `http://127.0.0.1:4317/` loads in a tab       |
+| API requests blocked     | The server runs in Local mode. Only Local mode allows `chrome-extension://` origins     |
+| Blank page after rebuild | Reload the extension in `chrome://extensions`                                          |
+| Terminal controls absent | Expected. Use the normal localhost UI for the embedded terminal                        |

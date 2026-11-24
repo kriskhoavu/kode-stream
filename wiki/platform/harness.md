@@ -13,56 +13,95 @@ lastVerified: 2026-11-07
 
 ## What It Does
 <!-- chunkId: platform-harness-what-it-does -->
-<!-- keywords: harness, planner, builder, reviewer, draft pull request -->
+<!-- keywords: planner, builder, reviewer, draft pull request -->
 
-[live] The harness turns issues into draft pull requests: scouts fill a ranked queue, a person starts a task, and an orchestrator moves its run through plan, plan approval, build, test, review and draft pull request. Evidence: `internal/harness/domain/transitions.go:153`, `internal/harness/work.go:79`.
+[live] The harness turns issues into draft pull requests. Scouts fill a ranked queue. A person starts a task. An orchestrator moves its run through plan, plan approval, build, test, review and draft pull request. Evidence: `internal/harness/domain/transitions.go:112`, `internal/harness/work.go:67`.
 
-Each role is a coding CLI run headless in the run's own git worktree: the planner and plan checker, the builder and code checker, and the tester. Claude Code is the default; Codex and OpenCode run the same roles through the same port. The harness has no model runtime of its own.
+Each role is a coding CLI run headless in the run's own git worktree: planner, plan checker, builder, code checker and tester. Claude Code is the default. Codex and OpenCode run the same roles through the same port. The harness has no model runtime of its own.
 
 ## A Repository's Own Procedure
 <!-- chunkId: platform-harness-repository-procedure -->
-<!-- keywords: role skills, skill, track, feature-planning, workspace settings -->
+<!-- keywords: role skills, track, skill file, brief -->
 
-[live] A workspace's settings can name the skill each role follows in its repository: a role (`planner`, `plan_reviewer`, `coder`, `code_reviewer`, `qa_fixer`) with a `skill` and an optional `track`, set under Role skills in the workspace's AI and harness tab under Workspaces. The role's brief then says to follow that skill and track, or to read `.claude/skills/<skill>/SKILL.md` where the CLI cannot load skills. The brief's scope, constraints, report and verification still win over the skill, and a question the skill would put to the user goes into the report's `open`. A role without a skill keeps the built-in instructions. A skill or track outside the allowed characters is refused when the settings are saved. A repository's `.kode-stream/harness.yaml`, which held role skills before, is moved into its workspace's settings once, on start. Evidence: `internal/harness/build.go:242`, `internal/harness/teamfile.go:109`, `internal/harness/application/brief/brief.go:211`.
+[live] A workspace can name the skill, and an optional track, that each role follows: `planner`, `plan_reviewer`, `coder`, `code_reviewer` or `qa_fixer`. Set it under Role skills on the workspace's AI and harness tab. Evidence: `internal/harness/build.go:223`, `internal/harness/application/brief/brief.go:104`.
+
+- The brief tells the role to follow that skill and track, or to read `.claude/skills/<skill>/SKILL.md` where the CLI cannot load skills.
+- The brief's scope, constraints, report and verification still win over the skill.
+- A question the skill would ask the user goes into the report's `open` list.
+- A role without a skill keeps the built-in instructions.
+- Saving refuses a skill or track with characters outside the allowed set.
 
 ## Defaults And A Workspace's Own Choices
 <!-- chunkId: platform-harness-workspace-settings -->
-<!-- keywords: defaults, workspace override, models per workspace, review per workspace, settings file -->
+<!-- keywords: workspace override, per-workspace models, readiness check -->
 
-[live] The harness's switches under Settings are defaults every workspace starts from, and a workspace may set its own in its AI and harness tab: whether the harness runs there, whether its tasks start on their own, whether its runs wait at Review, whether an agent may stop and ask, its test command, the paths its Builder may change and its role skills; its sources sit in its Integrations tab, beside its Jira connection. Each workspace holds its own models, each role's engine, model, hard model and most turns, copied from Kode Stream's defaults when it is first seen on start; no setting decides them for every workspace. Role pauses, slots, intervals and every tool permission are set once, under Settings. A team shares a workspace's choices through `.kode-stream/settings.yaml`, which Kode Stream only exports into and imports from when a person asks. See [[workspace-settings]]. Evidence: `internal/harness/domain/settings.go:154`, `internal/harness/domain/settings.go:200`, `internal/harness/dashboard.go:604`.
+[live] The harness switches under Settings are defaults. A workspace may override them, and it owns its models. Role pauses, slots, intervals and tool permissions are set once, under Settings. [[workspace-settings]] has the full split. Evidence: `internal/harness/domain/settings.go:141`, `internal/harness/dashboard_settings.go:60`.
 
-[live] Where a workspace turns the readiness check on, a Jira ticket in READY, or another status it names as ready, starts on its own, and its Planner first checks that the ticket says enough to plan from. When it does not, the task waits for the ticket's reporter, not for you: its card reads "Waiting for <reporter>", and its panel holds the problem, the questions and a comment that mentions the reporter, to copy onto the ticket. Kode Stream posts nothing to Jira. A reply on the ticket sends the Planner on; Continue anyway, with what you know, or Dismiss decide it without them. Nothing is built before you approve the plan. Evidence: `internal/harness/clarify.go:16`, `web/src/features/harness/GateCard.tsx:220`.
+[live] With the readiness check on, a Jira ticket in a ready status starts on its own. The Planner first checks that the ticket says enough to plan from. If not, the task waits for the ticket's reporter: the card reads "Waiting for <reporter>", and the panel holds the problem, the questions and a comment to copy onto the ticket. Kode Stream posts nothing to Jira. A reply on the ticket sends the Planner on. **Continue anyway** or **Dismiss** decide without the reporter. Evidence: `internal/harness/clarify.go:12`, `web/src/features/harness/GateCard.tsx:213`.
 
 ## Who Decides
 <!-- chunkId: platform-harness-who-decides -->
-<!-- keywords: approval, gate, start, resume, webex -->
+<!-- keywords: approval gate, start, resume, hand off -->
 
-[live] Work starts only when a person presses Start, unless `autoStart` is on, and a plan reaches the builder only after a person approves it; a blocked run resumes only on a person's approval. Evidence: `internal/harness/queue.go:211`, `internal/harness/approvals.go:42`.
+[live] Work starts only on **Start**, unless `autoStart` is on. A plan reaches the builder only after a person approves it. A blocked run resumes only on a person's approval. Evidence: `internal/harness/work.go:113`, `internal/harness/approvals.go:40`.
 
-[live] A run whose tests passed waits at Review, unless the settings turn `requireReview` off; it is on by default. There the person opens a session of their own in the run's worktree, from the ticket's Review step in Agent Space, tries the change and edits it. Then they decide: **Hand off** commits what they changed and opens the draft pull request, after running the tests again if anything changed since they passed; **Back to Build** and **Back to Plan** send their words to the Builder or the Planner as a must-fix finding, and the run comes back to Review once its tests pass again. Evidence: `internal/harness/approvals.go:510`, `internal/harness/approvals.go:544`.
+[live] A run whose tests pass waits at Review while `requireReview` is on, the default. The person opens a session in the run's worktree from the Review step in Agent Space, tries the change and edits it. Evidence: `internal/harness/pipeline.go:276`.
 
-A gate can be decided on the Workstream board or from Webex through chat-bot; the decision records its channel and who made it, and the same idempotency key always returns the same decision. See [[platform-harness-bot-contract]].
+- **Hand off** commits the person's changes and opens the draft pull request. It reruns the tests first if anything changed since they passed.
+- **Back to Build** and **Back to Plan** send the person's words to the Builder or Planner as a must-fix finding. The run returns to Review once its tests pass.
+
+A gate can be decided on the Workstream board or from Webex through the bot. The decision records its channel and actor. See [[platform-harness-bot-contract]].
 
 ## What It Will Not Do
 <!-- chunkId: platform-harness-boundaries -->
-<!-- keywords: never commit, baseline, transcript, budget, datadir -->
+<!-- keywords: never commit, transcript, budget, datadir -->
 
-[live] Agents never commit, push or switch branches; the harness commits on `harness/*` branches only, after an approved plan, an approved build, passing tests, and a Review decision, which commits what the person changed in their session. Evidence: `internal/harness/domain/settings.go:149`, `internal/harness/adapters/worktree/gitworktree/gitworktree.go:70`.
+[live] Agents never commit, push or switch branches. The harness commits on `harness/*` branches only, after an approved plan, an approved build, passing tests and a Review decision. Evidence: `internal/harness/adapters/worktree/gitworktree/gitworktree.go:66`.
 
-[live] No prompt, brief or transcript is stored; an agent run keeps its usage, cost, bounded report and the path of the CLI's transcript. Evidence: `internal/harness/work.go:262`.
+[live] No prompt, brief or transcript is stored. An agent run keeps its usage, cost, bounded report and the path of the CLI's transcript. Evidence: `internal/harness/domain/agent_run.go:51`.
 
-[live] The harness runs in Local mode on SQLite or Postgres storage only. Under `datadir` it reports itself unsupported, and in Cloud mode its changes answer 503. Evidence: `internal/harness/harness.go:161`, `internal/server/api/cloud_command.go:98`.
+[live] The harness runs in Local mode on SQLite or Postgres only. Under `datadir` it reports itself unsupported. In Cloud mode its changes return 503. Evidence: `internal/harness/harness.go:143`, `internal/server/api/cloud_auth.go:62`.
 
-[open] Budgets are not enforced. Cost is recorded per agent run and summed per day, run, role and model; the only stop is each CLI's own spending limit per agent run.
-
-Details: [[platform-harness-reference]].
+[open] Should the harness enforce budgets? Cost is recorded per agent run and summed per day, run, role and model. The only stop is each CLI's own spending limit per agent run.
 
 ## Where It Shows
 <!-- chunkId: platform-harness-where-it-shows -->
-<!-- keywords: workstream board, card, needs you, worked by, task queue, agents tab, settings -->
+<!-- keywords: workstream board, needs you, task queue, run page -->
 
-[live] The harness has no page of its own. A ticket is one card on the Workstream board whether a person or the harness works on it: the board reads the harness beside its items and joins a task to a card by the Jira key, which is the item's identifier. A card the harness holds shows who works on it, its stage and its progress, and rings amber when it waits on a person; what waits on a person sits in the "Needs you" strip above the board; a task the Finder found that no plan holds yet is a dashed card in Unsorted; "Worked by" is a facet. Evidence: `web/src/features/workstream/harnessJoin.ts:54`, `web/src/pages/WorkstreamPage.tsx:152`.
+[live] The harness has no page of its own. A ticket is one card on the Workstream board, joined by Jira key to the item's identifier. Evidence: `web/src/features/workstream/harnessJoin.ts:44`, `web/src/pages/WorkstreamPage.tsx:75`.
 
-[live] The board shows Tasks or Plans, never both, chosen with Tasks · Plans at the left of the title row, Tasks first; each is shown as a Board or a List, chosen beside it, and each remembers its own. Tasks holds every task the harness has in the workspace except the dismissed and stale ones, on the plan card that holds it or on a card of its own, and the harness sets its column: To do before it starts, Draft from its start until its plan is approved, In Progress while it is built and tested, Review while its pull request waits, Done once it is done; a stopped task stays in the column its run reached. The one move a person makes is dragging a task that has not started from To do to Draft, which starts it as Start does; every other column takes no task card. Start, or that drag, moves the card to Draft at once, where it reads Starting, with a turning loader and the working ring, until a Planner takes it; every run and gate event carries its task, so the card follows the run without a reload. Plans holds the plans on the branch, which only a person moves, by drag or by the status menu, as cards or as rows grouped by status, each row drawn as a Task Queue row edged in its status's colour: the ID with the service and source, the title with its description and tags, the owner and how long ago it changed, the agents on it, the harness's line or By hand with Run, and the status as a coloured pill that opens the status menu. The Tasks list is the Task Queue: the tasks in the order the harness takes them, each saying what it waits for; the card's Agents tab holds the harness run beside the hand-driven sessions, and `?view=run` on the item page shows the run whole, full width. Run with the harness on a card creates its task through `POST /api/harness/tasks`. The plan a run writes is readable on the card at any time before the merge: "Read the plan" on the card's run, and the Plan tab of a ticket card, read the run's plan folder live from its own copy while it has one, uncommitted work included, then from its branch, local or as last pushed. Every card opens with its kind and key: a plan card reads "Plan · key" beside a solid stripe, and a card the harness holds that no plan on the shown branch matches reads "Jira ticket · key" beside a hatched stripe. The key opens the details: a card's key, a Plans row's ID and a Task Queue row's key open the plan's page or the task's panel, and the title is plain text, except where the ID only repeats the title, which then opens them. Stop, behind a confirmation, stops a run from its Task Queue row, its task panel or its full run page. A stopped task, whose run a person cancelled, is not finished: it stays on the board and in the Task Queue as Stopped, with Start again, which begins a new run beside the stopped one. The Task Queue shows the active tasks by default and the finished ones under Finished or All. Remove, behind a warning, deletes a task in any state from its Task Queue row, its task panel or its full run page: it stops a run in flight and deletes the task with its runs, conversations, sessions, working copy and local `harness/` branch, keeping a pushed branch and a pull request (`POST /api/harness/tasks/{id}/remove`). If its issue is still open and the Finder's search still matches it, the Finder adds it back as a new task. Reset, behind a confirmation, on the task panel and the full run page of any task that has had a run, starts the task over: it stops a run in flight, deletes every run with its stages, conversations, working copy and local `harness/` branch, and puts the task back in the Task Queue to wait for Start, keeping its pin, priority and questions setting; a pushed branch and a draft pull request stay at the remote (`POST /api/harness/tasks/{id}/reset`). Beside To do, where Plans has Configure source items, the Tasks board has Configure AI & harness, which opens the workspace's own provider and harness settings, the same as its AI and harness tab under Workspaces, in a dialog. Both hold them in two tabs: Tools and harness (the provider, the harness's choices, the test command and the paths the Builder may change), then Models and skills (who does what, and the role skills); one Save keeps both tabs. Refresh on the Tasks board asks the workspace's sources at once (`POST /api/harness/scout/poll` with the workspace) and says what Jira returned, besides re-indexing the branch; on Plans it only re-indexes. The harness's settings live under Settings. `/harness/runs/{id}` opens the run whole, full width: on the item page of the plan card that holds it, or, for a Jira ticket no plan card holds, on a page of its own; the task panel's Open details goes there. Under the title it names the ticket as a link, the branch and, once opened, the pull request; under the pipeline it lays the run out as the item page lays out a plan. The left panel switches between Plan (the plan folder as a tree), Changes (every changed code file as a list, its name above its folder, with lines added and removed) and Agents (every conversation, grouped by step, where All steps or a step's name reads a whole section at once). The middle shows what is chosen in tabs: a plan file as Preview, Source or Diff, a code file as its Diff, a conversation as it ran. The right panel holds the task: Info, Jira with the questions a person answered, Checker with every review, whose findings open their file, and Steps with each step's status, rounds, time and cost. Clicking a step in the pipeline opens what that step made. Evidence: `web/src/features/harness/RunWorkbench.tsx:38`. Every other `/harness` path opens the board. A card an agent works on now wears a pulsing ring. Evidence: `web/src/features/workstream/harnessJoin.ts:179`, `web/src/features/workstream/PlanListView.tsx:17`, `web/src/features/harness/QueueList.tsx:84`, `web/src/features/workstream/QueueView.tsx:16`, `internal/harness/queue.go:281`, `web/src/features/harness/ResetTaskButton.tsx:23`, `web/src/features/harness/RemoveTaskButton.tsx:17`, `web/src/features/workstream/AgentsPanel.tsx:78`, `web/src/app/router.ts:46`.
+- A harness card shows who works on it, its stage and progress. It rings amber when it waits on a person, and pulses while an agent works.
+- **Needs you**, above the board, lists what waits on a person.
+- A task the Finder found that no plan holds is a dashed card in Unsorted. "Worked by" is a facet.
+- A card opens with its kind and key: "Plan · key" with a solid stripe, or "Jira ticket · key" with a hatched stripe. The key opens the plan's page or the task's panel.
 
-[live] Each agent the harness runs, one Planner, Checker or Builder round, is a **harness session**: headless, in the run's own worktree, steered through the run's questions and approvals, read as a conversation. A **harness run** is the pipeline for one task and holds its harness sessions. A coding agent a person starts in a terminal on the checkout is an **interactive session**. Agent Space's Sessions view lists both kinds in one list, grouped by ticket, with an Interactive or Harness tag on each card and All · Interactive · Harness to narrow it. A ticket's harness sessions share one card there; its detail shows the run's stepper, where a step and then a round open that agent's conversation, beside the run's changes, Open run page and Stop. [[workspace-agent-sessions]] sets out the difference in full. Evidence: `web/src/features/sessions/HarnessSessionDetail.tsx:32`, `web/src/features/canvas/CanvasSessionsView.tsx:67`.
+**Tasks · Plans** picks what the board shows, and each shows as a Board or a List. Evidence: `web/src/features/workstream/PlanListView.tsx:18`, `web/src/features/workstream/QueueView.tsx:16`.
+
+- **Tasks** holds every task except dismissed and stale ones. The harness sets the column: To do before start, Draft until the plan is approved, In Progress while built and tested, Review while the pull request waits, Done when done. A stopped task stays where its run stopped.
+- The only manual move is dragging an unstarted task from To do to Draft, which starts it. The card reads Starting until a Planner takes it.
+- The Tasks list is the Task Queue: tasks in the order the harness takes them, each saying what it waits for. Active tasks show by default. Finished ones show under Finished or All.
+- **Plans** holds the branch's plans, which only a person moves, by drag or by the status menu.
+- **Run** with the harness on a plan card creates its task (`POST /api/harness/tasks`).
+- **Configure AI & harness** beside To do opens the workspace's harness settings in a dialog.
+- **Refresh** on Tasks polls the workspace's sources at once (`POST /api/harness/scout/poll`) and re-indexes. On Plans it only re-indexes.
+
+Task actions:
+
+- **Stop**, after a confirmation, stops a run. The task stays as Stopped, with **Start again** for a new run.
+- **Reset**, after a confirmation, deletes every run with its stages, conversations, worktree and local `harness/` branch, and puts the task back in the queue. It keeps the pin, priority and questions setting (`POST /api/harness/tasks/{id}/reset`). Evidence: `web/src/features/harness/ResetTaskButton.tsx:17`.
+- **Remove**, after a warning, stops any run and deletes the task with its runs, conversations, sessions, worktree and local branch (`POST /api/harness/tasks/{id}/remove`). If its issue still matches the Finder's search, the Finder adds it back. Evidence: `web/src/features/harness/RemoveTaskButton.tsx:12`.
+- Reset and Remove keep a pushed branch and a pull request at the remote.
+
+The plan a run writes is readable before the merge. **Read the plan** and a ticket card's Plan tab read the run's plan folder from its worktree, uncommitted work included, then from its branch.
+
+`/harness/runs/{id}` opens the run full width, on the plan's item page or on its own page for a ticket without a plan. Evidence: `web/src/features/harness/RunWorkbench.tsx:20`, `web/src/app/router.ts:44`.
+
+- Under the title: the ticket link, the branch and the pull request.
+- Left panel: Plan (the plan folder), Changes (changed files with lines added and removed) and Agents (conversations grouped by step).
+- Middle: the chosen plan file (Preview, Source or Diff), code diff or conversation.
+- Right panel: Info, Jira with answered questions, Checker with every review, and Steps with status, rounds, time and cost.
+- Every other `/harness` path opens the board.
+
+Each harness agent round is a **harness session**. [[workspace-agent-sessions]] explains how Agent Space lists them beside interactive sessions.
+
+Details: [[platform-harness-reference]].

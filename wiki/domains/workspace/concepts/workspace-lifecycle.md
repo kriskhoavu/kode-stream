@@ -18,45 +18,40 @@ lastVerified: 2026-09-12
 
 ## Ways A Workspace Enters The Application
 <!-- chunkId: workspace-lifecycle-registration -->
-<!-- keywords: local path, remote clone, import, registration -->
+<!-- keywords: local path, remote clone, registry import, managed root -->
 
-[live] PM-001, PM-016, and PM-024 workspace registration supports an existing local path, a managed clone from a Git URL, and discovery plus selective import from another Kode Stream data source. Evidence: `internal/common/models/models.go:236`, `internal/workspace/workspace_lifecycle_service.go:46`, `internal/workspace/workspace_import_service.go:26`.
+[live] A workspace is registered from an existing local path, cloned from a Git URL into a managed root, or imported from another Kode Stream registry file. Evidence: `internal/workspace/workspace_lifecycle_service.go:46`, `internal/workspace/workspace_import_service.go:26`.
 
-A managed clone records its origin and managed-root identity so removal can distinguish application-owned clone data
-from a user-owned checkout. Import begins with a preview: candidates, duplicates, conflicts, and invalid records are
-visible before selected workspaces are registered.
+A managed clone records its origin and managed root, so removal can tell Kode Stream's clone from a user's checkout. Import starts with a preview of candidates, duplicates and invalid records. A person then picks which to register.
 
 ## Source Structure Becomes Workspace Policy
 <!-- chunkId: workspace-lifecycle-source-structure -->
-<!-- keywords: source proposal, source settings, plan roots, preview -->
+<!-- keywords: source proposal, plan roots, item paths, preview -->
 
-[live] PM-014 source-structure proposals are generated from the scanned repository and can be previewed, accepted, replaced, or reset per workspace. Evidence: `internal/common/models/models.go:470`, `internal/server/api/gin_routes.go:128`, `internal/server/api/gin_routes.go:157`.
+[live] Kode Stream proposes a source structure from the scanned repository. A person previews it, then accepts, replaces or resets it per workspace. Evidence: `internal/common/models/source_structure.go:3`.
 
-The accepted settings define where structured items are discovered and how new item paths and fields are produced.
-They are configuration, not a second copy of repository content.
+The accepted settings say where items are found and how new item paths and fields are made. They are configuration, not a copy of repository content.
 
 ## Changes Stay Attached To The Checkout
 <!-- chunkId: workspace-lifecycle-safe-changes -->
-<!-- keywords: file save, revert, git commit, checkout, audit -->
+<!-- keywords: file save, revert, commit, audit history -->
 
-[live] PM-002 and PM-004 file saves, reverts, commits, synchronization operations, and branch switches pass through workspace-aware services instead of allowing arbitrary filesystem or Git commands. Evidence: `internal/item/item_service.go:166`, `internal/item/item_service.go:234`, `internal/git/git_service.go:243`, `internal/git/git_service.go:292`, `internal/git/git_service.go:341`.
+[live] File saves, reverts, commits, synchronization and branch switches go through workspace-aware services. No arbitrary filesystem or Git command runs. Evidence: `internal/item/item_service.go:162`, `internal/git/git_service.go:338`.
 
-The current checkout remains the operational context. Dirty-tree and synchronization conflicts return recovery details,
-and mutation outcomes are recorded for workspace history. Branch review is a separate read-only context documented in
-[[workspace-branch-context]].
+Dirty-tree and synchronization conflicts return recovery details. Workspace history records each outcome. Branch review is a separate read-only context: see [[workspace-branch-context]].
 
 ## Not supported
 <!-- chunkId: workspace-lifecycle-not-supported -->
 <!-- keywords: arbitrary path, implicit checkout, destructive cleanup -->
 
-[live] PM-002 does not authorize writes outside configured workspace sources, implicit branch switching, or destructive cleanup of user-owned repositories. Evidence: `internal/item/writer/writer.go:243`, `internal/git/git_service.go:341`, `internal/workspace/registry/registry.go:450`.
+[live] Writes outside configured sources, implicit branch switches and destructive cleanup of a user-owned repository. Evidence: `internal/item/writer/paths.go:27`, `internal/workspace/workspace_lifecycle_service.go:86`.
 
 ## Known conflicts
 <!-- chunkId: workspace-lifecycle-known-conflicts -->
-<!-- keywords: read-only mvp, kanban, legacy workflow -->
+<!-- keywords: read-only mvp, kanban board, legacy screens -->
 
-[legacy] PM-001 describes the product as a read-only MVP and PM-002 describes the original Kanban-era screens. The current implementation supports guarded mutation and uses Workstream and Item Workspace instead.
+- "Kode Stream is read-only, with a Kanban board." It edits through guarded actions, and its surfaces are Workstream and Item Workspace.
 
 ## Related pages
 
-See [[workspace-lifecycle-reference]], [[workspace-branch-context]], and [[workspace-workstream-explorer]].
+See [[workspace-lifecycle-reference]] and [[workspace-workstream-explorer]].

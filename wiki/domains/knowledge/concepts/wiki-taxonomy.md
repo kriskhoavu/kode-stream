@@ -16,36 +16,36 @@ lastVerified: 2026-09-12
 <!-- chunkId: knowledge-wiki-taxonomy-navigation-model -->
 <!-- keywords: bucket, area, tier, directory structure -->
 
-[live] The first directory is a bucket, a repeated structural directory can become a tier, and all remaining directory segments form the area. Evidence: `internal/knowledge/taxonomy.go:20`, `internal/knowledge/taxonomy.go:63`.
+[live] The first directory is the bucket. A repeated structural directory can become a tier. The other directories form the area. Evidence: `internal/knowledge/taxonomy.go:17`.
 
-This lets the same browser present domain knowledge and E2E journeys without hard-coding repository-specific folder names. The graph exposes tier as an attribute; the browser groups bucket, area, and collapsible tier partitions.
+So one browser shows domain pages and E2E journeys without hard-coded folder names. Both views group by bucket, then area, and show the tier as a page attribute.
 
 ## Why Tiers Are Learned Locally
 <!-- chunkId: knowledge-wiki-taxonomy-learned-locally -->
-<!-- keywords: parent threshold, bucket scope, false tier, corpus -->
+<!-- keywords: parent threshold, bucket scope, false tier -->
 
-[live] A directory name becomes a tier only after appearing below two distinct parents within one bucket. Evidence: `internal/knowledge/taxonomy.go:8`, `internal/knowledge/taxonomy.go:27`.
+[live] A directory name becomes a tier only under two distinct parents in one bucket. Evidence: `internal/knowledge/taxonomy.go:8`.
 
-Counting within a bucket prevents a subject name repeated in unrelated buckets from becoming a false global tier. Explicit settings are available when inference is too unstable for a small or changing corpus.
+Counting per bucket stops a name repeated across buckets from becoming a false tier. `knowledge-settings.yaml` fixes the tiers when inference is unstable.
 
 ## Navigation Behavior
 <!-- chunkId: knowledge-wiki-taxonomy-navigation-behavior -->
-<!-- keywords: knowledge browser, graph view, collapsed tier, selection -->
+<!-- keywords: knowledge browser, graph view, selection, filter -->
 
-[live] Browser and graph views share the same taxonomy projection; selecting or filtering a page opens the containing branch so the result remains visible. Evidence: `web/src/features/knowledge/taxonomy.ts:1`, `web/src/features/knowledge/KnowledgeBrowser.tsx:21`.
+[live] The browser and graph share one taxonomy projection. Selecting or filtering a page opens its group so the page stays visible. Evidence: `web/src/features/knowledge/KnowledgeBrowser.tsx:21`.
 
 ## Not supported
 <!-- chunkId: knowledge-wiki-taxonomy-not-supported -->
 <!-- keywords: content instruction, taxonomy persistence, custom role -->
 
-[live] Retrieved page content does not instruct the classifier, inferred taxonomy is not persisted as authoritative state, and the only recognized bucket role is `journeys`. Evidence: `internal/knowledge/taxonomy_settings.go:15`, `internal/knowledge/taxonomy.go:94`.
+[live] Page content never instructs the classifier. Inferred taxonomy is never stored as authority. The only bucket role is `journeys`. Evidence: `internal/knowledge/taxonomy_settings.go:13`.
 
 ## Known conflicts
 <!-- chunkId: knowledge-wiki-taxonomy-known-conflicts -->
-<!-- keywords: empty tier override, replacement semantics, plan discrepancy -->
+<!-- keywords: empty tier override, replacement semantics, settings file -->
 
-[live] A non-empty configured tier list replaces inferred tiers, but an empty list leaves inference intact; an empty list therefore cannot explicitly clear all tiers. Evidence: `internal/knowledge/taxonomy_settings.go:85`, `internal/knowledge/taxonomy_settings.go:95`.
+- "An empty tier list in settings clears all tiers." It leaves inference on. Only a non-empty list replaces it. Evidence: `internal/knowledge/taxonomy_settings.go:79`.
 
 ## Related pages
 
-See [[knowledge-wiki-taxonomy-reference]], [[knowledge-index]], and [[e2e-testing-index]].
+See [[knowledge-wiki-taxonomy-reference]] and [[e2e-testing-index]].

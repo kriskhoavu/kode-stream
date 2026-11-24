@@ -1,34 +1,18 @@
 # Kode Stream Architecture
 
-Kode Stream uses a Go backend and React frontend to provide workflow views over Git-backed planning content. This
-document focuses on system boundaries, package responsibilities, data ownership, and integration flow.
+A Go backend and a React frontend give workflow views over Git-backed planning content. This page covers system
+boundaries, packages, data ownership and the main flows. Behavior details live in the [wiki](../../wiki/index.md).
 
-## Architecture Principles
+## Principles
 
-- Keep source content in Git and app state outside managed repositories.
-- Make repository writes explicit, scoped, and guarded.
-- Use cached indexes for fast board, search, explorer, and graph workflows.
-- Keep transport concerns at the API boundary.
-- Treat workspace content as untrusted input.
-- Keep integrations optional and isolated from core workspace workflows.
-
-## System Overview
-
-```text
-Browser
-  -> Kode Stream server
-  -> React app and JSON API
-  -> Domain services
-  -> App-owned state
-  -> Registered Git workspaces
-  -> Optional integrations
-```
+- Source content stays in Git. App state stays outside managed repositories.
+- Repository writes are explicit, scoped and guarded.
+- Cached indexes serve the board, search, explorer and graph.
+- Transport concerns stay at the API boundary.
+- Workspace content is untrusted input.
+- Integrations are optional and isolated from core workflows.
 
 ## Deployment Model
-
-Kode Stream has three deployment models and two independent local storage choices. Do not use “Cloud mode” to imply
-that every Cloud workspace has an Agent: the Cloud control plane supports both Agent-Backed and Agentless Remote
-Snapshot workspaces.
 
 ```mermaid
 flowchart TD
@@ -39,83 +23,36 @@ flowchart TD
   L --> LDB[SQLite database storage]
   CA --> PG[Postgres database storage]
   CS --> PG
-  CA --> Machine[User machine: Git, files, terminal, AI, verification]
+  CA --> Machine[User machine: repository and local tools]
   CS --> Provider[Read-only Git provider API at pinned commit]
 ```
 
-| Deployment model                | Where Kode Stream runs                                                      | Workspace execution/data boundary                                                                                     | Supported storage              | Intended use                                                                                   |
-|---------------------------------|-----------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|--------------------------------|------------------------------------------------------------------------------------------------|
-| Local application               | User machine; installed with Homebrew, built locally, or run in Docker      | Local paths and managed clones; Git, file writes, terminal, AI, runtime, and verification run locally                 | `datadir` or SQLite `database` | One user working directly with local repositories                                              |
-| Cloud Agent-Backed              | Cloud API on VM/container plus Cloud Agent on the workspace owner’s machine | Agent keeps repository files, Git credentials, processes, and terminals local; Cloud sends approved command envelopes | Postgres `database` only       | Hosted collaboration with privileged work kept on user machines                                |
-| Cloud Agentless Remote Snapshot | Cloud API on VM/container                                                   | Cloud reads an authorized provider repository at a resolved immutable commit; no checkout or process runs in Cloud    | Postgres `database` only       | Current backend foundation: read-only metadata, tree, and file endpoints without a local Agent |
+| Model                           | Runs on                                                    | Workspace boundary                                                                  | Storage                        |
+|---------------------------------|------------------------------------------------------------|-------------------------------------------------------------------------------------|--------------------------------|
+| Local application               | User machine (Homebrew, local build or Docker)             | Local paths and managed clones. Git, writes, terminal, AI and verification run here | `datadir` or SQLite `database` |
+| Cloud Agent-Backed              | Cloud API on a VM or container, Cloud Agent on user machine | Agent connects and publishes metadata. Command delivery returns 503                | Postgres `database`            |
+| Cloud Agentless Remote Snapshot | Cloud API on a VM or container                             | Read-only provider reads at a resolved commit. No checkout or process in Cloud      | Postgres `database`            |
 
-### Capability Boundary
+"Cloud mode" does not mean every workspace has an Agent. See the
+[Cloud runtime reference](../../wiki/platform/cloud-runtime-reference.md) and the
+[storage reference](../../wiki/platform/storage-reference.md).
 
-```text
-Local application
-  Browser -> loopback Go server -> local repository + local app state
-  Read, write, Git, terminal, AI, runtime, verification
-  Docker variant: server and tools run in the container; a host repository is mounted at /workspace
-
-Cloud Agent-Backed
-  Browser -> Cloud API -> outbound Cloud Agent -> user's repository + local tools
-  Hosted metadata; privileged actions execute only on the user's machine
-
-Cloud Agentless Remote Snapshot
-  Browser -> Cloud API -> provider read API -> commit-pinned tree and files
-  Read, snapshot selection, terminal handoff guidance only
-```
-
-Cloud Agent connects outbound to `/api/agents/channel` over WebSocket. Agent-Backed workspace records use
-`WorkspaceLocation=cloud_agent`; Remote Snapshot records use `WorkspaceLocation=cloud_remote_snapshot` and never
-contain a local path, agent ID, command envelope, or provider credential.
-
-Remote Snapshot's end-user provider registration and snapshot-backed board/search views are planned follow-up work.
-
-```text
-┌──────────────────────────────────────────────────────────────┐
-│ React app                                                    │
-│ Workstream | Explorer | Item workspace | Wiki graph | Tools  │
-└──────────────────────────────┬───────────────────────────────┘
-                               │ JSON API
-┌──────────────────────────────▼───────────────────────────────┐
-│ Go server                                                    │
-│ internal/server       Composition and embedded frontend      │
-│ internal/server/api   HTTP transport and API contracts       │
-│ internal/*            Domain services and adapters           │
-└───────────────┬───────────────────────────────┬──────────────┘
-                │                               │
-┌───────────────▼────────────────┐  ┌───────────▼───────────────┐
-│ App-owned state                │  │ Registered Git workspaces │
-│ Storage provider repositories  │  │ User source files         │
-│ SQLite / data-dir / Postgres   │  │ Git history               │
-└────────────────────────────────┘  └───────────────────────────┘
-```
-
-For the mode-specific diagrams and use cases, see [Local mode](local-mode/README.md),
-[Cloud mode](cloud-mode/README.md), and [Chrome extension](chrome-extension/README.md). The Local storage-options
-diagram source is [Mermaid](local-mode/storage-options.mmd).
-
-## Deployment Adapter Boundaries
-
-Kode Stream does not use one abstract `DeploymentMode` interface. Instead, the runtime mode is configuration and
-policy, while the variable concerns use smaller abstractions: `StorageProvider` for app-owned state and
-`workspaceAccessAdapter` for Cloud workspace commands. The Chrome extension is a frontend API-origin adapter, not a
-server-side runtime mode. See the [deployment adapter class diagrams](deployment-adapters.md).
+Mode diagrams: [Local mode](local-mode/README.md), [Cloud mode](cloud-mode/README.md),
+[Chrome extension](chrome-extension/README.md). The runtime mode is configuration and policy, not one
+`DeploymentMode` interface. `StorageProvider` and `workspaceAccessAdapter` carry what varies. See
+[deployment adapters](deployment-adapters.md).
 
 ## Code Layout
 
-`internal/` and `web/` hold the logic and every test. `cmd/` holds the composition root. Kode
-Stream ships one binary rather than a fleet, and the frontend is compiled into it — `internal/server`
-declares `//go:embed all:frontend` — so a single image and a single Homebrew formula carry the
-whole product.
+`cmd/` holds the composition root. `internal/` and `web/` hold the logic and every test. `internal/server` declares
+`//go:embed all:frontend`, so one binary, one image and one Homebrew formula carry the whole product.
 
 ```text
               web/src/                          internal/
          (React frontend)          agent  ai  audit  canvas  filesystem  git  item
                   │                jira  knowledge  navigation  provider  search
                   │                server  storage  system  verification  workspace
-                  │                cloudstate  common  e2eresult  runtime  workstream
+                  │                cloudstate  common  e2eresult  harness  runtime  workstream
                   │                                     │
                   │  npm run build → embedded           │
                   └──────────────────┬──────────────────┘
@@ -129,230 +66,105 @@ whole product.
        deploy/docker/image/kode-stream/      cmd/scripts/distribution/
 ```
 
-One deviation from the platform rule, deliberately: `cmd/scripts/distribution/` holds release
-automation rather than a deployable. It is invoked by CI, not by an operator standing in `deploy/`,
-which is why it stays with the code it releases — see [deploy/README.md](../../deploy/README.md).
+`cmd/scripts/distribution/` holds release automation. CI runs it, so it stays beside the code it releases.
 
-`internal/` domain packages take standard contexts and primitive parameters, never framework
-request objects, and Gin is confined to `internal/server/api`. That is what lets workspace, storage,
-and verification behaviour be tested without booting a server. `agent-plane` and `context-cellar`
-use the same two-kinds-of-directory split, with `packages/` in place of `internal/` on the
-TypeScript side.
+Gin lives only in `internal/server/api`. Domain packages take standard contexts and primitive parameters, never
+framework request objects, so their tests need no server.
 
-## Backend Layers
+## Backend Packages
 
-| Layer             | Package               | Role                                                                                   |
-|-------------------|-----------------------|----------------------------------------------------------------------------------------|
-| CLI               | `cmd/kode-stream`     | Starts the server and runs diagnostics                                                 |
-| Composition       | `internal/server`     | Wires services, resolves paths, serves embedded frontend                               |
-| API transport     | `internal/server/api` | Owns routes, middleware, request parsing, and JSON responses                           |
-| Shared contracts  | `internal/common`     | Defines errors, HTTP helpers, and compatibility DTOs                                   |
-| Domain services   | `internal/*`          | Own workflows, policies, repositories, and integration logic                           |
-| File capabilities | `internal/filesystem` | Provides guarded path validation, bounded reads, and writes                            |
-| Storage           | `internal/storage`    | Resolves storage option, wires providers, runs SQL migrations, exposes status and sync |
-
-Gin is limited to `internal/server/api`. Domain packages receive standard contexts, model types, and primitive
-parameters instead of framework-specific request objects.
-
-## Domain Areas
-
-| Domain       | Package                 | Responsibility                                                    |
-|--------------|-------------------------|-------------------------------------------------------------------|
-| Workspace    | `internal/workspace`    | Registration, import, scanning, source settings, files, health    |
-| Workstream   | `internal/workstream`   | Checkout board loading, commit-pinned branch review, filters      |
-| Item         | `internal/item`         | Item detail, Markdown writes, metadata, status, creation, refresh |
-| Search       | `internal/search`       | Indexed item search, content search, and workspace path search    |
-| Knowledge    | `internal/knowledge`    | LLM Wiki indexing, graph, sync, reads, and enrichment             |
-| Git          | `internal/git`          | Status, fetch, pull, push, commit, branch create, branch switch   |
-| Jira         | `internal/jira`         | Issue lookup, REST access, caching, and guarded attachments       |
-| AI           | `internal/ai`           | Provider detection, settings, external launch, embedded sessions  |
-| Verification | `internal/verification` | Bounded verification jobs, status, checkpoints, and artifacts     |
-| System       | `internal/system`       | Config paths, native dialogs, path reveal, health, diagnostics    |
-| Audit        | `internal/audit`        | Local operation event append and query                            |
-| Navigation   | `internal/navigation`   | Saved filters and recent items                                    |
-| Canvas       | `internal/canvas`       | Branch-scoped layouts, placements, references, and projections    |
+| Package                 | Role                                                                      |
+|-------------------------|---------------------------------------------------------------------------|
+| `cmd/kode-stream`       | Starts the server and runs diagnostics                                    |
+| `internal/server`       | Wires services, resolves paths, serves the embedded frontend              |
+| `internal/server/api`   | Routes, middleware, request parsing and JSON responses                    |
+| `internal/common`       | Errors, HTTP helpers and shared DTOs                                      |
+| `internal/filesystem`   | Guarded path validation, bounded reads and writes                         |
+| `internal/storage`      | Storage option, providers, SQL migrations, status and sync                |
+| `internal/workspace`    | Registration, import, scanning, source settings, files, health            |
+| `internal/workstream`   | Checkout board loading, commit-pinned branch review, filters              |
+| `internal/item`         | Item detail, Markdown writes, metadata, status, creation, refresh         |
+| `internal/search`       | Item search, content search and path search                               |
+| `internal/knowledge`    | Wiki indexing, graph, sync, reads and enrichment                          |
+| `internal/git`          | Status, fetch, pull, push, commit, branch create and switch               |
+| `internal/jira`         | Issue lookup, REST access, caching and guarded attachments                |
+| `internal/ai`           | Provider detection, settings, external launch, embedded sessions          |
+| `internal/verification` | Bounded verification jobs, status, checkpoints and artifacts              |
+| `internal/system`       | Config paths, native dialogs, path reveal, health, diagnostics            |
+| `internal/audit`        | Operation event append and query                                          |
+| `internal/navigation`   | Saved filters and recent items                                            |
+| `internal/canvas`       | Branch-scoped layouts, placements, references and projections             |
+| `internal/harness`      | The engineering harness. See [the harness page](../../wiki/platform/harness.md) |
 
 ## Frontend Areas
 
-| Area            | Path                                   | Role                                                     |
-|-----------------|----------------------------------------|----------------------------------------------------------|
-| App shell       | `web/src/App.tsx`                      | Layout and top-level navigation                          |
-| App state       | `web/src/app/useAppState.ts`           | Workspace, route, refresh, theme, and stale state        |
-| API layer       | `web/src/shared/api`                   | Fetch wrapper and endpoint methods                       |
-| Workstream      | `web/src/pages/WorkstreamPage.tsx`     | Board, cards, filters, intake, and preview drawer        |
-| Workspaces      | `web/src/pages/WorkspacesPage.tsx`     | Workspace setup, import, edit, delete, scan, reveal      |
-| Item workspace  | `web/src/pages/ItemWorkspacePage.tsx`  | Files, preview, editor, diff, metadata, Jira, Git tools  |
-| Explorer        | `web/src/pages/WorkstreamExplorer.tsx` | Workspace tree, file editor, content search, inspector   |
-| Canvas          | `web/src/pages/CanvasPage.tsx`         | Draggable workspace, plan, and durable session workbench |
-| Branch review   | `web/src/pages/BranchReviewPage.tsx`   | Read-only plans and files from a pinned non-checkout ref |
-| Feature modules | `web/src/features/*`                   | Search, reliability, content rendering, editor, explorer |
-| Shared modules  | `web/src/shared/*`                     | Reusable API, domain, and UI support code                |
+| Path                                   | Role                                                     |
+|----------------------------------------|----------------------------------------------------------|
+| `web/src/App.tsx`                      | Layout and top-level navigation                          |
+| `web/src/app/useAppState.ts`           | Workspace, route, refresh, theme and stale state         |
+| `web/src/shared/api`                   | Fetch wrapper and endpoint methods                       |
+| `web/src/pages/WorkstreamPage.tsx`     | Board, cards, filters, intake and preview drawer         |
+| `web/src/pages/WorkspacesPage.tsx`     | Workspace setup, import, edit, delete, scan, reveal      |
+| `web/src/pages/ItemWorkspacePage.tsx`  | Files, preview, editor, diff, metadata, Jira, Git tools  |
+| `web/src/pages/WorkstreamExplorer.tsx` | Embedded tree, file editor, content search, inspector    |
+| `web/src/pages/CanvasPage.tsx`         | Agent Space: the Sessions view and the Canvas            |
+| `web/src/pages/BranchReviewPage.tsx`   | Read-only plans and files from a pinned non-checkout ref |
+| `web/src/features/*`                   | Feature modules                                          |
+| `web/src/shared/*`                     | Reusable API, domain and UI code                         |
 
-Frontend shared modules do not import page modules. Pages compose feature and shared modules.
+Shared modules never import pages. Pages compose feature and shared modules.
 
 ## Data Ownership
 
-Kode Stream separates app-owned state from repository-owned content.
+| Owner      | Examples                                                                                 | Write policy                                     |
+|------------|------------------------------------------------------------------------------------------|--------------------------------------------------|
+| App state  | Workspace registry, indexes, audit, UI settings, Canvas placements, safe session records | Kode Stream writes to the selected storage option |
+| Repository | Markdown, metadata, wiki pages, Git history                                              | Written only through explicit user actions       |
 
-| Owner      | Examples                                                                                 | Write policy                                            |
-|------------|------------------------------------------------------------------------------------------|---------------------------------------------------------|
-| App state  | Workspace registry, indexes, audit, UI settings, Canvas placements, safe session records | Written by Kode Stream to the configured storage option |
-| Repository | Markdown, metadata, wiki pages, Git history                                              | Written only through explicit user actions              |
-
-Indexes are derived data. A scan can rebuild them from registered workspace content.
-
-Canvas is also a projection. It persists layout identity, viewport, node coordinates, and collapsed presentation only.
-Current labels, repository relationships, Git state, verification state, capabilities, and process availability are
-resolved from their owning domains on read. Derived repository and application connections are never stored as authored
-Canvas edges.
-
-## Storage Architecture
-
-Storage is selected at server startup:
-
-| Runtime mode | Storage option | Driver   | Required configuration                                            | Stored state                                                          |
-|--------------|----------------|----------|-------------------------------------------------------------------|-----------------------------------------------------------------------|
-| Local        | `datadir`      | file     | Default                                                           | YAML/JSONL app-owned state under `KODE_STREAM_DATA_DIR`               |
-| Local        | `database`     | SQLite   | `KODE_STREAM_STORAGE_OPTION=database` or optional SQLite override | Workspace metadata, derived item indexes, audit, navigation, settings |
-| Cloud        | `database`     | Postgres | `KODE_STREAM_STORAGE_DRIVER=postgres`, `KODE_STREAM_DATABASE_URL` | Shared control-plane metadata, branch indexes, audit, settings        |
-
-Local data-dir storage is a supported option, not a deprecated path. See [Storage](../domain/storage/storage-architecture.md)
-for the option matrix, manual sync, backup, restore, and performance comparison.
-
-`internal/storage` resolves `KODE_STREAM_STORAGE_OPTION`, composes a provider-backed `RepositoryBundle`, opens SQL
-stores when needed, runs embedded migrations when `KODE_STREAM_MIGRATIONS=auto`, exposes database readiness through
-`/api/health`, and exposes storage status/sync through `/api/storage/*`.
-
-Settings can run local-only manual sync in either direction:
-
-- `datadir_to_database`
-- `database_to_datadir`
-
-Sync writes a target backup under `backups/storage-sync/` before replacement. Runtime writes are not dual-written; the
-selected storage option is the only active backend.
-
-Cloud Agents never connect to Postgres. They connect only to the Cloud API over HTTPS/WebSocket and publish safe
-workspace metadata or scan results. Repository source files, Git credentials, terminal transcripts, prompts, and SSH
-keys are not stored in SQL.
+Indexes are derived, and a scan rebuilds them. Canvas stores only layout. It resolves labels, Git state, verification
+and process availability from their owners on read.
 
 ## Item Discovery
 
-The scanner turns configured repository sources into item cards and knowledge entries. It evaluates each source in this
-order:
+The scanner evaluates each configured source in this order:
 
-1. Source mappings: the rules in `.kode-stream/workspace-settings.yaml` whose `fields.source` names the source, else
+1. Source mappings: rules in `.kode-stream/workspace-settings.yaml` whose `fields.source` names the source, else
    `workspace-settings.yaml` inside the source.
 2. Structured item folders.
 3. Freestyle Markdown docs.
 
-Metadata precedence is:
+Metadata precedence:
 
 1. `plan.yaml`
 2. Source mapping fields and README heading
 3. README heading and inferred status
 4. Folder names and fallback defaults
 
-Supported workflow statuses are `draft`, `in_progress`, `review`, `done`, and `unsorted`.
+Workflow statuses are `draft`, `in_progress`, `review`, `done` and `unsorted`.
 
 ## Core Flows
 
-### Scan And Index
-
 ```text
-Register or scan workspace
-  -> validate workspace configuration
-  -> read configured sources
-  -> apply source mappings
-  -> parse metadata, README headings, Markdown documents, and Git metadata
-  -> update derived indexes in the configured storage backend
-  -> report warnings without blocking valid items
-```
+Scan
+  -> validate workspace configuration and read configured sources
+  -> apply source mappings, parse metadata, headings, Markdown and Git metadata
+  -> update derived indexes; report warnings without blocking valid items
 
-### Checkout Load, Review, And Re-index
-
-```text
 Load an operational page
-  -> resolve the current Git checkout and commit
-  -> use the working-tree reader only
-  -> compare commit, source configuration hash, and working-tree hash with stored branch scan metadata
-  -> reuse stored branch index when fresh
-  -> otherwise replace checkout branch rows, warnings, and metadata in one transaction
-  -> return checkout board, Canvas, Knowledge, or item data
+  -> resolve the current checkout and commit
+  -> reuse the branch index if commit, source configuration hash and working-tree hash match
+  -> otherwise replace the branch rows in one transaction
 
-Open Branch Review
-  -> acquire the workspace mutation lock shared with checkout loading and switching
-  -> verify the requested branch is not the checkout, then resolve it to a pinned ref and commit
-  -> use the commit SHA for every Git-tree scan and file read; retain the ref as metadata
-  -> transactionally replace the branch index and release the lock
-  -> expose plans and committed files without mutation or execution actions
-  -> keep the checkout and operational routes unchanged
-
-Import one reviewed structured plan
-  -> require the item to belong to the workspace named by the route
-  -> acquire the workspace mutation lock shared with in-app checkout switching
-  -> re-resolve and require the pinned source commit and confirmed checkout under the lock
-  -> reject an existing destination item root or unsafe path
-  -> stage the complete plan beside its destination
-  -> atomically rename it into the confirmed checkout and refresh its index
-  -> remove the published target if refresh fails
-  -> release the workspace mutation lock
+Write
+  -> validate workspace, item, file identity, path scope and content hash
+  -> write, rescan affected data, refresh open views
 ```
 
-### Write
-
-```text
-Edit Markdown or metadata
-  -> validate workspace, item, file identity, path scope, and content hash
-  -> write selected file or metadata
-  -> rescan affected workspace data
-  -> refresh open views
-```
-
-### Integration Flow
-
-```text
-Jira
-  -> resolve workspace settings and token
-  -> fetch matching issue context
-  -> proxy allowed attachments through guarded access
-
-Terminal and AI sessions
-  -> detect supported local providers
-  -> validate workspace and optional selected item
-  -> launch external terminal or embedded session
-  -> record audit outcome without prompt content
-
-Terminal Canvas
-  -> resolve one layout for workspace and current checkout branch
-  -> combine saved placements with current workspace, plan, Git, verification, and session projections
-  -> revalidate capabilities and branch context before actions
-  -> keep safe durable session metadata separate from the in-memory PTY/process binding
-
-Verification
-  -> start bounded job
-  -> collect checkpoints, status, logs, and artifacts
-  -> expose results through the item and verification APIs
-
-LLM Wiki & Graph
-  -> index structured Markdown knowledge
-  -> build graph relationships
-  -> detect bucket, area, and tier from wiki layout
-  -> expose reads, sync, enrichment, and graph views
-```
-
-Wiki structure is inferred rather than configured. A directory name becomes a tier when it appears under two or
-more distinct parents inside one bucket, and each page carries its bucket, area, and tier alongside its
-domain. An optional `knowledge-settings.yaml` at the wiki root overrides the detected tiers and declares what a
-bucket means; the `journeys` role selects the bucket holding reusable E2E coverage and defaults to `e2e-testing`.
-
-Both Knowledge views group by bucket then area, with tier shown as a page attribute rather than a level. That caps
-the rendered hierarchy at two levels whatever the wiki's directory depth, and a nested area is drawn as one compound
-row. When an index entry carries no bucket or area, both views derive them from `domain`, so a workspace that has not
-been rescanned renders correctly.
+Branch Review, plan import and the shared workspace mutation lock are in the
+[checkout reference](../../wiki/domains/workspace/reference/branch-context-reference.md). Wiki taxonomy is in the
+[taxonomy reference](../../wiki/domains/knowledge/reference/wiki-taxonomy-reference.md).
 
 ## API Structure
-
-All API routes are local and grouped by capability.
 
 | Family       | Scope                                                                       |
 |--------------|-----------------------------------------------------------------------------|
@@ -366,34 +178,16 @@ All API routes are local and grouped by capability.
 | Verification | Job creation, checkpoint ingest, status, artifacts, reruns                  |
 | Git          | Status, activity, branches, fetch, pull, push, commit, branch operations    |
 | Streaming    | Workspace creation events and embedded session channels                     |
-| Canvas       | Default resolution, branch-scoped projections, placements, and viewport     |
+| Canvas       | Default resolution, branch-scoped projections, placements, viewport         |
+| Harness      | Tasks, runs, approvals, settings, events, bot routes                        |
 
-In Cloud mode, command-capable routes are denied on the hosted server unless they use the Cloud command envelope path
-and a connected owner Cloud Agent is available.
-
-## Error Handling
-
-Domain errors use stable codes and map to HTTP statuses at the API boundary.
-
-| Code           | HTTP status                 |
-|----------------|-----------------------------|
-| `not_found`    | `404 Not Found`             |
-| `validation`   | `400 Bad Request`           |
-| `conflict`     | `409 Conflict`              |
-| `unauthorized` | `401 Unauthorized`          |
-| `forbidden`    | `403 Forbidden`             |
-| `unavailable`  | `503 Service Unavailable`   |
-| `infra`        | `500 Internal Server Error` |
-
-The frontend receives a stable JSON envelope with `error` and optional `code` and `recoveryHint` fields.
+The [API transport reference](../../wiki/platform/api-transport-reference.md) covers middleware and error codes.
 
 ## Safety
 
-The safety model is enforced across filesystem, rendering, Git, and integration boundaries:
-
-- Scope file access to registered workspace sources.
-- Reject path traversal, `.git` access, and symlink escapes.
-- Use expected content hashes for Markdown writes.
-- Sanitize or escape workspace content in previews.
-- Stage only selected paths for Git commits.
-- Keep credentials, prompts, and terminal content out of managed repositories.
+- File access stays inside registered workspace sources.
+- Path traversal, `.git` access and symlink escapes are rejected.
+- Markdown writes need the expected content hash.
+- Previews sanitize or escape workspace content.
+- Git commits stage only selected paths.
+- Credentials, prompts and terminal content never enter managed repositories or SQL.

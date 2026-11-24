@@ -16,40 +16,36 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-jira-workstream-reference-scope -->
 <!-- keywords: workspace Jira, connection, issue lookup, cache -->
 
-[live] PM-019 Jira lookup resolves the connection from the owning workspace; item lookup and workspace-plus-key lookup share the same service and cache behavior. Evidence: `internal/jira/jira_service.go:92`, `internal/jira/jira_service.go:110`, `internal/jira/jira_service.go:201`.
+[live] Jira lookup takes its connection from the owning workspace. Item lookup and workspace-plus-key lookup share one service and cache. Evidence: `internal/jira/jira_service.go:91`, `internal/jira/jira_service.go:120`.
 
-Credentials are referenced through configuration rather than returned to the browser. Authentication, permission, and
-availability failures become distinct unavailable states with recovery guidance.
+Configuration references the credentials. The browser never receives them. Authentication, permission and availability failures each return their own unavailable state with recovery guidance.
 
 ## Issue And Attachment Boundary
 <!-- chunkId: workspace-jira-workstream-reference-attachments -->
-<!-- keywords: issue API, attachment ID, origin, size limit, media type -->
+<!-- keywords: attachment ID, redirect origin, size limit, media type -->
 
-[live] PM-019 item attachments are fetched only when the attachment ID belongs to the issue already resolved for that item. Evidence: `internal/jira/jira_service.go:253`, `internal/jira/jira_service_test.go:242`.
+[live] An attachment is fetched only when its ID belongs to the issue already resolved for the item. Evidence: `internal/jira/jira_service.go:307`.
 
-The proxy validates the content URL and redirect origin, enforces a 25 MiB maximum, bounds attachment count, and
-normalizes content type and filename before streaming. Browser clients do not receive Jira credentials.
+The proxy checks the content URL and redirect origin, caps size at 25 MiB, bounds the attachment count, and normalizes content type and filename before streaming.
 
 ## Local Item Creation
 <!-- chunkId: workspace-jira-workstream-reference-creation -->
-<!-- keywords: Jira issue, plan draft, source structure, duplicate -->
+<!-- keywords: plan draft, source structure, collision validation -->
 
-[live] PM-025 Workstream resolves Jira before constructing the local draft and then creates the item through the same source-aware item creation path as manual intake. Evidence: `web/src/pages/WorkstreamPage.tsx:491`, `web/src/pages/WorkstreamPage.tsx:508`, `internal/item/writer/writer_test.go:201`.
-
-Jira fields seed local values but do not bypass identifier, path, source, or collision validation.
+[live] Workstream resolves Jira first, then creates the item through the same source-aware path as manual intake. Jira fields never bypass identifier, path, source or collision checks. Evidence: `web/src/features/workstream/NewWorkItemDialog.tsx:45`, `internal/item/writer/writer_test.go:199`.
 
 ## Not supported
 <!-- chunkId: workspace-jira-workstream-reference-not-supported -->
 <!-- keywords: Jira write, webhook, bidirectional sync -->
 
-[live] PM-019 the route manifest exposes issue and attachment reads but no Jira write or synchronization endpoint. Evidence: `internal/server/api/gin_routes.go:137`, `internal/server/api/gin_routes.go:144`.
+[live] The route manifest has issue and attachment reads only. There is no Jira write, webhook or synchronization endpoint. Evidence: `internal/server/api/gin_routes.go:143`.
 
 ## Known conflicts
 <!-- chunkId: workspace-jira-workstream-reference-known-conflicts -->
-<!-- keywords: issue cache, attachment behavior, stale plan -->
+<!-- keywords: plan screenshots, component names, stale plan -->
 
-[legacy] Earlier plan screenshots and component names predate Jira-first creation. The service's read-only and workspace-scoped boundary remains unchanged.
+- "Plan screenshots show the current Jira screens." They predate Jira-first creation. The read-only boundary is the same.
 
 ## Related pages
 
-See [[workspace-jira-workstream]], [[workspace-lifecycle-reference]], and [[workspace-ai-launch-reference]].
+See [[workspace-jira-workstream]] and [[workspace-ai-launch-reference]].

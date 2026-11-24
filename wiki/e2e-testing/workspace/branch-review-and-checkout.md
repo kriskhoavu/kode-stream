@@ -11,76 +11,58 @@ lastVerified: never
 
 ## Goal And Preconditions
 <!-- chunkId: e2e-testing-workspace-branch-review-checkout-goal -->
-<!-- keywords: goal, disposable workspace, branches, marker, plan -->
+<!-- keywords: disposable workspace, branch fixtures, marker, safe writes -->
 
-[open] Does the current implementation still satisfy the goal and preconditions behavior described below? This section has not yet been reverified.
+[open] Can the current build complete this journey? It has not run against a supplied runtime.
 
-Validate [[workspace-branch-review-workflows]] in a non-production Local environment. Supply a base URL, authentication
-reference, and an isolated disposable Git workspace. Branch A is the checkout and contains a known reversible
-uncommitted marker; branch B contains a unique committed structured plan. Import and checkout are approved safe writes
-for this fixture only. Run import and checkout as isolated fixture phases: checkpoint or remove the imported target
-before switching to branch B, because Git must not overwrite that untracked path.
+This journey checks [[workspace-branch-review-workflows]] in a non-production Local environment. Supply a base URL, an authentication reference and a disposable Git workspace:
 
-Use Playwright MCP in a fresh context. Keep credentials, terminal content, and unrelated repository data out of
-evidence. Chrome DevTools may diagnose a failed Playwright step but is not the execution provider.
+- Branch A is the checkout and holds a known, reversible uncommitted marker.
+- Branch B holds a unique committed structured plan.
+
+Import and checkout are approved safe writes for this fixture only. Run them as separate phases. Remove or checkpoint the imported target before switching to branch B, because Git must not overwrite that untracked path. Follow the [[e2e-testing-index]] execution policy.
 
 ## Review Without Changing Checkout
 <!-- chunkId: e2e-testing-workspace-branch-review-checkout-review -->
-<!-- keywords: workstream, branch review, read-only, commit, checkout -->
+<!-- keywords: read-only review, pinned commit, stale bookmark -->
 
-[open] Does the current implementation still satisfy the review without changing checkout behavior described below? This section has not yet been reverified.
+Read-only steps:
 
-1. Open Workstream and wait for the board; assert branch A is labeled **Checkout** and its plans are visible.
-2. Choose **Review branch**, select branch B, and wait for **Branch Review** and **Read-only committed snapshot**.
-3. Assert branch B and a short commit appear while checkout remains branch A.
-4. Open the unique plan and one file; assert committed content is visible and editing, status, terminal, AI, and
-   verification controls are absent.
-5. When a stale `/items/{snapshot-id}` bookmark is supplied, open it and wait for item loading to finish. Assert only
-   the review-only error and Back action remain; plan, file, Git, AI, verification, and mutation controls are absent.
-6. Use **Back**, visit Canvas and Knowledge, then return to the review URL; assert both operational pages still use
-   branch A.
+1. Open Workstream. Assert branch A is labeled **Checkout** and its plans show.
+2. Choose **Review branch** and select branch B. Wait for **Branch Review** and **Read-only committed snapshot**.
+3. Assert branch B and a short commit show while the checkout stays branch A.
+4. Open the unique plan and one file. Assert the content shows and edit, status, terminal, AI and verification controls are absent.
+5. If a stale `/items/{snapshot-id}` bookmark is supplied, open it. Assert only the review-only error and **Back** remain.
+6. Choose **Back**, visit Canvas and Knowledge, then return to review. Assert both pages still use branch A.
 
-These steps are read-only. Capture the checkout label, review context, and committed file preview.
+Capture the checkout label, review context and file preview.
 
 ## Import Into Checkout
 <!-- chunkId: e2e-testing-workspace-branch-review-checkout-import -->
-<!-- keywords: import, confirmation, branch A, marker, conflict -->
+<!-- keywords: import confirmation, marker unchanged, conflict -->
 
-[open] Does the current implementation still satisfy the import into checkout behavior described below? This section has not yet been reverified.
+1. Select the plan and choose **Import selected plan**.
+2. Confirm the preview names branch B, its commit, branch A and the plan.
+3. Wait for the item route. Assert the plan exists in branch A's working tree.
+4. Assert Git still reports branch A and the marker is unchanged.
 
-1. Select the unique structured plan and choose **Import selected plan**.
-2. Confirm the preview names branch B, its pinned commit, branch A, and the selected plan.
-3. Wait for the operational item route and assert the plan exists in branch A working-tree content.
-4. Assert Git still reports branch A and the known uncommitted marker remains unchanged.
-
-Import is an isolated safe write. If the destination exists or the source moved, assert a visible conflict and stop this
-section; do not delete or overwrite content to force the journey through.
+If the target exists or the source moved, assert a visible conflict and stop. Never delete or overwrite to force it.
 
 ## Activate And Synchronize
 <!-- chunkId: e2e-testing-workspace-branch-review-checkout-activate -->
-<!-- keywords: guarded checkout, dirty confirmation, canvas, knowledge, synchronization -->
+<!-- keywords: guarded checkout, dirty confirmation, synchronization -->
 
-[open] Does the current implementation still satisfy the activate and synchronize behavior described below? This section has not yet been reverified.
+1. Reset to the switch phase, return to Branch Review and choose **Switch workspace to this branch**.
+2. When the dirty-tree prompt appears, check its branch and change context, then confirm.
+3. Wait for Workstream. Assert branch B is labeled **Checkout** with its plans.
+4. Open Canvas and Knowledge. Assert neither shows branch A or a remembered snapshot.
 
-1. Reset to the isolated switch phase, return to Branch Review, and choose **Switch workspace to this branch**.
-2. When the guarded dirty-tree prompt appears, verify its branch and local-change context, then confirm for the fixture.
-3. Wait for Workstream to reload and assert branch B is now labeled **Checkout** with branch B plans.
-4. Open Canvas and wait for its checkout label and plan nodes; open Knowledge and wait for its index.
-5. Assert neither page silently shows branch A or a remembered snapshot selection.
-
-The checkout is an approved safe write. A direct switch after import may report that the imported path would be
-overwritten; that is the expected fail-closed Git outcome, not a reason to force checkout. Stop on the first failed
-branch assertion because later actions would target an ambiguous repository context.
+A switch right after import may report that the imported path would be overwritten. That is the expected Git refusal. Stop at the first failed branch assertion.
 
 ## Cleanup, Evidence, And Limits
 <!-- chunkId: e2e-testing-workspace-branch-review-checkout-cleanup -->
-<!-- keywords: cleanup, evidence, result, playwright, limitation -->
+<!-- keywords: cleanup, evidence, result, coverage limit -->
 
-[open] Does the current implementation still satisfy the cleanup, evidence, and limits behavior described below? This section has not yet been reverified.
+Capture Workstream before and after the switch, the review banner, the import result and the synchronized Canvas. Restore the disposable workspace through its normal cleanup and stop only processes this run started. Record passed, failed, blocked and not-run sections in the ticket-local result.
 
-Record Workstream before and after switching, the review banner, import confirmation/result, and synchronized Canvas
-state. Restore or remove the disposable workspace through its normal test cleanup; stop only processes started for the
-run. Record passed, failed, blocked, and not-run sections in the ticket-local result.
-
-PM-038 introduces this Local branch journey. It does not cover remote provider snapshots, merge or overwrite behavior,
-arbitrary repository import, or Cloud Agent checkout. See [[workspace-branch-context-reference]].
+The journey does not cover provider snapshots, merge or overwrite, arbitrary repository import or Cloud Agent checkout. See [[workspace-branch-context-reference]].

@@ -15,61 +15,47 @@ lastVerified: never
 <!-- chunkId: e2e-testing-quality-coverage-goal -->
 <!-- keywords: quality panel, disposable workspace, provider descriptor, test fixtures -->
 
-[open] Can the current build complete this journey with an isolated Kode Stream workspace and a second workspace containing linked canonical coverage?
+[open] Can the current build complete this journey with one workspace holding an E2E-enabled plan and a second holding a linked canonical journey?
 
-Use Playwright MCP in a fresh context. Supply the base URL, authentication reference when required, a disposable workspace containing an E2E-enabled plan, a second workspace with a matching canonical journey, and an enabled AI provider. Keep credentials and production data out of the runbook and evidence.
+Supply the base URL, an authentication reference if needed, both workspaces and an enabled AI provider. Follow the [[e2e-testing-index]] execution policy.
 
 ## Inspect Plan Coverage
 <!-- chunkId: e2e-testing-quality-coverage-plan -->
 <!-- keywords: ticket local, canonical ordering, not run, load diagnostic -->
 
-[open] Has local-before-canonical ordering and the empty-result state been rerun against the current build?
+Read-only steps:
 
-1. Open an E2E-enabled plan and select **Quality**; wait for runtime, repository automation, and **E2E Test** sections to finish loading.
-2. Assert the local scenario appears under **Plan runbooks** before any **Canonical wiki journeys** linked through source references.
-3. Inspect a runbook without a valid latest result and assert it reports **Not run** or an explicit diagnostic rather than pass or failure.
-4. Apply a text filter and assert only matching runbook cards remain without hiding an independent coverage diagnostic.
-
-These steps are read-only.
+1. Open the E2E-enabled plan and select **Quality**. Wait for the runtime, repository automation and **E2E Test** sections to load.
+2. Assert **Plan runbooks** appear before **Canonical wiki journeys**.
+3. Assert a runbook without a valid result shows **Not run** or a diagnostic, never pass or fail.
+4. Apply a text filter. Assert only matching cards remain and coverage diagnostics stay visible.
 
 ## Inspect Knowledge Coverage
 <!-- chunkId: e2e-testing-quality-coverage-knowledge -->
 <!-- keywords: canonical page, side panel, ordinary page, result metadata -->
 
-[open] Has Knowledge visibility and result presentation been rerun against the current build?
+Read-only steps:
 
-1. Open the linked canonical page under `wiki/e2e-testing/`; wait for the page and Quality side panel to load.
-2. Assert the canonical journey card shows its current status, freshness, provider, environment, failed step, and safe evidence references when those fields exist.
-3. Open a Knowledge page outside the E2E bucket and assert no E2E Quality side panel appears.
-4. If safe evidence is listed, open one reference and assert the guarded shared preview renders it or reports an inline read error without removing coverage.
-
-These steps are read-only.
+1. Open the linked page under `wiki/e2e-testing/`. Wait for the page and the Quality side panel.
+2. Assert the card shows status, freshness, provider, environment, failed step and safe evidence, where present.
+3. Open a page outside the E2E bucket. Assert no Quality side panel appears.
+4. Open one evidence reference. Assert the guarded preview renders it or shows an inline read error.
 
 ## Open The Agent Handoff
 <!-- chunkId: e2e-testing-quality-coverage-handoff -->
-<!-- keywords: immutable prompt, result destination, required skill, blocked provider -->
+<!-- keywords: fixed prompt, result destination, required skill, blocked provider -->
 
-[open] Has the constrained launch state been rerun for both capable and incapable providers?
+1. Choose **Run E2E test** on a runbook. Wait for the launch dialog and provider capabilities.
+2. Assert the runbook and result path are fixed and the prompt requires the `e2e-testing` skill.
+3. With a capable provider, assert the skill is ready and **Open session** is enabled. Do not launch in a read-only run.
+4. With an incapable provider, assert configuration guidance appears and launch stays disabled.
 
-1. Choose **Run E2E test** on a runbook and wait for the launch dialog and provider capabilities.
-2. Assert the runbook context and result destination are fixed and the prompt requires the `e2e-testing` skill.
-3. With a capable provider, assert the required skill is ready and **Open session** is enabled. Do not launch during a read-only validation run.
-4. With a provider that lacks the capability, assert configuration guidance appears and launch remains disabled.
-
-Opening the dialog is read-only. Launching an agent is a safe write only when the supplied fixture and cleanup authorize it.
+Launching an agent is a safe write only when the fixture and its cleanup allow it.
 
 ## Cleanup And Evidence
 <!-- chunkId: e2e-testing-quality-coverage-cleanup -->
 <!-- keywords: screenshot, console health, reversible state, result record -->
 
-[open] Has a current result been recorded with the versioned result contract?
+Close dialogs and previews, return to the original workspace and stop only sessions this run created. Capture both coverage groups, the not-run state, the Knowledge side panel, the evidence preview and both launch states. Record only safe identifiers and paths, in the versioned result format.
 
-Close dialogs and previews, return to the original workspace, and stop only sessions created for the run. Capture the two coverage groups, the not-run or diagnostic state, the Knowledge side panel, guarded evidence preview, and capable or blocked launch state. Record only safe identifiers and evidence paths.
-
-## Coverage Deltas And Limits
-<!-- chunkId: e2e-testing-quality-coverage-limits -->
-<!-- keywords: agent execution, browser runtime, historical pass, framework neutrality -->
-
-[legacy] PM-036's historical Playwright result covered ordering, launch readiness, Knowledge visibility, evidence preview, themes, and browser console health, but its Markdown result predates the current versioned evidence contract and therefore does not verify this page today.
-
-Kode Stream presents coverage and prepares the agent handoff; it does not execute browser steps itself. See [[workspace-e2e-quality]], [[workspace-e2e-quality-reference]], and [[e2e-testing-index]].
+Kode Stream shows coverage and prepares the handoff. It never runs browser steps. See [[workspace-e2e-quality]].

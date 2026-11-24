@@ -17,42 +17,38 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-ai-session-launch-compose -->
 <!-- keywords: provider, prompt, preset, skill, agent -->
 
-[live] PM-018 and PM-027 the launch dialog resolves a provider, context mode, preset or edited prompt, and optional provider-discovered skills and agents before starting a process. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.tsx:37`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:169`, `internal/ai/ai_launch_service.go:348`.
+[live] The launch dialog resolves a provider, a context mode, a preset or edited prompt, and optional skills and agents the provider exposes. Then it starts the process. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.tsx:37`, `internal/ai/ai_launch_capabilities.go:43`.
 
-Capability selection is validated against the chosen provider's catalog. The prompt carries the chosen workspace or item
-context rather than giving the process an unbounded application snapshot.
+Kode Stream checks each capability against the provider's catalog. The prompt carries only the chosen workspace or item context.
 
 ## Choose Embedded Or External
 <!-- chunkId: workspace-ai-session-launch-surface -->
-<!-- keywords: embedded terminal, external terminal, PTY, process -->
+<!-- keywords: external terminal, PTY, terminal adapter, safe record -->
 
-[live] PM-018, PM-020, and PM-027 a session can launch through a configured external terminal or through the application-managed PTY. Evidence: `internal/ai/ai_launch_service.go:309`, `internal/ai/ai_terminal_repository.go:155`, `web/src/features/ai-session/AISessionLaunchControl.tsx:35`.
+[live] A session runs in a configured external terminal or in a PTY that Kode Stream manages. Evidence: `internal/ai/ai_launch_service.go:238`, `internal/ai/ai_terminal_repository.go:105`.
 
-External launch delegates the visible process to the selected terminal adapter. Embedded launch keeps terminal I/O in
-Kode Stream and records enough safe metadata for Canvas, the workspace Workbench tab, and the global Sessions page.
+An external launch hands the process to the terminal adapter. An embedded launch keeps terminal I/O in Kode Stream and records safe metadata for Canvas and the Sessions view.
 
-## Embedded Presentation Does Not Change Session Identity
+## Embedded Presentation
 <!-- chunkId: workspace-ai-session-launch-layout -->
 <!-- keywords: floating terminal, side panel, maximize, minimize -->
 
-[live] PM-027 an embedded session can be floating, docked to the right, maximized, or minimized without restarting the underlying process. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:9`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:86`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:136`.
+[live] An embedded session can float, dock right, maximize or minimize without restarting its process. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:9`.
 
-Canvas may present a live session as a spatial node. The workspace-node Workbench tab and global Sessions page present
-the same terminal and changes in scoped lists. These are views over session state, not different launch contracts. See
-[[workspace-terminal-canvas]] and [[workspace-session-focus]].
+Canvas and the Sessions view are further views of the same session, not other launch contracts. See [[workspace-terminal-canvas]] and [[workspace-session-focus]].
 
 ## Not supported
 <!-- chunkId: workspace-ai-session-launch-not-supported -->
 <!-- keywords: snapshot launch, arbitrary capability, hidden prompt -->
 
-[live] PM-027 reviewed snapshots cannot launch operational sessions, and unknown capability identifiers are rejected rather than injected into a prompt. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.test.tsx:83`, `internal/ai/ai_launch_service.go:369`.
+[live] A reviewed snapshot cannot launch a session. An unknown capability is rejected, never injected into a prompt. Evidence: `internal/ai/ai_launch_capabilities.go:43`.
 
 ## Known conflicts
 <!-- chunkId: workspace-ai-session-launch-known-conflicts -->
-<!-- keywords: terminal dock, canvas, sessions page, old layout -->
+<!-- keywords: terminal dock, sole presentation, layouts -->
 
-[legacy] PM-020 treats the application dock as the sole embedded presentation. PM-027 added more layouts, and PM-037 plus PM-042 later added Canvas Workbench and Sessions views.
+- "The terminal dock is the only place an embedded session shows." Canvas, the Workbench and the Sessions view show it too.
 
 ## Related pages
 
-See [[workspace-ai-launch-reference]], [[workspace-terminal-canvas]], and [[workspace-session-focus]].
+See [[workspace-ai-launch-reference]] and [[workspace-agent-sessions]].

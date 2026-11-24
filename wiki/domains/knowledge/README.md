@@ -16,20 +16,20 @@ lastVerified: 2026-09-12
 <!-- chunkId: knowledge-index-pages -->
 <!-- keywords: taxonomy concept, navigation reference, wiki structure -->
 
-[live] PM-022 [[knowledge-workspace]] and [[knowledge-workspace-reference]] describe discovery, reading, relationships, and refresh actions; [[knowledge-wiki-taxonomy]] and [[knowledge-wiki-taxonomy-reference]] record the later classification model. Evidence: `internal/knowledge/detector.go:50`, `internal/knowledge/taxonomy.go:27`, `web/src/features/knowledge/taxonomy.ts:1`.
+[live] [[knowledge-workspace]] and [[knowledge-workspace-reference]] cover discovery, reading, relationships and refresh. [[knowledge-wiki-taxonomy]] and [[knowledge-wiki-taxonomy-reference]] cover how pages are grouped. Evidence: `internal/knowledge/detector.go:49`, `internal/knowledge/taxonomy.go:17`.
 
 ## Not written yet
 <!-- chunkId: knowledge-index-not-written -->
-<!-- keywords: freshness claims, chunk retrieval, metadata parsing -->
+<!-- keywords: freshness claims, chunk retrieval, ranking -->
 
-[open] How should claim status, `lastVerified`, and chunk metadata influence retrieval ranking? The current parser does not assign those fields ranking semantics.
+[open] Should claim status, `lastVerified` and chunk metadata affect ranking? The parser gives them no ranking meaning.
 
 ## Open questions
 <!-- chunkId: knowledge-index-open-questions -->
 <!-- keywords: stable taxonomy, explicit tiers, corpus growth -->
 
-[open] When should a young corpus replace inferred tiers with an explicit `knowledge-settings.yaml` override? Reclassification currently occurs on each rescan.
+[open] When should a young corpus fix its tiers in `knowledge-settings.yaml`? Each rescan infers them again.
 
 ## Related pages
 
-See [[workspace-index]], [[e2e-testing-index]], and [[platform-documentation-audit]].
+See [[workspace-index]], [[e2e-testing-index]] and [[platform-documentation-audit]].

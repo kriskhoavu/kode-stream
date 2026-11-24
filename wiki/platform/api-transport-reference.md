@@ -17,40 +17,39 @@ lastVerified: 2026-09-12
 
 ## Single Transport
 <!-- chunkId: platform-api-transport-reference-single-transport -->
-<!-- keywords: gin engine, api routes, route manifest, handlers -->
+<!-- keywords: gin engine, route manifest, handlers, spa handler -->
 
-[live] One Gin engine registers the API route manifest, and the manifest is shared by registration and policy tests. Evidence: `internal/server/api/gin_transport.go:20`, `internal/server/api/gin_routes.go:80`.
+[live] One Gin engine registers the API route manifest. Registration and policy tests share that manifest. Evidence: `internal/server/api/gin_transport.go:20`, `internal/server/api/gin_routes.go:82`.
 
-The earlier dual-router migration state is historical. Gin parameters are adapted to the existing HTTP handlers, while the separate SPA handler continues to own frontend assets.
+Gin parameters are adapted to the existing HTTP handlers. A separate SPA handler serves the frontend assets.
 
 ## Middleware And Policy
 <!-- chunkId: platform-api-transport-reference-middleware-policy -->
 <!-- keywords: recovery, request id, timeout, cors, capability -->
 
-[live] The API stack applies recovery, Local extension CORS, request-ID propagation, and a 30-second request context; every protected route owner must declare an authorization policy. Evidence: `internal/server/api/gin_transport.go:18`, `internal/server/api/gin_routes.go:31`.
+[live] The API stack applies recovery, Local extension CORS, request-ID propagation and a 30-second request context. Every protected route owner must declare an authorization policy. Evidence: `internal/server/api/gin_transport.go:26`, `internal/server/api/gin_routes.go:31`.
 
-The request-ID middleware propagates a supplied ID; it does not promise to generate one. The timeout cancels the request context and is not a guarantee that every handler has already stopped work or returned within 30 seconds.
+- The request-ID middleware passes on a supplied ID. It does not generate one.
+- The timeout cancels the request context. It does not guarantee that a handler stops within 30 seconds.
 
-## Historical Measurements
-<!-- chunkId: platform-api-transport-reference-historical-measurements -->
-<!-- keywords: benchmark scorecard, allocation count, audit fixture, historical result -->
+## Error Envelope
+<!-- chunkId: platform-api-transport-reference-error-envelope -->
+<!-- keywords: domain error code, http status, recovery hint -->
 
-[legacy] The PM-030 and PM-031 scorecards are development snapshots from Apple Silicon, useful for regression context but not current service-level objectives. Source: `PM-030 (plan retired) | Performance scorecard`, `PM-031 (plan retired) | Performance scorecard`.
-
-The last recorded PM-031 samples reported health at 1,383 ns/op and 2,066 B/op, search at 1,279 ns/op and 1,642 B/op, and item detail at 5,133 ns/op and 3,064 B/op. The audit sample remained fixture and file-I/O dominated, so it does not establish a warm-cache improvement.
+Domain errors carry stable codes that the API maps to HTTP statuses: `validation` 400, `unauthorized` 401, `forbidden` 403, `not_found` 404, `conflict` 409, `infra` 500, `unavailable` 503. The JSON body holds `error` and optional `code` and `recoveryHint`.
 
 ## Not supported
 <!-- chunkId: platform-api-transport-reference-not-supported -->
-<!-- keywords: unsupported transport, dual router, latency objective -->
+<!-- keywords: second router, implicit policy, unprotected owner -->
 
-[live] A second API router and implicit policy for a new protected owner are not supported. Evidence: `internal/server/api/gin_routes.go:31`, `internal/server/api/gin_routes.go:74`.
+[live] A second API router, and a new protected owner without an explicit policy. Evidence: `internal/server/api/gin_routes.go:71`.
 
 ## Known conflicts
 <!-- chunkId: platform-api-transport-reference-known-conflicts -->
-<!-- keywords: stale route list, warm cache, percentile measurement -->
+<!-- keywords: warm cache, percentile measurement, benchmark -->
 
-[open] What are the current warm-cache p50 and p95 values for representative routes? The retired scorecards did not measure these percentiles and must not be presented as current performance.
+[open] What are the warm-cache p50 and p95 values for typical routes? Old benchmark scorecards are not current performance.
 
 ## Related pages
 
-See [[platform-application-reference]], [[platform-cloud-runtime-reference]], [[platform-storage-reference]], and [[workspace-index]].
+See [[platform-application-reference]] and [[platform-cloud-runtime-reference]].

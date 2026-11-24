@@ -13,42 +13,42 @@ lastVerified: 2026-09-12
 
 ## Runbook Discovery
 <!-- chunkId: workspace-e2e-quality-reference-discovery -->
-<!-- keywords: plan metadata, scenario markdown, deterministic order, diagnostic -->
+<!-- keywords: plan metadata, scenario markdown, sourceRef match, diagnostic -->
 
-[live] `E2ERunbooks` accepts only working-tree plans whose metadata enables `e2e-runbook`, discovers Markdown scenario files under `automation/`, and returns a diagnostic when coverage is absent. Evidence: `internal/item/e2e_runbooks.go:23`, `internal/item/e2e_runbooks.go:39`, `internal/item/e2e_runbooks.go:43`.
+[live] `E2ERunbooks` accepts only working-tree plans whose metadata enables `e2e-runbook`. It finds Markdown scenarios under `automation/` and returns a diagnostic when there is no coverage. Evidence: `internal/item/e2e_runbooks.go:23`.
 
-[live] Canonical journeys are selected from indexed E2E pages by exact normalized `sourceRef` matches and sorted by title. Evidence: `internal/knowledge/knowledge_service.go:437`, `internal/knowledge/knowledge_service.go:451`, `internal/knowledge/knowledge_service.go:457`.
+[live] Canonical journeys are indexed E2E pages whose normalized `sourceRef` matches exactly, sorted by title. Evidence: `internal/knowledge/knowledge_e2e.go:14`.
 
 ## Result Boundary
 <!-- chunkId: workspace-e2e-quality-reference-result-boundary -->
 <!-- keywords: versioned payload, fingerprint, byte limit, path traversal -->
 
-[live] Latest results are bounded before parsing, must use an accepted status and a matching runbook fingerprint, and may expose only safe evidence paths. Invalid, stale, oversized, or legacy content does not become passing evidence. Evidence: `internal/e2eresult/result.go:20`, `internal/e2eresult/result.go:56`, `internal/e2eresult/result.go:80`, `internal/e2eresult/result.go:93`.
+[live] A result is size-checked before parsing. It needs an accepted status, a matching runbook fingerprint and safe evidence paths. Invalid, stale, oversized or legacy content never counts as a pass. Evidence: `internal/e2eresult/result.go:18`, `internal/e2eresult/result.go:52`.
 
-The read model returns a result destination even before the first run. Missing results appear as not run, while unsafe paths and unreadable content produce diagnostics. Evidence: `internal/item/e2e_runbooks.go:90`, `internal/item/e2e_runbooks.go:108`.
+The read model returns the result path before the first run. A missing result shows as not run. Unsafe paths and unreadable content produce diagnostics. Evidence: `internal/item/e2e_runbooks.go:90`.
 
 ## Quality Surface And Launch
 <!-- chunkId: workspace-e2e-quality-reference-surface-launch -->
 <!-- keywords: plan group, wiki group, guarded preview, skill descriptor -->
 
-[live] `E2EQualityPanel` groups plan runbooks before wiki journeys, filters cards, displays result metadata, opens evidence through the guarded workspace file API, and launches the selected runbook through `AISessionLaunchDialog`. Evidence: `web/src/features/e2e-testing/E2EQualityPanel.tsx:29`, `web/src/features/e2e-testing/E2EQualityPanel.tsx:36`, `web/src/features/e2e-testing/E2EQualityPanel.tsx:47`, `web/src/features/e2e-testing/E2EQualityPanel.tsx:103`.
+[live] `E2EQualityPanel` lists plan runbooks before wiki journeys, filters cards, shows result metadata, opens evidence through the guarded file API and launches through `AISessionLaunchDialog`. Evidence: `web/src/features/e2e-testing/E2EQualityPanel.tsx:16`.
 
-[live] E2E launch fixes the prompt's runbook and result path, requires a discovered `e2e-testing` capability, and sends the resolved capability identifier. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.tsx:52`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:64`, `web/src/features/ai-session/AISessionLaunchDialog.tsx:170`.
+[live] An E2E launch fixes the runbook and result path in the prompt, requires a discovered `e2e-testing` capability and sends its resolved identifier. Evidence: `web/src/features/ai-session/AISessionLaunchDialog.tsx:66`.
 
-Knowledge renders the Quality side panel only while reading a page under the E2E bucket. Evidence: `web/src/pages/KnowledgePage.tsx:33`, `web/src/features/e2e-testing/KnowledgeE2ESidePanel.tsx:7`.
+Knowledge shows the Quality side panel only on pages under the E2E bucket. Evidence: `web/src/pages/KnowledgePage.tsx:32`.
 
 ## Not supported
 <!-- chunkId: workspace-e2e-quality-reference-not-supported -->
 <!-- keywords: snapshot item, background polling, local runner, credential persistence -->
 
-[live] Snapshot-reviewed plans cannot supply operational runbooks, result refresh is explicit rather than polled, and this feature does not create a local verification job or credential store. Evidence: `internal/item/e2e_runbooks.go:29`, `web/src/features/e2e-testing/E2EQualityPanel.tsx:108`.
+[live] Reviewed snapshots supply no runbooks. Result refresh is explicit, not polled. The feature creates no verification job and no credential store. Evidence: `internal/item/e2e_runbooks.go:29`.
 
 ## Known conflicts
 <!-- chunkId: workspace-e2e-quality-reference-known-conflicts -->
-<!-- keywords: historical report, markdown fields, unknown evidence, current schema -->
+<!-- keywords: colon fields, markdown result, current schema -->
 
-[legacy] PM-036's retired result records colon-delimited Markdown fields, while the current parser requires a versioned structured result and matching runbook fingerprint. The historical pass is useful migration context but is not current runtime evidence. Evidence: `internal/e2eresult/result.go:56`, `internal/e2eresult/result_test.go:19`.
+- "Colon-delimited Markdown fields record a result." The parser requires a versioned structured result with a matching fingerprint. Evidence: `internal/e2eresult/result_test.go:19`.
 
 ## Related pages
 
-See [[workspace-e2e-quality]], [[workspace-automation-verification-reference]], and [[e2e-testing-quality-coverage]].
+See [[workspace-e2e-quality]] and [[e2e-testing-quality-coverage]].

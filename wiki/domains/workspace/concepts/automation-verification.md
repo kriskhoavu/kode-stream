@@ -15,28 +15,28 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-automation-verification-purpose -->
 <!-- keywords: browser specification, runtime contract, selected evidence -->
 
-[live] PM-026 and PM-029 automation verification lets a user choose discovered browser specifications and execute them through the workspace runtime without treating plan prose as executable input. Evidence: `internal/item/item_service.go:330`, `internal/verification/verification_service.go:500`.
+[live] A person picks discovered browser specifications and runs them through the workspace runtime. Plan prose is never executable input. Evidence: `internal/item/item_verification.go:53`, `internal/verification/automation.go:28`.
 
-The result keeps boot, health, test, teardown, logs, and retained artifacts visible as one bounded verification job. Exact fields and limits live in [[workspace-automation-verification-reference]].
+One bounded verification job shows boot, health, test, teardown, logs and retained artifacts. See [[workspace-automation-verification-reference]].
 
 ## Safety Model
 <!-- chunkId: workspace-automation-verification-safety-model -->
-<!-- keywords: relative path, shell quoting, artifact boundary, isolated run -->
+<!-- keywords: relative path, shell quoting, artifact boundary -->
 
-[live] Selected paths must remain relative to the configured automation repository, template values are validated and quoted, and artifact traversal outside configured roots is rejected. Evidence: `internal/verification/verification_service.go:541`, `internal/verification/verification_service.go:695`.
+[live] Selected paths stay relative to the automation repository. Template values are validated and quoted. Artifact paths outside the configured roots are rejected. Evidence: `internal/verification/automation.go:69`.
 
 ## Not supported
 <!-- chunkId: workspace-automation-verification-not-supported -->
 <!-- keywords: arbitrary markdown, durable job, production credential -->
 
-[live] Arbitrary Markdown discovery, durable job history, and embedding credentials in plans or artifacts are not supported. Evidence: `internal/item/item_service.go:417`, `internal/verification/verification_service.go:152`.
+[live] Discovery from arbitrary Markdown, durable job history, and credentials in plans or artifacts. Evidence: `internal/item/item_verification.go:146`, `internal/verification/retention.go:26`.
 
 ## Known conflicts
 <!-- chunkId: workspace-automation-verification-known-conflicts -->
 <!-- keywords: runtime evidence, plan intent, browser execution -->
 
-[open] Which browser journeys have been rerun against the current product build? Plan completion alone is not runtime evidence.
+[open] Which browser journeys have been rerun against the current build? A finished plan is not runtime evidence.
 
 ## Related pages
 
-See [[workspace-automation-verification-reference]], [[e2e-testing-index]], and [[workspace-index]].
+See [[workspace-automation-verification-reference]] and [[e2e-testing-index]].

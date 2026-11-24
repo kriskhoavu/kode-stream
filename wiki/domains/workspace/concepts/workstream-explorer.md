@@ -21,53 +21,50 @@ lastVerified: 2026-09-12
 
 ## One Planning Surface
 <!-- chunkId: workspace-workstream-explorer-one-surface -->
-<!-- keywords: workstream, board, status column, item workspace -->
+<!-- keywords: board, status column, item workspace, drag -->
 
-[live] PM-011, PM-012, and PM-028 Workstream is the primary collection view, and a structured item opens into Item Workspace instead of a separate top-level Explorer product. Evidence: `web/src/app/router.ts:1`, `web/src/pages/WorkstreamPage.tsx:621`, `web/src/pages/ItemWorkspacePage.tsx:1159`.
+[live] Workstream is the main collection view. A structured item opens into Item Workspace. Evidence: `web/src/app/router.ts:9`, `web/src/pages/ItemWorkspacePage.tsx:594`.
 
-Cards are grouped by workflow status and eligible cards can be dragged between columns. The same move remains available
-through explicit status controls, so drag and drop is an interaction shortcut rather than a separate state model.
+Cards group by workflow status. Dragging a card between columns does the same as the explicit status control.
 
 ## Explorer Is Context, Not A Destination
 <!-- chunkId: workspace-workstream-explorer-context -->
-<!-- keywords: embedded explorer, item workspace, sources, all files -->
+<!-- keywords: embedded explorer, sources mode, all files, lazy tree -->
 
-[live] PM-007, PM-008, PM-009, and PM-028 repository exploration is implemented by `WorkstreamExplorer` embedded in Item Workspace, with configured-source and all-files modes. Evidence: `web/src/pages/ItemWorkspacePage.tsx:1159`, `web/src/pages/WorkstreamExplorer.tsx:44`, `web/src/features/workstream-explorer/useWorkstreamExplorer.ts:136`.
+[live] The repository explorer is embedded in Item Workspace, with a configured-sources mode and an all-files mode. Evidence: `web/src/pages/WorkstreamExplorer.tsx:29`.
 
-The tree supplies repository context beside item metadata and content. It supports lazy directory loading, Git state,
-path search, scoped content search, preview, and guarded editing without changing the application-wide route context.
+The tree loads directories lazily and offers Git state, path search, scoped content search, preview and guarded editing. It never changes the app's route context.
 
 ## Search Has Three Scopes
 <!-- chunkId: workspace-workstream-explorer-search-scopes -->
-<!-- keywords: global search, quick switcher, path search, content search -->
+<!-- keywords: quick switcher, path search, content search, ranking -->
 
-[live] PM-005 and PM-009 search separates global item navigation, repository path search, and textual content search. Evidence: `internal/search/search_service.go:34`, `internal/search/content_search_service.go:47`, `internal/search/content_search_service.go:84`.
+[live] Search separates item navigation, path search and content search. Evidence: `internal/search/search_service.go:34`, `internal/search/content_search_service.go:47`.
 
-Global search powers the quick switcher and ranks structured items. Explorer path search finds repository entries.
-Content search can be restricted to one item, configured sources, one workspace, or all registered workspaces according
-to the calling surface.
+- Global search drives the quick switcher and ranks structured items.
+- Path search finds repository entries.
+- Content search covers one item, configured sources, one workspace or all workspaces, as the calling surface decides.
 
 ## Shared Preview
 <!-- chunkId: workspace-workstream-explorer-preview -->
-<!-- keywords: markdown, json, image, html sandbox, source fallback -->
+<!-- keywords: markdown, image, html sandbox, source fallback -->
 
-[live] PM-006 one content viewer is reused by Workstream, Item Workspace, Explorer, Knowledge, Branch Review, and verification evidence. Evidence: `web/src/features/content-viewer/ContentViewer.tsx:15`, `web/src/pages/WorkstreamPage.tsx:1963`, `web/src/features/knowledge/KnowledgeReader.tsx:24`.
+[live] One content viewer serves Workstream, Item Workspace, Explorer, Knowledge, Branch Review and verification evidence. Evidence: `web/src/features/content-viewer/ContentViewer.tsx:15`.
 
-It selects a safe presentation for Markdown, structured text, images, HTML, and plain source. Large or unsupported content
-falls back to source-oriented presentation rather than executing repository content in the application context.
+It picks a safe view for Markdown, structured text, images, HTML and source. Large or unsupported content falls back to source. Repository content never runs in the app.
 
 ## Not supported
 <!-- chunkId: workspace-workstream-explorer-not-supported -->
 <!-- keywords: standalone explorer, snapshot mutation, global branch selector -->
 
-[live] PM-010 and PM-028 do not provide a standalone `/explorer` route or a global branch snapshot that changes operational reads. Evidence: `web/src/app/router.ts:1`, `internal/search/search_service_test.go:63`.
+[live] A standalone `/explorer` route, and a global branch snapshot that changes operational reads. Evidence: `web/src/app/router.ts:9`, `internal/search/search_service_test.go:61`.
 
 ## Known conflicts
 <!-- chunkId: workspace-workstream-explorer-known-conflicts -->
-<!-- keywords: kanban, explorer route, branches route, old navigation -->
+<!-- keywords: kanban, explorer route, branches route -->
 
-[legacy] PM-005 through PM-012 use the former Kanban, Explorer, Items, and Branches navigation model. PM-028 removed the standalone Explorer surface, and PM-038 later replaced cross-branch snapshots with checkout-first operation and Branch Review.
+- "Kode Stream has Kanban, Explorer, Items and Branches pages." The pages are Workstream, Knowledge, Agent Space, Workspaces and Settings. Explorer lives inside Item Workspace. Other branches open in Branch Review.
 
 ## Related pages
 
-See [[workspace-workstream-explorer-reference]], [[workspace-lifecycle]], and [[workspace-branch-context]].
+See [[workspace-workstream-explorer-reference]] and [[workspace-branch-context]].

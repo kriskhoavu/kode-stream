@@ -12,62 +12,43 @@ lastVerified: never
 
 ## One Operational Context
 <!-- chunkId: workspace-branch-context-operational-context -->
-<!-- keywords: checkout, operational context, working tree, pages -->
+<!-- keywords: checkout, working tree, pages, refresh -->
 
-[open] Does the current implementation still satisfy the one operational context behavior described below? This section has not yet been reverified.
+[open] Does the code still match this page? It is plan-derived and not yet checked.
 
-The current Git checkout is the only operational context for Workstream, Item Workspace, Canvas, Knowledge, editing,
-terminal launch, and verification. These surfaces resolve the checkout from Git instead of trusting a remembered branch
-selection or a route parameter. When Git changes outside Kode Stream, focus and visibility refreshes invalidate the
-operational projections. Canvas-specific ownership remains documented in [[workspace-terminal-canvas]].
+The current Git checkout is the only operational context. Workstream, Item Workspace, Canvas, Knowledge, editing, terminal launch and verification all read the checkout from Git. They never trust a remembered branch or a route parameter. A focus or visibility refresh picks up Git changes made outside Kode Stream.
 
 ## Branch Review Boundary
 <!-- chunkId: workspace-branch-context-review-boundary -->
-<!-- keywords: branch review, pinned commit, read-only, snapshot -->
+<!-- keywords: pinned commit, read-only, snapshot, committed content -->
 
-[open] Does the current implementation still satisfy the branch review boundary behavior described below? This section has not yet been reverified.
+Branch Review is a separate route for a local branch that is not the checkout. The server resolves the branch to a commit and returns read-only plans and files from that commit. Review cannot edit, move statuses, launch terminals, run verification or change Git. See [[workspace-branch-review-workflows]].
 
-Branch Review is a separate route for a non-checkout local branch. The server resolves the branch to a commit, scans
-committed Git-tree content, and returns read-only plans and files. The review branch and commit are visible beside the
-unchanged checkout. Review cannot edit files or metadata, move statuses, launch terminals, run verification, or mutate
-Git. See [[workspace-branch-review-workflows]] for the user journey.
-
-## Explicit Import Instead Of First-Edit Copy
+## Explicit Import
 <!-- chunkId: workspace-branch-context-explicit-import -->
-<!-- keywords: import, structured plan, conflict, source commit -->
+<!-- keywords: structured plan, conflict, source commit, copy -->
 
-[open] Does the current implementation still satisfy the explicit import instead of first-edit copy behavior described below? This section has not yet been reverified.
-
-Cross-branch copying remains useful but is an explicit structured-plan import. Before copying, Kode Stream revalidates
-the reviewed source commit and refuses an existing target path, unsafe path, documentation-only item, or moved branch.
-The checkout stays unchanged and unrelated working-tree modifications are preserved. Exact contracts and failure codes
-are in [[workspace-branch-context-reference]].
+To bring a plan from a reviewed branch into the checkout, a person imports it. Kode Stream revalidates the source commit and refuses an existing target, an unsafe path, a documentation-only item or a moved branch. The checkout and its other working-tree changes stay as they are. See [[workspace-branch-context-reference]].
 
 ## Why Snapshot State Is Not Global
 <!-- chunkId: workspace-branch-context-no-global-snapshot -->
-<!-- keywords: snapshot state, conflict, authoritative branch, design decision -->
+<!-- keywords: design decision, authoritative branch, page agreement -->
 
-[open] Does the current implementation still satisfy the why snapshot state is not global behavior described below? This section has not yet been reverified.
-
-A global selected snapshot made pages disagree about which branch was active while mutable content still came from the
-working tree. Separating review from operation gives each route one clear promise: operational pages may act on the
-checkout, and review may only read a pinned commit. Branch-scoped indexes and Canvas layouts are retained as useful
-derived state, but they no longer drive application-wide navigation.
-
-[legacy] PM-013's first-edit materialization workflow was removed. PM-038 replaced it with explicit reviewed-plan import and kept non-checkout content read-only.
+One global snapshot selection let pages disagree about the active branch. Each route now makes one promise: operational pages act on the checkout, and review only reads a pinned commit. Branch-scoped indexes and Canvas layouts stay as derived state but do not drive navigation.
 
 ## Not supported
 <!-- chunkId: workspace-branch-context-not-supported -->
 <!-- keywords: capability boundary, exclusions, unsupported action -->
 
-[open] Which additional unsupported operations should this page name after implementation verification?
+- Editing a reviewed branch in place.
+- Switching branches automatically from review or Canvas.
 
 ## Known conflicts
 <!-- chunkId: workspace-branch-context-known-conflicts -->
-<!-- keywords: documentation drift, verification gap, competing description -->
+<!-- keywords: documentation drift, first edit copy, materialization -->
 
-[open] Do the retained plan descriptions disagree with current behavior? Verify the sections above before relying on them.
+- "The first edit on a reviewed branch copies the plan into the checkout." It does not. Import is an explicit action.
 
 ## Related pages
 
-See [[workspace-branch-context-reference]], [[workspace-index]], and [[e2e-testing-index]].
+See [[workspace-branch-context-reference]] and [[workspace-index]].

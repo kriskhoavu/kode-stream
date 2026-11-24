@@ -13,50 +13,48 @@ lastVerified: 2026-09-12
 
 ## Index Contract
 <!-- chunkId: knowledge-workspace-reference-index -->
-<!-- keywords: detector, page limit, file limit, partial page -->
+<!-- keywords: detector, page limit, partial page, atomic replace -->
 
-[live] PM-022 detection bounds files, file bytes, total bytes, and pages; the default page ceiling is 5,000 and oversized files can remain visible as partial pages with warnings. Evidence: `internal/knowledge/detector.go:23`, `internal/knowledge/detector.go:209`, `internal/knowledge/detector_test.go:57`.
+[live] Detection bounds files, file bytes, total bytes and pages. The default page limit is 5,000. An oversized file can stay visible as a partial page with a warning. Evidence: `internal/knowledge/detector.go:22`.
 
-Index publication uses temporary-file and directory synchronization before replacement. A failed rebuild leaves the
-last complete index available rather than publishing a partial replacement.
+The index is written to a temporary file and synced before replacement. A failed rebuild keeps the last complete index.
 
 ## Page And Graph Contract
 <!-- chunkId: knowledge-workspace-reference-page-graph -->
-<!-- keywords: page detail, backlinks, graph nodes, graph edges -->
+<!-- keywords: backlinks, graph nodes, graph edges, routes -->
 
-[live] PM-022 relationship resolution produces deterministic backlinks and graph edges from valid wikilinks, with graph responses bounded to 2,000 nodes and 10,000 edges. Evidence: `internal/knowledge/relationships.go:10`, `internal/knowledge/knowledge_service.go:33`.
+[live] Valid wikilinks produce deterministic backlinks and graph edges. A graph response holds at most 2,000 nodes and 10,000 edges. Evidence: `internal/knowledge/knowledge_service.go:28`.
 
 | API operation | Purpose                                                    |
 |---------------|------------------------------------------------------------|
 | List wikis    | Discover Knowledge roots for a workspace                   |
-| List pages    | Retrieve page summaries and warnings for one root          |
-| Read page     | Retrieve guarded Markdown and metadata by slug             |
-| Read graph    | Retrieve bounded nodes and resolved relationships          |
-| Rescan        | Re-read one wiki from the current checkout                 |
-| Sync          | Pull through guarded Git behavior, then rebuild            |
+| List pages    | Page summaries and warnings for one root                   |
+| Read page     | Guarded Markdown and metadata by slug                      |
+| Read graph    | Bounded nodes and resolved links                           |
+| Rescan        | Re-read one wiki from the checkout                         |
+| Sync          | Pull through guarded Git, then rebuild                     |
 | Enrich        | Run configured enrichment after confirmation, then rebuild |
 
-The current Gin manifest exposes page, graph, rescan, sync, and enrich routes. Evidence:
-`internal/server/api/gin_routes.go:172`, `internal/server/api/gin_routes.go:175`, `internal/server/api/gin_routes.go:178`.
+The routes are in `internal/server/api/gin_routes.go`.
 
 ## Refresh Safety
 <!-- chunkId: knowledge-workspace-reference-refresh -->
 <!-- keywords: workspace lock, audit, timeout, output limit -->
 
-[live] PM-022 sync and enrich hold the workspace mutation boundary, record audit outcomes, and rescan only after their mutation succeeds; enrichment has a five-minute default timeout and bounded output. Evidence: `internal/knowledge/knowledge_service.go:36`, `internal/knowledge/knowledge_service.go:294`, `internal/knowledge/knowledge_service.go:306`.
+[live] Sync and enrich hold the workspace lock, are audited and rescan only after they succeed. Enrichment times out after five minutes by default, with bounded output. Evidence: `internal/knowledge/knowledge_service.go:31`.
 
 ## Not supported
 <!-- chunkId: knowledge-workspace-reference-not-supported -->
 <!-- keywords: unsafe root, unconfigured enrich, partial replacement -->
 
-[live] PM-022 unsafe wiki roots, unconfigured enrichment, and failed detection cannot replace the indexed corpus. Evidence: `internal/knowledge/knowledge_service_test.go:108`, `internal/knowledge/knowledge_service_test.go:120`, `internal/knowledge/knowledge_service_test.go:152`.
+[live] An unsafe wiki root, unconfigured enrichment, or failed detection cannot replace the index. Evidence: `internal/knowledge/knowledge_service_test.go:120`.
 
 ## Known conflicts
 <!-- chunkId: knowledge-workspace-reference-known-conflicts -->
-<!-- keywords: metadata schema, taxonomy, legacy field -->
+<!-- keywords: flat domain navigation, legacy field, grouping -->
 
-[legacy] PM-040 supersedes PM-022's flat domain navigation and optional legacy metadata fields. Core discovery, page, link, graph, and action contracts remain current.
+- "Knowledge groups pages by a flat domain." It groups by bucket and area. See [[knowledge-wiki-taxonomy-reference]].
 
 ## Related pages
 
-See [[knowledge-workspace]], [[knowledge-wiki-taxonomy-reference]], and [[platform-storage-reference]].
+See [[knowledge-workspace]] and [[platform-storage-reference]].

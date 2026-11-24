@@ -1,7 +1,7 @@
 # Cloud Mode Architecture
 
-Cloud mode is a hosted control plane, not a hosted checkout or terminal. It authenticates users, stores shared
-app-owned state in Postgres, and provides two workspace access modes with deliberately different trust boundaries.
+Cloud mode is a hosted control plane, not a hosted checkout or terminal. It authenticates users through OAuth2Proxy,
+stores shared app state in Postgres and offers two workspace access modes.
 
 ```mermaid
 flowchart TB
@@ -10,37 +10,19 @@ flowchart TB
   api --> postgres[(Postgres\napp-owned control-plane state)]
   api --> agentWorkspace[Agent-Backed workspace]
   agentWorkspace --> agent[Outbound Cloud Agent\non user machine]
-  agent --> localRepo[Local repository, Git credentials,\nterminal, AI, runtime, verification]
+  agent --> localRepo[Local repository and tools]
   api --> snapshot[Agentless Remote Snapshot workspace]
   snapshot --> provider[Read-only Git provider API]
   provider --> commit[Resolved immutable commit]
   agent -. never connects .-> postgres
 ```
 
-Source: [cloud-mode.mmd](cloud-mode.mmd).
+Sources: [cloud-mode.mmd](cloud-mode.mmd), [agent-backed.mmd](agent-backed.mmd),
+[agentless-remote-snapshot.mmd](agentless-remote-snapshot.mmd), [postgres-storage.mmd](postgres-storage.mmd).
 
-## Workspace access modes
+Cloud always runs `KODE_STREAM_STORAGE_OPTION=database` with `KODE_STREAM_STORAGE_DRIVER=postgres` and a
+secret-managed `KODE_STREAM_DATABASE_URL`.
 
-| Mode                      | Repository boundary                                                                                 | Capabilities                                                                                       | Use case                                                                     |
-|---------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|
-| Agent-Backed              | Repository, credentials, and tools stay on the owner’s machine behind an outbound Agent connection. | Reads and role/Agent-gated file, Git, terminal, AI, runtime, and verification actions.             | Hosted collaboration where privileged work must remain local.                |
-| Agentless Remote Snapshot | Cloud reads an authorized provider repository at a resolved immutable commit.                       | Current backend: commit-pinned metadata, tree, and file reads; workspace-detail terminal guidance. | Backend foundation for safe shared review without a local Agent or checkout. |
-
-Cloud always uses `KODE_STREAM_STORAGE_OPTION=database`, `KODE_STREAM_STORAGE_DRIVER=postgres`, and a secret-managed
-`KODE_STREAM_DATABASE_URL`. Cloud Agents never connect directly to Postgres.
-
-The full Remote Snapshot user workflow is not yet complete: provider connection/registration, snapshot-backed
-board/search, and durable provider operations remain planned work. See [Remote Snapshot operations](../../domain/cloud/remote-snapshot-operations.md).
-
-Focused Mermaid diagrams: [Agent-Backed workspace](agent-backed.mmd),
-[Agentless Remote Snapshot](agentless-remote-snapshot.mmd), and [Cloud Postgres storage](postgres-storage.mmd).
-
-## Use cases
-
-- Collaborate in a hosted browser UI while retaining repository files and local tooling on a user's machine.
-- Review a consistent, commit-pinned provider snapshot without creating a checkout.
-- Operate a shared control plane with concurrent writes, migrations, health checks, and managed backups.
-
-For authentication, environment configuration, deployment, and recovery, use [Cloud deployment](../../domain/cloud/cloud-deployment.md).
-For the capability matrix and Remote Snapshot operations, use [Cloud deployment modes](../../domain/cloud/cloud-modes.md) and
-[Remote Snapshot operations](../../domain/cloud/remote-snapshot-operations.md).
+What each access mode can do today is in the
+[Cloud runtime reference](../../../wiki/platform/cloud-runtime-reference.md). Environment, authentication,
+troubleshooting and upgrades are in [Cloud deployment](../../../deploy/cloud-deployment.md).

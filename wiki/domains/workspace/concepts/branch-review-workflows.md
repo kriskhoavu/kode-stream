@@ -12,61 +12,53 @@ lastVerified: never
 
 ## Review Another Branch
 <!-- chunkId: workspace-branch-review-workflows-review -->
-<!-- keywords: review branch, committed plans, pinned commit, checkout -->
+<!-- keywords: committed plans, pinned commit, read-only snapshot -->
 
-[open] Does the current implementation still satisfy the review another branch behavior described below? This section has not yet been reverified.
+[open] Does the code still match this page? It is plan-derived and not yet checked.
 
-From Workstream, choose **Review branch**, then select a branch other than the checkout. Wait for **Branch Review** and
-**Read-only committed snapshot**. The header shows both the checkout and the reviewed branch with its short commit.
-Choose a plan and committed file to inspect it. Editing, status movement, terminal, AI, and verification controls are
-intentionally absent. Returning to Canvas or Knowledge still shows checkout content; see
-[[workspace-branch-context]].
+1. In Workstream, choose **Review branch**.
+2. Select a branch other than the checkout.
+3. Wait for **Branch Review** and **Read-only committed snapshot**.
+4. Choose a plan and a committed file.
+
+The header shows the checkout and the reviewed branch with its short commit. Editing, status, terminal, AI and verification controls are absent.
 
 ## Import One Structured Plan
 <!-- chunkId: workspace-branch-review-workflows-import -->
-<!-- keywords: import plan, confirmation, destination, conflict -->
+<!-- keywords: confirmation, destination, conflict, plan copy -->
 
-[open] Does the current implementation still satisfy the import one structured plan behavior described below? This section has not yet been reverified.
+1. Select a structured plan and choose **Import selected plan**.
+2. Confirm the source branch, pinned commit, destination checkout and plan.
 
-Select a structured plan and choose **Import selected plan**. Confirm the source branch, pinned commit, destination
-checkout, and plan identity. A successful import copies the complete plan directory into the checkout working tree,
-refreshes its index, and opens the operational item. If the branch moved or the target exists, review remains open and
-shows the conflict; Kode Stream never merges or overwrites automatically.
+The import copies the whole plan directory into the checkout, refreshes the index and opens the item. If the branch moved or the target exists, review stays open and shows the conflict. Kode Stream never merges or overwrites.
 
 ## Make The Reviewed Branch Operational
 <!-- chunkId: workspace-branch-review-workflows-activate -->
-<!-- keywords: switch workspace, dirty tree, confirmation, refresh -->
+<!-- keywords: switch workspace, dirty tree, stash, move changes -->
 
-[open] Does the current implementation still satisfy the make the reviewed branch operational behavior described below? This section has not yet been reverified.
-
-Choose the **Checkout** branch picker only when the reviewed branch should become the operational checkout. For local
-tracked or untracked content, choose **Move changes and switch** when it is available, or enter a stash message and
-choose **Stash and switch**. After Git switches successfully,
-Workstream opens on the new checkout and Canvas, Knowledge, and item routes refresh from that same context. Kode Stream
-does not reset, clean, or silently discard files.
+Use the **Checkout** branch picker. If the working tree has changes, choose **Move changes and switch**, or enter a stash message and choose **Stash and switch**. Workstream, Canvas, Knowledge and item routes then refresh from the new checkout. Kode Stream never resets, cleans or discards files.
 
 ## Handle Empty Or Stale Review State
 <!-- chunkId: workspace-branch-review-workflows-recovery -->
-<!-- keywords: no plans, stale commit, current checkout, recovery -->
+<!-- keywords: no plans, stale commit, recovery, reload -->
 
-[open] Does the current implementation still satisfy the handle empty or stale review state behavior described below? This section has not yet been reverified.
-
-**No plans on this branch** means the pinned commit has no indexed items under configured sources. A branch that is now
-the checkout should be used through Workstream instead of review. Refresh the snapshot before import when needed; if the
-source ref moved after loading, reload review and inspect the new commit before trying again.
+- **No plans on this branch**: the commit has no indexed items under configured sources.
+- If the branch is now the checkout, use Workstream instead.
+- If the source branch moved, reload review and inspect the new commit before you import.
 
 ## Not supported
 <!-- chunkId: workspace-branch-review-workflows-not-supported -->
-<!-- keywords: capability boundary, exclusions, unsupported action -->
+<!-- keywords: capability boundary, merge, overwrite -->
 
-[open] Which additional unsupported operations should this page name after implementation verification?
+- Merging or overwriting an existing plan on import.
+- Editing or running anything in review.
 
 ## Known conflicts
 <!-- chunkId: workspace-branch-review-workflows-known-conflicts -->
-<!-- keywords: documentation drift, verification gap, competing description -->
+<!-- keywords: documentation drift, verification gap, plan-derived -->
 
-[open] Do the retained plan descriptions disagree with current behavior? Verify the sections above before relying on them.
+None known. The page is not yet checked against the code.
 
 ## Related pages
 
-See [[workspace-branch-context-reference]], [[workspace-index]], and [[e2e-testing-index]].
+See [[workspace-branch-context]] and [[workspace-branch-context-reference]].

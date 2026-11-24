@@ -1,48 +1,39 @@
 # Homebrew Tap Bootstrap
 
-First-time tap setup only. Day-to-day releases live in `deploy/homebrew/release.md`.
+First-time tap setup. Releases follow [release.md](release.md).
 
-## 1) Create the tap repository
+1. Create the tap. The name must be `homebrew-<name>`, so `brew tap kriskhoavu/tap` resolves to
+   `kriskhoavu/homebrew-tap`:
 
-The repo must be named `homebrew-<name>`; `brew tap kriskhoavu/tap` resolves to
-`kriskhoavu/homebrew-tap`.
+   ```bash
+   gh repo create kriskhoavu/homebrew-tap --public --description "Homebrew tap for kode-stream"
+   ```
 
-```bash
-gh repo create kriskhoavu/homebrew-tap --public --description "Homebrew tap for kode-stream"
-```
+2. Seed the formula:
 
-## 2) Seed the formula
+   ```bash
+   git clone https://github.com/kriskhoavu/homebrew-tap.git
+   mkdir -p homebrew-tap/Formula
+   cp cmd/scripts/distribution/kode-stream.rb homebrew-tap/Formula/kode-stream.rb
+   ```
 
-```bash
-git clone https://github.com/kriskhoavu/homebrew-tap.git
-mkdir -p homebrew-tap/Formula
-cp cmd/scripts/distribution/kode-stream.rb homebrew-tap/Formula/kode-stream.rb
-```
+   The template has placeholder checksums and `v0.0.0` URLs. `kode-stream.rb` must declare `class KodeStream`.
 
-The template ships placeholder checksums and `v0.0.0` URLs. It is not installable until
-`update_formula.py` points it at a real release, which the release procedure does for you.
+3. Publish a release ([release.md](release.md) step 1), then point the tap at it:
 
-The formula class name is derived from the filename: `kode-stream.rb` must declare
-`class KodeStream`.
+   ```bash
+   cmd/scripts/distribution/update_homebrew_formula_from_release.sh <version> ../homebrew-tap
+   ```
 
-## 3) First publish
+4. Verify before announcing:
 
-Publish a release first (`deploy/homebrew/release.md` step 1), then point the tap at it:
+   ```bash
+   brew install kriskhoavu/tap/kode-stream
+   brew test kriskhoavu/tap/kode-stream
+   brew audit --strict --formula kriskhoavu/tap/kode-stream
+   ```
 
-```bash
-cmd/scripts/distribution/update_homebrew_formula_from_release.sh <version> ../homebrew-tap
-```
-
-## 4) Verify before announcing
-
-```bash
-brew install kriskhoavu/tap/kode-stream
-brew test kriskhoavu/tap/kode-stream
-brew audit --strict --formula kriskhoavu/tap/kode-stream
-```
-
-To test formula edits before pushing, tap a local checkout — Homebrew refuses to install a
-formula by path, and `brew tap` clones at the current commit, so commit first:
+To test formula edits before pushing, commit them, then tap the local checkout:
 
 ```bash
 brew tap kriskhoavu/localtest /path/to/homebrew-tap
@@ -50,7 +41,5 @@ brew install kriskhoavu/localtest/kode-stream
 brew untap kriskhoavu/localtest
 ```
 
-## Retiring a formula
-
-The tap carries only `kode-stream.rb`. Deleting a formula breaks `brew upgrade` for anyone who
-installed it; `deprecate!` with a migration note is gentler if the old name has users.
+The tap carries only `kode-stream.rb`. Deleting a formula breaks `brew upgrade` for its users. Prefer `deprecate!`
+with a migration note.

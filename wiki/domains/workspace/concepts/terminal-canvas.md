@@ -12,63 +12,50 @@ lastVerified: never
 
 ## Purpose And Boundary
 <!-- chunkId: workspace-terminal-canvas-purpose -->
-<!-- keywords: canvas, projection, workspace, plan, session -->
+<!-- keywords: projection, layout, source of truth, ownership -->
 
-[open] Does the current implementation still satisfy the purpose and boundary behavior described below? This section has not yet been reverified.
+[open] Does the code still match this page? It is plan-derived and not yet checked.
 
-Terminal Canvas supports the daily workspace → plan → session loop without becoming another source of truth. It stores
-layout identity, viewport, positions, collapsed presentation, and checkout-aware references. Repository plans, Git state,
-verification, safe session records, and live terminal processes remain authoritative in their own domains. See
-[[workspace-terminal-canvas-reference]] for exact ownership and [[workspace-branch-context]] for the operational
-checkout boundary.
+Canvas supports the daily workspace → plan → session loop. It stores only layout: viewport, positions, collapsed state and references, per workspace and checkout branch. Plans, Git state, verification, session records and live terminals stay with their own owners. See [[workspace-terminal-canvas-reference]] and [[workspace-branch-context]].
 
 ## Independent Runtime Concerns
 <!-- chunkId: workspace-terminal-canvas-runtime-concerns -->
-<!-- keywords: topology, content provider, execution provider, datastore, authorization -->
+<!-- keywords: content provider, execution provider, datastore, authorization -->
 
-[open] Does the current implementation still satisfy the independent runtime concerns behavior described below? This section has not yet been reverified.
+Deployment topology, content provider, execution provider, app-state store and authorization are separate axes. Each action carries a resolved capability state: available, unavailable, unsupported, forbidden or conflicted. The owning service revalidates it. The UI never branches on Local, Cloud, Agentless, `datadir` or database names.
 
-Deployment topology, workspace-content provider, execution provider, app-state datastore, and authorization are separate
-axes. Actions use resolved capability states—available, unavailable, unsupported, forbidden, or conflicted—and are
-revalidated by the owning service. UI behavior does not branch on Local, Cloud, Agentless, data-dir, or database names.
-
-PM-037 delivers Local checkout content, Local process execution, and either data-dir or SQLite app state. Cloud Agent
-execution and Agentless Remote Snapshot Canvas UX remain separate future provider capabilities.
+Canvas works with a Local checkout and Local process execution.
 
 ## Movement And Relationships
 <!-- chunkId: workspace-terminal-canvas-movement -->
-<!-- keywords: movement, placement, relationships, groups, edges -->
+<!-- keywords: placement, drag, derived edges, anchor -->
 
-[open] Does the current implementation still satisfy the movement and relationships behavior described below? This section has not yet been reverified.
+Workspace, plan and session nodes move independently. A workspace is a semantic anchor, not a spatial parent. Edges between repository and application entities are derived and read-only.
 
-Workspace, plan, and durable session nodes move independently. A workspace is a semantic anchor, not a spatial parent;
-moving it does not move related nodes. Repository and application relationships are derived, read-only connections.
-Canvas-only links, groups, notes, artifacts, multiple canvases, and collaboration are deferred. Future group movement
-must use explicit membership rather than overlap.
+A named section groups two or more nodes. The browser keeps sections per layout, not the server. **Reset layout** arranges nodes into default service sections.
 
 ## Safety Outcomes
 <!-- chunkId: workspace-terminal-canvas-safety -->
-<!-- keywords: branch, terminal, session, verification, stale -->
+<!-- keywords: branch recheck, stale result, live process, record -->
 
-[open] Does the current implementation still satisfy the safety outcomes behavior described below? This section has not yet been reverified.
-
-Terminal launch rechecks the plan and current checkout immediately before process start. Durable session metadata stays
-separate from live PTY state, and verification outcome stays separate from fingerprint freshness. These boundaries are
-exercised in [[workspace-terminal-canvas-workflows]], [[e2e-testing-workspace-terminal-canvas]], and
-[[e2e-testing-workspace-branch-review-checkout]]. Canvas never treats a reviewed snapshot branch as executable context.
+- Terminal launch rechecks the plan and the checkout just before the process starts.
+- A durable session record is separate from the live process. A reload can reattach while the process lives. After an app restart, a record without a process shows as interrupted.
+- Removing a session node deletes only its placement. **Cancel process** is a separate confirmed action.
+- Verification outcome is separate from freshness. A pass turns **Passed (historical)** when the repository changes.
+- Canvas never treats a reviewed branch as executable context.
 
 ## Not supported
 <!-- chunkId: workspace-terminal-canvas-not-supported -->
-<!-- keywords: capability boundary, exclusions, unsupported action -->
+<!-- keywords: groups, notes, multiple canvases, cloud execution -->
 
-[open] Which additional unsupported operations should this page name after implementation verification?
+Notes, artifacts, custom links, multiple canvases, collaborative layouts, sections shared across browsers, Cloud Agent execution and a Remote Snapshot Canvas.
 
 ## Known conflicts
 <!-- chunkId: workspace-terminal-canvas-known-conflicts -->
-<!-- keywords: documentation drift, verification gap, competing description -->
+<!-- keywords: workspace parent, node movement, layout authority -->
 
-[open] Do the retained plan descriptions disagree with current behavior? Verify the sections above before relying on them.
+- "Moving a workspace node moves its plans." It does not. Nodes move independently.
 
 ## Related pages
 
-See [[workspace-terminal-canvas-reference]], [[workspace-index]], and [[e2e-testing-index]].
+See [[workspace-terminal-canvas-workflows]], [[workspace-terminal-canvas-reference]] and [[e2e-testing-workspace-terminal-canvas]].

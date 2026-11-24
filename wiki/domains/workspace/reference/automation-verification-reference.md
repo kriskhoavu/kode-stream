@@ -16,50 +16,46 @@ lastVerified: 2026-09-12
 
 ## Selection And Discovery
 <!-- chunkId: workspace-automation-verification-reference-selection -->
-<!-- keywords: selected specs, runbook discovery, plan metadata, environment -->
+<!-- keywords: selected specs, plan metadata, environment, suggestions -->
 
-[live] An item stores the selected specification paths, environment, display mode, and update time; the server discovers candidate paths from plan metadata and ignores empty suggestions. Evidence: `internal/common/models/models.go:797`, `internal/item/item_service.go:417`.
+[live] An item stores the selected specification paths, environment, display mode and update time. The server finds candidate paths in plan metadata and ignores empty ones. Evidence: `internal/common/models/workstream.go:49`, `internal/item/item_verification.go:146`.
 
-The selection is distinct from the reusable browser journey itself. Plan-local `automation-test[].path` values are suggestions, while `verificationTests` records what the user chose to run. See [[e2e-testing-index]].
+`automation-test[].path` values in a plan are suggestions. `verificationTests` records what the person chose to run.
 
 ## Runtime Contract
 <!-- chunkId: workspace-automation-verification-reference-runtime-contract -->
-<!-- keywords: runtime configuration, runner, command template, artifact paths -->
+<!-- keywords: runner, command template, artifact paths, teardown -->
 
-[live] Workspace runtime configuration controls whether automation is enabled, the automation repository path, runner, default environment, command template, and retained artifact paths. Evidence: `internal/common/models/models.go:192`, `internal/verification/verification_service.go:500`.
+[live] The workspace runtime configuration sets: automation on or off, the automation repository path, runner, default environment, command template and retained artifact paths. Evidence: `internal/common/models/workspace.go:87`.
 
-The runner prepares and starts the application repository, waits for health, then runs the rendered command in the automation repository. Template values are shell-quoted before substitution. A failed start, health check, or test triggers teardown and records bounded runtime and automation logs.
+The runner starts the application repository, waits for health, then runs the rendered command in the automation repository. Template values are shell-quoted. A failed start, health check or test triggers teardown and keeps bounded logs.
 
 ## Runtime Profiles And Checkpoints
 <!-- chunkId: workspace-automation-verification-reference-profiles -->
-<!-- keywords: smoke, critical, full, checkpoint, freshness -->
+<!-- keywords: smoke, critical, full, fingerprint -->
 
-[live] PM-026 runtime verification supports `smoke`, `critical`, and `full` profiles, while checkpoints record externally completed verification against a workspace and commit. Evidence: `internal/runtime/runtime_service.go:20`, `internal/server/api/gin_routes.go:180`.
+[live] Runtime verification has `smoke`, `critical` and `full` profiles. A checkpoint records verification finished elsewhere against a workspace and commit. Evidence: `internal/runtime/runtime_service.go:20`.
 
-A verification fingerprint includes runtime configuration, mode, profile, environment, display mode, and checkout state.
-Canvas and other consumers can therefore distinguish a fresh result from one invalidated by configuration or source
-changes. A rerun creates another bounded job through the existing verification service.
+The fingerprint covers runtime configuration, mode, profile, environment, display mode and checkout state. A rerun creates a new bounded job.
 
 ## Job And Artifact Boundaries
 <!-- chunkId: workspace-automation-verification-reference-job-boundaries -->
-<!-- keywords: verification job, artifact retention, log bounds, teardown -->
+<!-- keywords: in-memory registry, artifact retention, size limits -->
 
-[live] Automation jobs use the verification service's bounded in-memory job registry, and collected artifacts are constrained by configured paths and size limits. Evidence: `internal/verification/verification_service.go:152`, `internal/verification/verification_service.go:682`.
-
-The API exposes workspace runtime reads and updates, item selection reads and updates, and automation-mode verification job creation. Restarting the application loses job history.
+[live] Jobs live in the verification service's bounded in-memory registry, so a restart loses them. Artifacts are limited to configured paths and sizes. Evidence: `internal/verification/retention.go:26`, `internal/verification/artifacts.go:101`.
 
 ## Not supported
 <!-- chunkId: workspace-automation-verification-reference-not-supported -->
-<!-- keywords: unsupported capability, durable history, arbitrary path -->
+<!-- keywords: durable history, changed-service selection, arbitrary path -->
 
-[live] PM-026 durable verification job history, automatic changed-service selection, and arbitrary filesystem artifact collection are not supported. Evidence: `internal/verification/verification_service.go:152`, `internal/verification/verification_service.go:695`.
+[live] Durable job history, automatic selection of changed services, and artifact collection from arbitrary paths. Evidence: `internal/verification/artifacts.go:118`.
 
 ## Known conflicts
 <!-- chunkId: workspace-automation-verification-reference-known-conflicts -->
-<!-- keywords: plan intent, runtime evidence, discovery semantics -->
+<!-- keywords: prose scanning, discovery semantics, runnable specs -->
 
-[live] Candidate automation paths come from explicit metadata; the implementation does not scan arbitrary Markdown prose for runnable specs. Evidence: `internal/item/item_service.go:373`, `internal/item/item_service.go:417`.
+- "Kode Stream finds runnable specs in plan prose." It reads explicit metadata only. Evidence: `internal/item/item_verification.go:146`.
 
 ## Related pages
 
-See [[workspace-automation-verification]], [[workspace-terminal-canvas-reference]], and [[e2e-testing-index]].
+See [[workspace-automation-verification]] and [[workspace-terminal-canvas-reference]].

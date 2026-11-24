@@ -48,8 +48,8 @@ making implementation changes.
 - Root `README.md` is the human entry point.
 - `wiki/` is the authoritative corpus for durable product behavior and implementation evidence; start at
   [wiki/index.md](wiki/index.md).
-- `docs/` retains architecture and development material. Its overlapping domain pages are migration sources tracked by
-  the [documentation audit](wiki/platform/documentation-audit.md), not a second authority.
+- `docs/` holds architecture and development material only. The
+  [documentation boundary](wiki/platform/documentation-audit.md) says which folder owns which fact.
 - `deploy/` holds operator procedures beside the assets they drive — see [deploy/README.md](deploy/README.md).
 - `AGENTS.md` is operating context for agents, not a copy of plans.
 - Ticket-specific work lives in `plans/platform/PM-<NNN>/`.

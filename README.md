@@ -1,207 +1,75 @@
 # Kode Stream
 
-Kode Stream is a local, Git-native workspace for planning documents, Jira context, terminal sessions, verification
-harnesses, and LLM Wiki & Graph workflows. It turns Markdown-based plans, specs, and docs into a focused workflow UI
-while keeping the files in Git.
-
-The app is built for engineering teams that keep work plans close to code and need faster navigation, safer edits, and
-clearer local Git operations.
+Kode Stream is a local, Git-native workspace for plans, Jira context, terminal and agent sessions, verification and
+wiki knowledge. It turns Markdown plans and docs in Git into a workflow UI, and the files stay in Git.
 
 ## What It Does
 
-- Registers local workspaces or clones remote Git repositories.
-- Indexes structured plans, configured document sources, and freestyle Markdown docs.
-- Shows indexed work in a Workstream board with filtering, saved views, and quick search.
-- Opens each item in a workspace view with file tree, preview, Markdown editor, metadata, diff, Jira context, and Git tools.
-- Provides a global Workstream Explorer for browsing, searching, creating, renaming, editing, and reviewing workspace files.
-- Runs guarded Git actions for status, commit, fetch, pull, push, and branch operations.
-- Connects workspace items with Jira issue context and guarded attachment access.
-- Launches external or embedded terminal sessions with supported local AI CLIs.
-- Runs verification harness jobs and tracks their status and artifacts.
-- Provides a branch-scoped Canvas for arranging workspace, plan, and durable terminal-session nodes.
-- Lists a workspace's agent sessions in Agent Space, in one list of two kinds: interactive sessions a person drives in
-  a terminal, and harness sessions the harness runs headless for a task, each with its changes.
-- Indexes LLM Wiki content and graph relationships for structured knowledge workflows.
-- Keeps app-wide settings under Settings and each workspace's own on its page under Workspaces: its AI provider,
-  harness switches, tests, models, role skills and sources. A team shares chosen parts through `.kode-stream/settings.yaml`.
-- Stores app registry, cache, audit log, filters, recents, and AI settings outside managed repositories.
+- Registers local workspaces, or clones remote Git repositories.
+- Indexes structured plans, configured sources and freestyle Markdown.
+- Shows work on the Workstream board, with filters, saved views and quick search.
+- Opens an item with its file tree, preview, Markdown editor, metadata, diff, Jira context and Git tools.
+- Runs guarded Git actions: status, commit, fetch, pull, push and branch operations.
+- Launches AI CLIs in an external terminal or an embedded one.
+- Lists a workspace's agent sessions in **Agent Space**: interactive sessions a person drives in a terminal, and
+  harness sessions the [engineering harness](wiki/platform/harness.md) runs headless.
+- Arranges workspace, plan and session nodes on a branch-scoped **Canvas**.
+- Runs verification jobs and tracks their status and artifacts.
+- Indexes a wiki and its link graph in **Knowledge**.
 
 ## Deployment Modes
 
-Kode Stream has three supported deployment models. Storage is a separate choice only for Local.
+| Model                           | Runs on                                       | Workspace capability                                                  | Storage                                  |
+|---------------------------------|-----------------------------------------------|-----------------------------------------------------------------------|------------------------------------------|
+| Local application               | User machine, via Homebrew or a local binary  | Full local reads, writes, Git, terminal, AI, runtime and verification | `datadir` (default) or SQLite `database` |
+| Cloud Agent-Backed              | Cloud VM or container plus an Agent on the user machine | Agent connection and metadata. Command delivery is not built  | Postgres `database`                      |
+| Cloud Agentless Remote Snapshot | Cloud VM or container                         | Read-only provider reads pinned to a commit                           | Postgres `database`                      |
 
-| Model                           | Install/run location                          | Workspace capability                                                                            | Storage                                  |
-|---------------------------------|-----------------------------------------------|-------------------------------------------------------------------------------------------------|------------------------------------------|
-| Local application               | User machine; Homebrew or local binary        | Full local reads, writes, Git, terminal, AI, runtime, and verification                          | `datadir` (default) or SQLite `database` |
-| Cloud Agent-Backed              | Cloud VM/container plus Agent on user machine | Agent connection and metadata exist; durable command delivery remains pending                   | Postgres `database`                      |
-| Cloud Agentless Remote Snapshot | Cloud VM/container                            | Read-only provider snapshot pinned to a commit; no Agent, checkout, or hosted command execution | Postgres `database`                      |
+Read next:
 
-```text
-Local: Browser -> loopback Kode Stream -> local repository
-Cloud + Agent: Browser -> Cloud API <-> outbound Agent metadata channel; commands pending
-Cloud snapshot: Browser -> Cloud API -> provider API -> immutable repository commit
-```
-
-Remote Snapshot currently provides the commit-pinned backend foundation for metadata, tree, and file reads. Its
-self-service registration and snapshot-backed board/search UI remain planned work.
-
-See [Architecture](docs/architecture/overview.md) for the component boundary, the
-[Cloud runtime reference](wiki/platform/cloud-runtime-reference.md) and
-[storage reference](wiki/platform/storage-reference.md) for current behavior, and the [wiki index](wiki/index.md) for
-the authoritative knowledge corpus.
-
-To build and test the repository, see [Development](docs/development.md). Operator procedures live under
-[`deploy/`](deploy/README.md). [AGENTS.md](AGENTS.md) is the operating context for AI coding agents.
-
-## Tech Stack
-
-| Area        | Technology                                          |
-|-------------|-----------------------------------------------------|
-| Backend     | Go 1.25 module, Go 1.22+ source patterns            |
-| API         | Gin 1.9 + Go `net/http`                             |
-| Frontend    | React 19, TypeScript 5, Vite 6                      |
-| Testing     | Vitest, React Testing Library, `go test`            |
-| Rendering   | Unified, KaTeX, highlight.js, YAML                  |
-| Packaging   | Go binary with embedded frontend assets             |
-| Persistence | Local SQLite or YAML/JSONL data-dir, Cloud Postgres |
+- [Architecture](docs/architecture/overview.md) and [Development](docs/development.md).
+- The [wiki index](wiki/index.md), which holds product behavior.
+- [`deploy/`](deploy/README.md) for operator procedures.
+- [AGENTS.md](AGENTS.md) for AI coding agents.
 
 ## Requirements
 
-- Go `1.25+`
-- Node.js `20+`
-- npm
-- Git
-
-Platform integrations:
-
-- macOS: `osascript`, `open`
-- Windows: PowerShell, Explorer
-- Linux: `zenity` or `kdialog`, `xdg-open`
-
-AI session launch requires an installed and authenticated supported CLI. Kode Stream does not bypass provider
-authentication, approval prompts, or sandbox behavior.
-
-## Terminal Canvas
-
-Choose **Canvas** from Workspace navigation to open the selected workspace and branch as a spatial workbench. Workspace,
-plan, and durable session nodes can be dragged independently; arrow keys move a focused node by 12 pixels and Shift plus
-an arrow moves it by one pixel. Saved positions are restored on reload without copying plan, Git, verification, or
-terminal content into Canvas storage.
-
-Select a plan to launch a terminal, run smoke verification, or open the full item view. Launch is revalidated against
-the current checkout branch immediately before process start. Select the workspace to inspect branch, HEAD, working-tree,
-and verification freshness. A passed result becomes historical and stale when the relevant repository fingerprint
-changes.
-
-Removing a node or resetting layout changes presentation only. Cancelling a live process is a separate confirmed action.
-Canvas supports this workflow for Local checkouts and local execution; groups, notes, custom links, multiple canvases,
-Cloud Agent execution, and Remote Snapshot Canvas UX remain future capabilities.
-
-See [Terminal Canvas concepts](wiki/domains/workspace/concepts/terminal-canvas.md) and the
-[Terminal Canvas reference](wiki/domains/workspace/reference/terminal-canvas-reference.md) for the safety and lifecycle
-details.
-
-## Sessions
-
-Choose **Agent Space**, then **Sessions**, to see every agent session of a workspace in one list, grouped by ticket or
-plan. A session comes in two kinds. An **interactive session** is a coding agent you started in a terminal on the
-checkout: it shows its live terminal, and you type into it and stop it. A **harness session** is one agent the
-harness ran for a task, headless, in a worktree of its own: it shows its conversation, and you steer it through the
-run's questions and approvals on its run page. A ticket's harness sessions share one card, however many rounds they
-took: its detail shows the run's steps, and you click a step, then one of its rounds, to read that agent's
-conversation. A tag on each card names its kind, and **All · Interactive · Harness** narrows the list. Both kinds have a **Changes** view with a per-file diff: an interactive session's checkout since it
-launched, a harness session's run, from its worktree or its branch. Changes are computed from Git on request and are
-never stored.
-
-A **Focus** toggle on the Canvas toolbar temporarily shows only plans with an active session, their session nodes, and
-the edges between them. The focused subset receives an automatic layout without changing saved node positions or the
-saved viewport.
-
-See [Interactive And Harness Sessions](wiki/domains/workspace/concepts/agent-sessions.md) for the difference in full.
-See [Session Focus](wiki/domains/workspace/concepts/session-focus.md) and its
-[reference](wiki/domains/workspace/reference/session-focus-reference.md) for availability and cross-workspace
-authorization rules.
+- Go 1.25+, Node.js 22, npm, Git.
+- macOS: `osascript`, `open`. Windows: PowerShell, Explorer. Linux: `zenity` or `kdialog`, `xdg-open`.
+- For AI sessions, an installed and signed-in supported CLI. Kode Stream never bypasses provider authentication,
+  approval prompts or sandboxing.
 
 ## Quick Start
 
-Everything local runs through `make`, and the default is Docker:
-
 ```bash
-make up
+make up        # Local mode in Docker
+make dev-up    # from source, in the background, no image rebuild
 ```
 
-Open `http://localhost:4317`. `make down` stops it, `make logs` follows it, `make help`
-lists every target and stack.
+Open `http://localhost:4317`. `make down`, `make logs` and `make help` do what they say. `make dev-down`, `make dev-ps`
+and `make dev-logs` manage the source build.
 
-To run from source instead — no image rebuild between edits:
-
-```bash
-make dev-up
-```
-
-That builds the frontend and the Go binary and serves them in the background;
-`make dev-down`, `make dev-ps`, and `make dev-logs` manage it. By hand it is:
+By hand:
 
 ```bash
-npm install
-npm run build
+npm install && npm run build
 go build -o ./bin/kode-stream ./cmd/kode-stream
-./bin/kode-stream serve -port 4317
+./bin/kode-stream serve -port 4317   # or set KODE_STREAM_PORT
 ```
 
-The default port is `4317`. You can also set it with `KODE_STREAM_PORT`:
-
-```bash
-KODE_STREAM_PORT=4317 ./bin/kode-stream serve
-```
+Other stacks: `KODE_STREAM_STORAGE_OPTION=database make up` (SQLite), `make up STACK=cloud` (Cloud with an Agent) and
+`KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless make up STACK=cloud`. See the
+[Local](deploy/docker/local/local-mode/README.md) and [Cloud](deploy/docker/local/cloud-mode/README.md) stacks.
 
 ## Install With Homebrew
 
-macOS users can install Kode Stream from the public tap:
-
 ```bash
-brew update
 brew tap kriskhoavu/homebrew-tap
 brew install kode-stream
 kode-stream serve -port 4317
 ```
 
-Open `http://localhost:4317`.
-
-Useful commands:
-
-```bash
-kode-stream doctor
-brew test kode-stream
-brew upgrade kode-stream
-```
-
-## Development
-
-```bash
-make verify
-```
-
-That is `npm run typecheck`, `npm test`, `go test ./...`, `go test -race ./...`, and `npm run build`. Run the
-pieces directly when you want only one:
-
-```bash
-npm run typecheck
-npm test -- --run
-go test ./...
-```
-
-Build the production assets and local binary:
-
-```bash
-make dev-build
-```
-
-Run frontend development server:
-
-```bash
-npm run dev
-```
+`kode-stream doctor`, `brew test kode-stream` and `brew upgrade kode-stream` check and update it.
 
 ## CLI
 
@@ -211,123 +79,39 @@ kode-stream doctor [--provider github|bitbucket] [--repo <path-or-url>] [--forma
 kode-stream agent start|status|doctor
 ```
 
-- `serve`: starts the local app server.
-- `doctor`: checks the environment and repository setup.
-- `agent`: starts, checks, or diagnoses the Cloud Agent command surface.
+`serve` starts the server. `doctor` checks the environment and repository setup. `agent` runs the Cloud Agent.
 
-For a local Agent-Backed Cloud smoke stack with Docker, Postgres, Keycloak, OAuth2Proxy, and a foreground Cloud Agent:
+## Verify
 
 ```bash
-make up STACK=cloud
+make verify   # npm run typecheck, npm test, go test ./..., go test -race ./..., npm run build
 ```
 
-For the Agentless Remote Snapshot control-plane stack, use:
+## Storage
 
-```bash
-KODE_STREAM_CLOUD_WORKSPACE_MODE=agentless make up STACK=cloud
-```
-
-See [Local Cloud Stack](deploy/docker/local/cloud-mode/README.md) for both flows.
-
-## Local Docker Mode
-
-Local mode can also run in Docker with either supported Local storage option:
-
-```bash
-make up
-KODE_STREAM_STORAGE_OPTION=database make up
-```
-
-The selected host workspace is mounted at `/workspace`. See [Local Docker Stack](deploy/docker/local/local-mode/README.md) for the
-storage boundary and container limitations for Git credentials, terminal, AI, dialogs, and path reveal.
-
-## Storage And Data Directory
-
-Kode Stream stores app-owned state outside managed repositories. Local mode supports `datadir` and `database` storage
-options. Local `datadir` is the default and uses YAML/JSONL files under the OS user config directory. Local `database`
-uses SQLite in the same directory. Cloud mode requires `database` with Postgres through `KODE_STREAM_DATABASE_URL`.
-
-Typical defaults:
+Kode Stream keeps its own state outside managed repositories, in the OS data directory:
 
 - macOS: `~/Library/Application Support/kode-stream/`
 - Linux: `~/.config/kode-stream/`
 - Windows: `%AppData%\kode-stream\`
 
-Startup resolution order:
-
-1. `KODE_STREAM_DATA_DIR`
-2. `bootstrap.yaml` in the default OS data directory
-3. Default OS data directory
-
-Example `bootstrap.yaml`:
-
-```yaml
-dataDir: /Users/me/.kode-stream-data
-storageOption: database
-```
-
-Changing `dataDir` or `storageOption` requires a restart.
-
-Main files:
-
-```text
-<effective-data-dir>/
-  bootstrap.yaml
-  kode-stream.db        # local database option
-  workspaces.yaml       # local datadir option
-  item-index.yaml       # local datadir option
-  audit-log.jsonl       # local datadir option
-  saved-filters.yaml    # local datadir option
-  recent-items.yaml     # local datadir option
-  ai-settings.yaml      # local datadir option
-  backups/storage-sync/
-  clone-root/
-```
-
-Storage configuration:
-
-| Variable                          | Local default                         | Cloud requirement                                       |
-|-----------------------------------|---------------------------------------|---------------------------------------------------------|
-| `KODE_STREAM_STORAGE_OPTION`      | `datadir`                             | `database`                                              |
-| `KODE_STREAM_STORAGE_DRIVER`      | derived from option                   | `postgres`                                              |
-| `KODE_STREAM_SQLITE_PATH`         | `<effective-data-dir>/kode-stream.db` | unused                                                  |
-| `KODE_STREAM_DATABASE_URL`        | unused                                | secret-managed Postgres URL                             |
-| `KODE_STREAM_MIGRATIONS`          | `auto`                                | `auto` or operator-managed `manual`                     |
-| `KODE_STREAM_TRUSTED_PROXY_CIDRS` | unused                                | non-catch-all CIDRs of the header-injecting OAuth proxy |
-
-Local examples:
-
-```bash
-KODE_STREAM_STORAGE_OPTION=database ./run.sh restart
-KODE_STREAM_STORAGE_OPTION=datadir ./run.sh restart
-./run.sh smoke-storage
-```
-
-Settings can manually sync `datadir -> database` or `database -> datadir`. Each sync creates a target backup under
-`backups/storage-sync/`. Runtime writes go only to the selected storage option.
-
-See [Storage](docs/domain/storage/storage-architecture.md) for supported storage options, performance comparison, backup,
-restore, manual sync, and Cloud Postgres operations.
+`KODE_STREAM_DATA_DIR`, or `dataDir` in `bootstrap.yaml` in that directory, moves it. Options, files, environment
+variables, sync and backup are in the [storage reference](wiki/platform/storage-reference.md).
 
 ## Workspace Files
 
-Kode Stream reads configured source directories such as `plans`, `wiki`, or `specs`.
+Kode Stream reads configured source directories such as `plans`, `wiki` or `specs`.
 
-Common workspace files:
-
-- `.kode-stream/workspace-settings.yaml`: optional mapping rules for sources with a non-standard layout. A rule
-  belongs to the source its `fields.source` names, by the source's path or its last part, so one file serves every
-  source of a repository. A source that no rule names reads `workspace-settings.yaml` inside the source. The settings
-  page saves to the file it read and replaces only that source's rules. `pathPattern` is relative to the source.
-- `.kode-stream/settings.yaml`: optional; chosen parts of a workspace's settings, shared through the repository. Kode
-  Stream writes it when a person exports from a workspace's page in Settings and reads it only when they import. It
-  holds no tool permission, executable or credential.
-- `plan.yaml`: item metadata such as `status`, `owner`, `tags`, and optional title overrides.
-- `README.md`: primary item document and default title source.
-
-Example `.kode-stream/workspace-settings.yaml`:
+- `plan.yaml`: item metadata such as `status`, `owner`, `tags` and title overrides.
+- `README.md`: the item's main document and default title.
+- `.kode-stream/workspace-settings.yaml`: optional mapping rules for sources with a non-standard layout. A rule belongs
+  to the source its `fields.source` names, by path or last path segment. A source no rule names reads
+  `workspace-settings.yaml` inside itself. `pathPattern` is relative to the source.
+- `.kode-stream/settings.yaml`: optional workspace settings a team shares. Kode Stream writes it only on export and
+  reads it only on import. See [workspace settings](wiki/domains/workspace/concepts/workspace-settings.md).
 
 ```yaml
+# .kode-stream/workspace-settings.yaml
 version: 1
 cards:
   - pathPattern: "{folder}/feature/{item}"
@@ -339,19 +123,30 @@ cards:
       tags: [wiki]
 ```
 
+```yaml
+# .kode-stream/settings.yaml
+version: 1
+ai:
+  provider: claude
+harness:
+  review: true
+  tests:
+    - go test ./...
+  models:
+    coder: { engine: claudecode, model: sonnet, hardModel: opus, maxTurns: 120 }
+  procedure:
+    planner: { skill: feature-planning, track: Plan }
+  sources:
+    - { kind: jira, enabled: true, query: "project = PM AND sprint in openSprints()" }
+```
+
 ## Safety Model
 
-- Server access is local by default.
-- Writes are limited to configured workspace sources, `.kode-stream/workspace-settings.yaml` and, on export,
+- The server listens on loopback by default.
+- Writes stay inside configured sources, `.kode-stream/workspace-settings.yaml` and, on export,
   `.kode-stream/settings.yaml`.
-- Markdown saves use expected content hashes to prevent stale overwrites.
+- Markdown saves need the expected content hash.
 - File access rejects path traversal and symlink escapes.
-- Git commits stage only user-selected paths inside configured sources.
-- Pull and branch switch guard against dirty working trees.
-- Credentials are not stored by Kode Stream.
-
-## Architecture
-
-See [Architecture](docs/architecture/overview.md) for system boundaries, storage design, data flow, and API structure.
-
-For hosted deployment, see [Cloud Deployment](docs/domain/cloud/cloud-deployment.md).
+- Commits stage only selected paths inside configured sources.
+- Pull and branch switch guard against a dirty working tree.
+- Kode Stream stores no credentials.

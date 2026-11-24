@@ -18,30 +18,26 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-appearance-shared-header-band -->
 <!-- keywords: header backdrop, workspace routes, lattice, neon -->
 
-[live] Workstream, Canvas, and Knowledge routes share one decorative header band with `lattice`, `neon`, and `none` variants; invalid stored values fall back to lattice. Evidence: `web/src/components/HeaderBackdrop.tsx:14`, `web/src/components/HeaderBackdrop.tsx:20`.
-
-The setting is browser-local and the backdrop is presentation-only. Navigation and page content remain above it in the stacking order.
+[live] Workstream, Canvas and Knowledge share one decorative header band: `lattice` (default), `neon` or `none`. An invalid stored value falls back to `lattice`. The choice is browser-local and changes presentation only. Evidence: `web/src/components/HeaderBackdrop.tsx:25`.
 
 ## Lattice Behavior
 <!-- chunkId: workspace-appearance-lattice-behavior -->
-<!-- keywords: deterministic lattice, svg animation, junction, reduced motion -->
+<!-- keywords: deterministic svg, junction, reduced motion -->
 
-[live] The lattice is a deterministic SVG generated once per module load and animated as one group; reduced-motion styles stop the animation and pin the sweep. Evidence: `web/src/components/LatticeBackdrop.tsx:24`, `web/src/components/lattice-backdrop.css:134`.
-
-The implemented band is 240 pixels high. Junction emphasis is derived from connected paths rather than separate interactive controls.
+[live] The lattice is a deterministic SVG band, 240 pixels high, built once per module load and animated as one group. Reduced motion stops the animation. Evidence: `web/src/components/LatticeBackdrop.tsx:24`, `web/src/components/lattice-backdrop.css:134`.
 
 ## Not supported
 <!-- chunkId: workspace-appearance-not-supported -->
-<!-- keywords: per route variant, cloud synchronization, density control -->
+<!-- keywords: per route variant, synchronization, density control -->
 
-[live] Per-route variants, cross-browser setting synchronization, and user controls for lattice color or density are not supported. Evidence: `web/src/components/HeaderBackdrop.tsx:29`, `web/src/features/settings/appSettings.ts:8`.
+[live] Per-route variants, synchronization across browsers, and lattice color or density controls. Evidence: `web/src/features/settings/appSettings.ts:8`.
 
 ## Known conflicts
 <!-- chunkId: workspace-appearance-known-conflicts -->
-<!-- keywords: historical brief, band height, reduced motion test -->
+<!-- keywords: media emulation, radio keys, runtime check -->
 
-[open] Has reduced motion been verified through browser media emulation and have native radio-key interactions been exercised? The retired validation inspected styles but did not complete those runtime checks.
+[open] Has reduced motion been checked with browser media emulation, and have the radio keys been exercised? Only the styles were inspected.
 
 ## Related pages
 
-See [[workspace-appearance-reference]], [[workspace-terminal-canvas]], and [[knowledge-index]].
+See [[workspace-appearance-reference]].

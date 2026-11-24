@@ -14,30 +14,32 @@ lastVerified: never
 <!-- chunkId: workspace-index-pages -->
 <!-- keywords: operational context, pinned review, terminal placement -->
 
-- [[workspace-branch-context]] and [[workspace-branch-context-reference]] explain checkout ownership.
-- [[workspace-branch-review-workflows]] describes review and import.
-- [[workspace-terminal-canvas]], [[workspace-terminal-canvas-workflows]], and [[workspace-terminal-canvas-reference]] cover the spatial workbench.
-- [[workspace-session-focus]] and [[workspace-session-focus-reference]] cover active-session focus, Agent Space's session list, and checkout-derived changes.
-- [[workspace-agent-sessions]] and [[workspace-agent-sessions-reference]] define the two kinds of session, interactive and harness, and Agent Space's one list of both.
-- [[workspace-card-agent-sessions]] and [[workspace-card-agent-sessions-reference]] cover a card's agent chips, its Agents tab and terminal, and resuming Claude Code conversations.
-- [[workspace-automation-verification]] and [[workspace-automation-verification-reference]] cover browser automation selection and execution.
-- [[workspace-e2e-quality]] and [[workspace-e2e-quality-reference]] cover agent-run browser journeys, results, and evidence.
-- [[workspace-appearance]] and [[workspace-appearance-reference]] cover the shared route backdrop and accessibility boundary.
-- [[workspace-settings]] covers the defaults every workspace starts from, a workspace's own choices over them, and the settings file a team shares them through.
-- [[workspace-lifecycle]] and [[workspace-lifecycle-reference]] cover registration, import, source structure, guarded changes, and reliability.
-- [[workspace-workstream-explorer]] and [[workspace-workstream-explorer-reference]] cover the primary planning surface, embedded repository context, search, and preview.
-- [[workspace-jira-workstream]] and [[workspace-jira-workstream-reference]] cover read-only Jira context and Jira-first local intake.
-- [[workspace-ai-session-launch]] and [[workspace-ai-launch-reference]] cover prompt composition and embedded or external session launch.
-- [[e2e-testing-index]] routes browser validation.
+| Topic                                         | Concept                                | Reference                                     |
+|-----------------------------------------------|----------------------------------------|-----------------------------------------------|
+| Checkout and Branch Review                    | [[workspace-branch-context]], [[workspace-branch-review-workflows]] | [[workspace-branch-context-reference]] |
+| Canvas                                        | [[workspace-terminal-canvas]], [[workspace-terminal-canvas-workflows]] | [[workspace-terminal-canvas-reference]] |
+| Focus, session list and checkout changes      | [[workspace-session-focus]]            | [[workspace-session-focus-reference]]         |
+| Interactive and harness sessions              | [[workspace-agent-sessions]]           | [[workspace-agent-sessions-reference]]        |
+| A card's agents and Claude Code conversations | [[workspace-card-agent-sessions]]      | [[workspace-card-agent-sessions-reference]]   |
+| AI session launch                             | [[workspace-ai-session-launch]]        | [[workspace-ai-launch-reference]]             |
+| Browser automation verification               | [[workspace-automation-verification]]  | [[workspace-automation-verification-reference]] |
+| E2E quality coverage                          | [[workspace-e2e-quality]]              | [[workspace-e2e-quality-reference]]           |
+| Header backdrop                               | [[workspace-appearance]]               | [[workspace-appearance-reference]]            |
+| Defaults and workspace settings               | [[workspace-settings]]                 | —                                             |
+| Registration, import, guarded changes         | [[workspace-lifecycle]]                | [[workspace-lifecycle-reference]]             |
+| Workstream, Explorer, search, preview         | [[workspace-workstream-explorer]]      | [[workspace-workstream-explorer-reference]]   |
+| Jira context and intake                       | [[workspace-jira-workstream]]          | [[workspace-jira-workstream-reference]]       |
+
+Browser journeys: [[e2e-testing-index]].
 
 ## Not written yet
 <!-- chunkId: workspace-index-not-written -->
-<!-- keywords: session inventory, cloud access, knowledge navigation -->
+<!-- keywords: session inventory, cloud access, coverage gap -->
 
-[open] Which durable capabilities from completed plans still need coverage? Enrichment follows the structural migration.
+[open] Which capabilities from retired plans still have no page?
 
 ## Open questions
 <!-- chunkId: workspace-index-open-questions -->
 <!-- keywords: implementation evidence, freshness review, behavioral contract -->
 
-[open] Which retained sections can be verified against current code? Undated pages are not runtime evidence.
+[open] Which pages marked `lastVerified: never` can now be checked against the code?

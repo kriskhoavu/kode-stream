@@ -12,76 +12,47 @@ lastVerified: never
 
 ## Arrange And Restore Work
 <!-- chunkId: workspace-terminal-canvas-workflows-arrange -->
-<!-- keywords: canvas, nodes, drag, keyboard, restore -->
+<!-- keywords: nodes, keyboard, reset layout, search -->
 
-[open] Does the current implementation still satisfy the arrange and restore work behavior described below? This section has not yet been reverified.
+[open] Does the code still match this page? It is plan-derived and not yet checked.
 
-Open **Canvas** for the active workspace checkout. Canvas resolves Git before loading or seeding the branch-scoped
-layout; it has no independent branch selector. Drag a workspace, plan, or session node independently, or
-focus it and use an arrow key to move 12 pixels; Shift plus an arrow moves one pixel. Wait for **Saved** before reloading.
-Canvas silently gives newly discovered plans and sessions deterministic positions without moving saved nodes or showing
-an action, count, or notification. **Reset layout** previews and confirms a presentation-only reset. **Remove from
-Canvas** keeps the referenced entity but hides its placement for this layout, so automatic placement does not bring it
-back.
+Open **Agent Space** and choose the **Canvas** view. Canvas uses the current checkout and has no branch selector.
 
-Use **Search Canvas nodes** to find a title, identifier, branch, or session state. **Fit view** recovers off-screen nodes.
-Closing the Workbench returns focus to the selected node.
+- Drag a node, or focus it and press an arrow key to move it 12 pixels. Shift plus an arrow moves it one pixel.
+- Wait for **Saved** before you reload.
+- New plans and sessions get positions silently. Saved nodes never move.
+- **Reset layout** previews, then resets presentation only.
+- **Remove from Canvas** hides the placement. Automatic placement does not bring it back.
+- **Search Canvas nodes** finds a title, identifier, branch or session state. **Fit view** recovers off-screen nodes.
 
-To inspect a different branch without checkout, exit Canvas and use [[workspace-branch-review-workflows]]. Returning to a
-previous checkout restores that branch's saved layout without making its layout a global branch selection.
+To inspect another branch, use [[workspace-branch-review-workflows]].
 
 ## Launch A Session
 <!-- chunkId: workspace-terminal-canvas-workflows-launch -->
-<!-- keywords: plan, launch terminal, branch, session, idempotency -->
+<!-- keywords: launch terminal, checkout changed, idempotency, cancel -->
 
-[open] Does the current implementation still satisfy the launch a session behavior described below? This section has not yet been reverified.
+Select a plan and choose **Launch terminal**. Canvas uses the default provider. The server rechecks workspace, plan, branch, commit, provider, authorization and limits. If the checkout changed, Canvas shows **Checkout changed** and offers **Refresh Canvas and Git status**. It never switches branches.
 
-Select a plan and choose **Launch terminal**. The configured default provider is used. The server checks the workspace,
-plan, expected branch, observed commit, provider, authorization, and limits again before launch. If the checkout changed,
-Canvas shows **Checkout changed** with expected/current context and offers **Refresh Canvas and Git status**; it never
-switches branches automatically.
-
-A successful launch creates one safe durable record and one live process, places only that new session when needed,
-and explicitly opens its Canvas node into the interactive terminal. Later selection does not expand or collapse a
-session. Use the top-right disclosure action to control the terminal; that choice is saved with the placement. Closing
-the terminal only collapses the session node. **Cancel process** remains separate from closing the terminal and from
-**Remove from Canvas**. After an
-application restart, an orphaned running record becomes interrupted and expands into lifecycle detail instead of
-offering a false reconnect. See [[workspace-terminal-canvas-reference]].
+A launch creates one session record and one process, and opens the new node's terminal. The top-right disclosure action opens or closes the terminal and is saved with the placement. Closing the terminal does not stop the process. **Cancel process** does.
 
 ## Inspect Git And Verification
 <!-- chunkId: workspace-terminal-canvas-workflows-verify -->
-<!-- keywords: git, verification, freshness, stale, historical -->
+<!-- keywords: freshness, stale, historical, smoke -->
 
-[open] Does the current implementation still satisfy the inspect git and verification behavior described below? This section has not yet been reverified.
-
-Select the workspace for branch, HEAD, working-tree status, changed-file count, and current verification detail. A plan
-also exposes **Run smoke verification** when its resolved capability allows it. Result and freshness are separate: a pass
-may be current, stale, or inconclusive. After a relevant repository or verification-configuration change, the previous
-pass appears as **Passed (historical)** until rerun.
-
-## MVP Limits
-<!-- chunkId: workspace-terminal-canvas-workflows-limits -->
-<!-- keywords: local, groups, snapshots, cloud agent, deferred -->
-
-[open] Does the current implementation still satisfy the mvp limits behavior described below? This section has not yet been reverified.
-
-The delivered journey is a Local desktop workbench with workspace, plan, and session nodes. It is not a general graph
-editor and does not provide groups, notes, artifacts, custom links, multiple canvases, Cloud Agent execution, Remote
-Snapshot Canvas UX, worktrees, or collaborative layouts. See [[workspace-terminal-canvas]].
+Select the workspace node for branch, HEAD, working-tree status, changed-file count and verification detail. A plan offers **Run smoke verification** when its capability allows. A pass may be fresh, stale or inconclusive. After a relevant change it shows as **Passed (historical)** until you rerun it.
 
 ## Not supported
 <!-- chunkId: workspace-terminal-canvas-workflows-not-supported -->
-<!-- keywords: capability boundary, exclusions, unsupported action -->
+<!-- keywords: graph editor, worktrees, branch selector -->
 
-[open] Which additional unsupported operations should this page name after implementation verification?
+Canvas is not a general graph editor. See [[workspace-terminal-canvas]] for the full list.
 
 ## Known conflicts
 <!-- chunkId: workspace-terminal-canvas-workflows-known-conflicts -->
-<!-- keywords: documentation drift, verification gap, competing description -->
+<!-- keywords: close terminal, stop process, remove node -->
 
-[open] Do the retained plan descriptions disagree with current behavior? Verify the sections above before relying on them.
+- "Closing the terminal or removing the node stops the agent." It does not. Only **Cancel process** stops it.
 
 ## Related pages
 
-See [[workspace-terminal-canvas-reference]], [[workspace-index]], and [[e2e-testing-index]].
+See [[workspace-terminal-canvas-reference]] and [[e2e-testing-workspace-terminal-canvas]].

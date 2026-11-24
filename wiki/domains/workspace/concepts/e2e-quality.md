@@ -14,30 +14,30 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-e2e-quality-coverage-model -->
 <!-- keywords: local playbook, canonical journey, provenance, ordering -->
 
-[live] A plan that declares reusable browser coverage shows its ticket-local runbooks before canonical wiki journeys linked to the same source. A canonical journey can also be opened from Knowledge with the same result and launch controls. Evidence: [[workspace-e2e-quality-reference]].
+[live] A plan that declares browser coverage lists its own runbooks first, then the canonical wiki journeys linked to it. Knowledge opens a canonical journey with the same result and launch controls. Evidence: [[workspace-e2e-quality-reference]].
 
-Local runbooks are working material for one plan. Canonical journeys under `wiki/e2e-testing/` are the durable, reusable browser procedures. See [[e2e-testing-quality-coverage]].
+Local runbooks are working material for one plan. Journeys under `wiki/e2e-testing/` are the reusable procedures. See [[e2e-testing-quality-coverage]].
 
 ## Result And Agent Handoff
 <!-- chunkId: workspace-e2e-quality-result-handoff -->
-<!-- keywords: not run, browser evidence, immutable context, provider capability -->
+<!-- keywords: not run, browser evidence, fixed context, base url -->
 
-[live] Each card reports a recorded result or an explicit not-run state, opens safe evidence through the shared preview, and hands execution to an AI session with the chosen runbook and result destination fixed. Evidence: [[workspace-e2e-quality-reference]].
+[live] Each card shows a recorded result or **not run**, opens evidence in the shared preview, and hands the run to an AI session with the runbook and result path fixed. Evidence: [[workspace-e2e-quality-reference]].
 
-Runtime inputs such as the base URL, authentication reference, and isolated test data are requested when the journey runs. They are not stored in the plan or wiki page.
+The session asks for the base URL, authentication reference and test data at run time. They are never stored in the plan or wiki.
 
 ## Not supported
 <!-- chunkId: workspace-e2e-quality-not-supported -->
 <!-- keywords: embedded executor, durable history, secret storage, inferred pass -->
 
-[live] Kode Stream does not execute the browser journey itself, persist a run history, store runtime credentials, or infer a passing result when no valid result exists. Evidence: [[workspace-e2e-quality-reference]].
+[live] Kode Stream does not run the journey itself, keep run history, store credentials or infer a pass without a valid result. Evidence: [[workspace-e2e-quality-reference]].
 
 ## Known conflicts
 <!-- chunkId: workspace-e2e-quality-known-conflicts -->
-<!-- keywords: repository automation, verification job, markdown result, freshness -->
+<!-- keywords: markdown result, versioned result, fingerprint -->
 
-[legacy] PM-036's recorded result used an older Markdown summary. The current result reader accepts a bounded, versioned result whose fingerprint matches the runbook; other content is treated as unknown rather than proof of a pass. Evidence: [[workspace-e2e-quality-reference]].
+- "A Markdown summary records a pass." Only a versioned result whose fingerprint matches the runbook counts. Anything else is unknown. Evidence: [[workspace-e2e-quality-reference]].
 
 ## Related pages
 
-See [[workspace-e2e-quality-reference]], [[workspace-automation-verification]], and [[e2e-testing-index]].
+See [[workspace-e2e-quality-reference]] and [[workspace-automation-verification]].

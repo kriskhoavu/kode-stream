@@ -14,34 +14,26 @@ lastVerified: 2026-09-12
 <!-- chunkId: workspace-appearance-reference-variant-contract -->
 <!-- keywords: lattice, neon, none, default variant -->
 
-[live] The valid variants are `lattice`, `neon`, and `none`, the default is lattice, and invalid persisted values normalize to that default. Evidence: `web/src/components/HeaderBackdrop.tsx:14`, `web/src/components/HeaderBackdrop.tsx:20`.
+[live] Valid variants are `lattice`, `neon` and `none`. The default is `lattice`, and an invalid stored value becomes the default. One browser-local preference covers Workstream, Canvas and Knowledge. Evidence: `web/src/components/HeaderBackdrop.tsx:25`, `web/src/features/settings/appSettings.ts:8`.
 
 ## Geometry And Motion
 <!-- chunkId: workspace-appearance-reference-geometry-motion -->
-<!-- keywords: field geometry, seeded walk, animation, reduced motion -->
+<!-- keywords: field geometry, seeded walk, animation, assistive technology -->
 
-[live] The lattice uses a 1200 by 240 field, a 24-pixel fine grid, a 96-pixel coarse grid, 12 seeded walks, and one group animation. Evidence: `web/src/components/LatticeBackdrop.tsx:24`, `web/src/components/LatticeBackdrop.tsx:31`.
-
-Reduced-motion CSS disables animation and pins the sweep. The decorative SVG is hidden from assistive technology.
-
-## Persistence And Scope
-<!-- chunkId: workspace-appearance-reference-persistence-scope -->
-<!-- keywords: browser preference, route scope, header band, local setting -->
-
-[live] One browser-local preference selects the treatment for Workstream, Canvas, and Knowledge routes. Evidence: `web/src/features/settings/appSettings.ts:8`, `web/src/components/HeaderBackdrop.tsx:29`.
+[live] The lattice uses a 1200 × 240 field, a 24-pixel fine grid, a 96-pixel coarse grid, 12 seeded walks and one group animation. Reduced-motion CSS stops the animation. The SVG is hidden from assistive technology. Evidence: `web/src/components/LatticeBackdrop.tsx:24`.
 
 ## Not supported
 <!-- chunkId: workspace-appearance-reference-not-supported -->
 <!-- keywords: synchronized preference, route override, custom geometry -->
 
-[live] Server-synchronized preferences, per-route overrides, and user-defined lattice geometry are not supported. Evidence: `web/src/features/settings/appSettings.ts:8`, `web/src/components/HeaderBackdrop.tsx:29`.
+[live] Server-synchronized preferences, per-route overrides and custom lattice geometry. Evidence: `web/src/components/HeaderBackdrop.tsx:100`.
 
 ## Known conflicts
 <!-- chunkId: workspace-appearance-reference-known-conflicts -->
-<!-- keywords: historical dimensions, validation limit, native interaction -->
+<!-- keywords: visual brief, dimensions, walk parameters -->
 
-[legacy] Earlier visual briefs contain superseded dimensions and walk parameters; the current source values above are authoritative. Source: `PM-041 (plan retired) | Visual brief`.
+- "The visual brief's dimensions apply." The source values above are the authority.
 
 ## Related pages
 
-See [[workspace-appearance]], [[workspace-terminal-canvas]], and [[knowledge-index]].
+See [[workspace-appearance]].

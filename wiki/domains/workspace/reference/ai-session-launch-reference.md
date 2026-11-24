@@ -15,50 +15,46 @@ lastVerified: 2026-09-12
 
 ## Prompt Resolution
 <!-- chunkId: workspace-ai-launch-reference-prompt -->
-<!-- keywords: preset, prompt draft, custom prompt, context mode -->
+<!-- keywords: preset, promptDraft, customPrompt, capability discovery -->
 
-[live] PM-027 the service accepts a preset, `promptDraft`, or the legacy `customPrompt` shape but rejects ambiguous combinations; an edited draft can retain its preset identity. Evidence: `internal/ai/ai_launch_service.go:318`.
+[live] The service accepts a preset, a `promptDraft` or the older `customPrompt`, and rejects an ambiguous mix. An edited draft can keep its preset identity. Evidence: `internal/ai/ai_launch_service.go:194`.
 
-Selected skills and agents are normalized against provider capability discovery. Discovery reads provider-specific
-capability roots in the workspace and application configuration without recursively treating arbitrary files as tools.
+Selected skills and agents are normalized against provider discovery. Discovery reads the provider's capability roots in the workspace and app configuration. It never treats arbitrary files as tools.
 
 ## Launch Guards
 <!-- chunkId: workspace-ai-launch-reference-guards -->
-<!-- keywords: workspace ID, expected branch, observed commit, idempotency -->
+<!-- keywords: expected branch, observed commit, idempotency, record write -->
 
-[live] PM-018 and PM-020 embedded launches carry expected workspace and branch context, observed commit, and an idempotency key. Evidence: `internal/ai/ai_embedded_service.go:40`, `internal/ai/ai_embedded_service.go:42`, `internal/ai/ai_embedded_service.go:43`.
+[live] An embedded launch carries the expected workspace and branch, the observed commit and an idempotency key. Evidence: `internal/ai/ai_embedded_service.go:37`.
 
-The service revalidates operational context before process start. A mismatch is a blocked launch with recovery context,
-not permission to switch branches automatically. Session records are published around process state transitions so a
-failed record write cannot silently produce an untracked running process.
+The service revalidates context before the process starts. A mismatch blocks the launch with recovery context and never switches branches. Session records are written around process state changes, so a failed write cannot leave an untracked process running.
 
 ## Embedded PTY Contract
 <!-- chunkId: workspace-ai-launch-reference-pty -->
-<!-- keywords: PTY, resize, channel, cancel, process state -->
+<!-- keywords: resize, channel, cancel, exit state -->
 
-[live] PM-020 the embedded adapter starts a bounded PTY, supports terminal resize, streams through a session channel, and tracks exit state. Evidence: `internal/ai/ai_terminal_repository.go:155`, `internal/ai/ai_terminal_repository.go:297`, `web/src/features/ai-session/EmbeddedTerminal.tsx:13`.
+[live] The embedded adapter starts a bounded PTY, supports resize, streams through a session channel and tracks exit state. Evidence: `internal/ai/ai_terminal_repository.go:105`, `internal/ai/ai_terminal_repository.go:283`.
 
-Closing a normal embedded window cancels its process unless the owning surface explicitly retains it. Hiding a compact
-Canvas view does not redefine process lifetime; the session record remains the shared source for other views.
+Closing a normal embedded window cancels its process unless the owning surface keeps it. Hiding a Canvas view does not change process lifetime.
 
 ## Presentation Modes
 <!-- chunkId: workspace-ai-launch-reference-presentation -->
-<!-- keywords: floating, side panel, maximized, minimized, responsive -->
+<!-- keywords: floating geometry, side panel, maximized, responsive -->
 
-[live] PM-027 the dock stores floating geometry, resizes the right panel, and promotes an undersized side panel to maximized presentation. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:30`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:154`, `web/src/features/ai-session/EmbeddedTerminalDock.tsx:173`.
+[live] The dock stores floating geometry, resizes the right panel and maximizes a side panel that is too narrow. Evidence: `web/src/features/ai-session/EmbeddedTerminalDock.tsx:30`.
 
 ## Not supported
 <!-- chunkId: workspace-ai-launch-reference-not-supported -->
-<!-- keywords: shell injection, unknown capability, branch mutation -->
+<!-- keywords: shell injection, request executable, branch mutation -->
 
-[live] PM-018 launch does not accept an arbitrary executable from the request, and branch mismatch does not trigger an implicit checkout. Evidence: `internal/ai/ai_launch_service.go:84`, `internal/ai/ai_embedded_session_record_test.go:48`.
+[live] A request cannot name an executable. A branch mismatch never triggers a checkout. Evidence: `internal/ai/ai_external_launch.go:101`.
 
 ## Known conflicts
 <!-- chunkId: workspace-ai-launch-reference-known-conflicts -->
-<!-- keywords: custom prompt, old terminal layout, session record -->
+<!-- keywords: custom prompt, compatibility field, current clients -->
 
-[legacy] `customPrompt` survives as a compatibility field from the earlier launch contract. Current clients send `promptDraft`, and current session browsing depends on the durable session record introduced after PM-020.
+- "Clients send `customPrompt`." Current clients send `promptDraft`. `customPrompt` is a compatibility field.
 
 ## Related pages
 
-See [[workspace-ai-session-launch]], [[workspace-session-focus-reference]], and [[workspace-terminal-canvas-reference]].
+See [[workspace-ai-session-launch]] and [[workspace-terminal-canvas-reference]].

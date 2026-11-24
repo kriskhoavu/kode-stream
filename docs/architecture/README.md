@@ -1,17 +1,14 @@
-# Architecture Documentation
+# Architecture
 
-Kode Stream separates its system architecture from operational guidance. Start with the overview, then choose the
-runtime or distribution that matches the way Kode Stream is being used.
+Start with the overview, then read the page for your runtime.
 
-| Architecture                                          | Use it to understand                                                                              | Primary Mermaid diagram                                   |
-|-------------------------------------------------------|---------------------------------------------------------------------------------------------------|-----------------------------------------------------------|
-| [System overview](overview.md)                        | Shared components, ownership, and how the modes fit together                                      | [Deployment model](overview.md#deployment-model)          |
-| [Local mode](local-mode/README.md)                    | A single-user local server, local repositories, and the `datadir` or SQLite option                | [Local mode](local-mode/local-mode.mmd)                   |
-| [Cloud mode](cloud-mode/README.md)                    | Hosted control plane, Agent-Backed workspaces, and Agentless Remote Snapshot workspaces           | [Cloud mode](cloud-mode/cloud-mode.mmd)                   |
-| [Chrome extension](chrome-extension/README.md)        | The unpacked extension distribution and its local-server boundary                                 | [Chrome extension](chrome-extension/chrome-extension.mmd) |
-| [Deployment adapters](deployment-adapters.md)         | Runtime policy, storage providers, Cloud workspace access, and extension API-origin seams         | [Class diagrams](deployment-adapters.md)                  |
-| [Engineering harness](../../wiki/platform/harness.md) | Scouts, the ranked queue, coding CLIs run in worktrees, and approvals from the Workstream board or Webex | None                                                      |
+| Page                                                  | Covers                                                                     |
+|-------------------------------------------------------|----------------------------------------------------------------------------|
+| [System overview](overview.md)                        | Components, packages, data ownership and how the modes fit together        |
+| [Local mode](local-mode/README.md)                    | The single-user local server and its `datadir` or SQLite storage           |
+| [Cloud mode](cloud-mode/README.md)                    | The hosted control plane, Agent-Backed and Remote Snapshot workspaces      |
+| [Chrome extension](chrome-extension/README.md)        | The unpacked extension and its local-server boundary                       |
+| [Deployment adapters](deployment-adapters.md)         | Runtime policy, storage providers, Cloud workspace access, extension origin |
+| [Engineering harness](../../wiki/platform/harness.md) | Scouts, the ranked queue, coding CLIs in worktrees, approvals              |
 
-Each README renders its primary Mermaid diagram inline; the adjacent `.mmd` file is the single source for every diagram.
-Detailed storage operation and deployment procedures stay in [Storage](../domain/storage/storage-architecture.md), [Cloud](../domain/cloud/cloud-modes.md), and
-[deployment and operations](../../deploy/README.md).
+Each README renders its main Mermaid diagram inline. The `.mmd` file beside it is the source.

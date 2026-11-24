@@ -10,51 +10,58 @@ sourceRef: |
   PM-042 (plan retired) | Browser journey
   PM-042 (plan retired) | Visible actions and assertions
   PM-042 (plan retired) | Historical result
-lastVerified: 2026-09-12
+lastVerified: 2026-11-24
 ---
 
 ## Global Session List
 <!-- chunkId: workspace-session-focus-reference-global-list -->
-<!-- keywords: global sessions, active scope, authorization, row cap -->
+<!-- keywords: active scope, authorization, row cap, change counts -->
 
-[live] `GET /api/sessions` defaults to active scope, accepts `active` or `all`, omits workspaces the caller cannot read, sorts newest first, and returns at most 200 rows. Evidence: `internal/server/api/sessions.go:43`, `internal/ai/session_global.go:14`.
+[live] `GET /api/sessions` defaults to `active` scope and accepts `active` or `all`. It omits workspaces the caller cannot read, sorts newest first and returns at most 200 rows. Evidence: `internal/server/api/sessions.go:34`, `internal/ai/session_global.go:13`.
 
-Only active rows receive best-effort change counts, and only after sorting and truncation. Missing titles, branches, or change counts do not fail the full list.
+Only active rows get best-effort change counts, after sorting and truncation. A missing title, branch or count does not fail the list.
 
 ## Change Availability
 <!-- chunkId: workspace-session-focus-reference-change-availability -->
-<!-- keywords: available, unavailable, unsupported, launch commit -->
+<!-- keywords: launch commit, reason code, unsupported, unavailable -->
 
-[live] Changes are `unsupported` for non-Local content providers and `unavailable` for a missing workspace path, unknown launch commit, or launch commit removed from history. Evidence: `internal/ai/session_changes.go:93`, `internal/ai/session_changes.go:126`.
+[live] Changes compare the session's launch commit (`ObservedCommit`) with the checkout, including staged, unstaged and untracked files. Each response carries an `availability` and, when not `available`, a `reason`. Evidence: `internal/ai/session_changes.go:15`.
 
-Other Git failures remain server errors so corruption or missing infrastructure is not mislabeled as a routine rewritten-history case. The summary reports file status, rename origin, additions, deletions, HEAD movement, and truncation.
+| Availability  | Reason                         | Meaning                                                    |
+|---------------|--------------------------------|------------------------------------------------------------|
+| `unsupported` | `content_provider_unsupported` | The workspace is not a Local checkout                      |
+| `unavailable` | `workspace_missing`            | The workspace is not registered, or its path is gone       |
+| `unavailable` | `launch_commit_unknown`        | The record has no `ObservedCommit`                         |
+| `unavailable` | `launch_commit_missing`        | The launch commit left history, for example after a rebase |
+
+Any other Git failure is a server error, never `launch_commit_missing`. The summary reports file status, rename origin, additions, deletions, HEAD movement and truncation.
 
 ## Diff And Authorization
 <!-- chunkId: workspace-session-focus-reference-diff-authorization -->
-<!-- keywords: session diff, one mibibyte, path guard, hidden denial -->
+<!-- keywords: one mebibyte, path guard, hidden denial, 404 -->
 
-[live] `GET /api/sessions/{id}/diff` returns a single on-demand file diff capped at 1 MiB, and session authorization returns the same 404 for a missing session and a denied workspace. Evidence: `internal/server/api/sessions.go:12`, `internal/server/api/sessions.go:89`.
+[live] `GET /api/sessions/{id}/diff` returns one file diff on demand, capped at 1 MiB. A missing session and a denied workspace both return the same 404. Evidence: `internal/server/api/sessions.go:12`, `internal/server/api/sessions.go:80`.
 
-An unavailable or unsupported diff returns conflict with its reason. Empty paths and paths beginning with `:` or `-` are rejected before Git is invoked.
+An unavailable or unsupported diff returns 409 with its reason. Git never runs for an empty path or a path that starts with `:` or `-`.
 
 ## Session Clients
 <!-- chunkId: workspace-session-focus-reference-client-refresh -->
 <!-- keywords: global route, checkout filter, plan grouping, projection refresh -->
 
-[live] Agent Space's Sessions view is the one session list; `/sessions` opens it. It loads the records of the current workspace and checkout, groups them by plan, and lists the harness's agents beside them as harness sessions (see [[workspace-agent-sessions-reference]]). Stopping an interactive session reloads the list and Canvas projection; **Open on board** selects the existing Canvas node. Evidence: `web/src/app/router.ts:64`, `web/src/pages/CanvasPage.tsx:173`, `web/src/features/canvas/CanvasSessionsView.tsx:23`.
+[live] Agent Space's Sessions view is the one session list, and `/sessions` opens it. It loads the current workspace's records for the checked-out branch, groups them by plan and lists harness sessions beside them (see [[workspace-agent-sessions-reference]]). Stopping an interactive session reloads the list and the Canvas projection. **Open on board** selects the existing Canvas node. Evidence: `web/src/app/router.ts:62`, `web/src/features/canvas/CanvasSessionsView.tsx:11`.
 
 ## Not supported
 <!-- chunkId: workspace-session-focus-reference-not-supported -->
 <!-- keywords: working tree fallback, durable diff, cloud provider, unlimited list -->
 
-[live] A missing launch commit has no working-tree-only fallback, diffs are not persisted, non-Local providers cannot compute changes, and the global list is not unbounded. Evidence: `internal/ai/session_changes.go:133`, `internal/ai/session_global.go:90`.
+[live] A missing launch commit has no working-tree-only fallback. Diffs are never stored. Non-Local providers cannot compute changes. The global list is capped. Evidence: `internal/ai/session_changes.go:105`, `internal/ai/session_global.go:13`.
 
 ## Known conflicts
 <!-- chunkId: workspace-session-focus-reference-known-conflicts -->
-<!-- keywords: historical validation, two workspace, native keyboard -->
+<!-- keywords: attribution, shared checkout, authorship -->
 
-[open] Has the Sessions view, with deterministic real edits and native terminal keyboard interaction, been rerun? The retired result used one throwaway workspace and did not complete that coverage.
+- "Changes show what this one session did." They show everything in the checkout since launch, by any session or person.
 
 ## Related pages
 
-See [[workspace-session-focus]], [[workspace-agent-sessions-reference]], [[workspace-terminal-canvas-reference]], and [[e2e-testing-workspace-terminal-canvas]].
+See [[workspace-session-focus]], [[workspace-agent-sessions-reference]] and [[workspace-terminal-canvas-reference]].
