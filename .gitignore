@@ -1,64 +1,16 @@
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### Node ###
-node_modules/
-plans/**/automation/artifacts/
-.npmrc
-*.tsbuildinfo
-vite.config.js
-vite.config.d.ts
-vitest.config.js
-vitest.config.d.ts
-
-### Local builds ###
+# Build output
 /kode-stream
-/.run/
-/internal/server/frontend/assets/
+/bin/
+/dist/
 /release/
+/internal/server/frontend/assets/
 
-### Docker ###
-docker-compose/dist/.env
-/log/
-log/
+# Local run state and e2e evidence
+/.run/
+plans/**/automation/artifacts/
 
-### macOS ###
-# General
-**/.DS_Store
-main-localization.json
-
-/.serena/*
-.github/skills/*
-.github/instructions/instructions.instructions.md
+# Dependencies, npm credentials, editors
+node_modules/
+.npmrc
+.idea/
+.DS_Store

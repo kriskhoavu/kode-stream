@@ -1,9 +1,9 @@
 .git
 .idea
-.serena
-node_modules
+.run
 bin
-release
-plans
-npm-debug.log
 deploy
+dist
+node_modules
+plans
+release
