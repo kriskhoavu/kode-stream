@@ -10,7 +10,7 @@ type OwnSettingsTab = 'tools' | 'models';
 const tabs: { id: OwnSettingsTab; label: string }[] = [{ id: 'tools', label: 'Tools and harness' }, { id: 'models', label: 'Models and skills' }];
 
 // One harness form spans both tabs, so an edit survives a tab switch and one Save keeps both.
-export function WorkspaceOwnSettings({ workspace, showHarness = true }: { workspace: WorkspaceConfig; showHarness?: boolean }) {
+export function WorkspaceOwnSettings({ workspace }: { workspace: WorkspaceConfig }) {
 	const ai = useAISettings();
 	const [tab, setTab] = useState<OwnSettingsTab>('tools');
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -23,14 +23,12 @@ export function WorkspaceOwnSettings({ workspace, showHarness = true }: { worksp
 	};
 	return (
 		<section className="settings-page workspace-own-settings">
-			{showHarness && (
-				<div className="hx-tabs" role="tablist" aria-label={`Settings for ${workspace.name}`}>
-					{tabs.map((item, index) => (
-						<button key={item.id} ref={(element) => { tabRefs.current[index] = element; }} type="button" role="tab" id={`own-tab-${item.id}`} aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} className={tab === item.id ? 'on' : undefined} onClick={() => setTab(item.id)} onKeyDown={(event) => onTabKey(event, index)}>{item.label}</button>
-					))}
-				</div>
-			)}
-			{(tab === 'tools' || !showHarness) && <section className="settings-section ai-settings-section">
+			<div className="hx-tabs" role="tablist" aria-label={`Settings for ${workspace.name}`}>
+				{tabs.map((item, index) => (
+					<button key={item.id} ref={(element) => { tabRefs.current[index] = element; }} type="button" role="tab" id={`own-tab-${item.id}`} aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} className={tab === item.id ? 'on' : undefined} onClick={() => setTab(item.id)} onKeyDown={(event) => onTabKey(event, index)}>{item.label}</button>
+				))}
+			</div>
+			{tab === 'tools' && <section className="settings-section ai-settings-section">
 				<header>
 					<div>
 						<span className="settings-group-label">Local AI tools</span>
@@ -59,7 +57,7 @@ export function WorkspaceOwnSettings({ workspace, showHarness = true }: { worksp
 				)}
 				{ai.error && <p className="settings-error" role="alert">{ai.error}</p>}
 			</section>}
-			{showHarness && <HarnessSettingsSection workspaceId={workspace.id} view={tab === 'tools' ? 'choices' : 'models'} />}
+			<HarnessSettingsSection workspaceId={workspace.id} view={tab === 'tools' ? 'choices' : 'models'} />
 		</section>
 	);
 }

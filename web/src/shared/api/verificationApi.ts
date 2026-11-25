@@ -1,5 +1,5 @@
 import type { E2ERunbookList, CreateVerificationJobInput, JiraIssueState, ItemVerificationTests, VerifyProfile, VerificationJob, RunArtifact, VerificationTestSelection } from '../../lib/types';
-import { apiURL, request } from './http';
+import { request } from './http';
 import { normalizeItemVerificationTests } from './normalize';
 
 export const verificationApi = {
@@ -20,5 +20,5 @@ export const verificationApi = {
 	itemE2ERunbooks: (itemId: string, signal?: AbortSignal) => request<E2ERunbookList>(`/api/items/${encodeURIComponent(itemId)}/e2e-runbooks`, { signal }, !signal),
   jiraIssue: (itemId: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira`, { signal }, !signal),
   refreshJiraIssue: (itemId: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/items/${encodeURIComponent(itemId)}/jira/refresh`, { method: 'POST', signal }, false),
-  jiraAttachmentURL: (itemId: string, attachmentId: string) => apiURL(`/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`)
+  jiraAttachmentURL: (itemId: string, attachmentId: string) => `/api/items/${encodeURIComponent(itemId)}/jira/attachments/${encodeURIComponent(attachmentId)}`
 };

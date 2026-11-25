@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { App, LocalServerUnavailable } from './App';
+import { App } from './App';
 import { api } from './shared/api';
 import type { WorkspaceConfig } from './lib/types';
 
@@ -18,18 +18,6 @@ afterEach(() => {
   vi.restoreAllMocks();
   localStorage.clear();
   window.history.replaceState(null, '', '/workstream');
-});
-
-describe('LocalServerUnavailable', () => {
-  it('shows the configured local API origin and retries on demand', () => {
-    const retry = vi.fn();
-    render(<LocalServerUnavailable status="unavailable" apiOrigin="http://127.0.0.1:9999" onRetry={retry} />);
-
-    expect(screen.getByRole('alert')).toHaveTextContent('http://127.0.0.1:9999');
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-
-    expect(retry).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe('App route transitions', () => {

@@ -44,13 +44,4 @@ describe('WorkspaceOwnSettings', () => {
 		expect(screen.queryByRole('combobox', { name: 'Provider here' })).not.toBeInTheDocument();
 		expect(screen.getByRole('region', { name: 'Harness settings for ws-1' })).toHaveAttribute('data-view', 'models');
 	});
-
-	it('leaves the harness out where it does not run', async () => {
-		vi.mocked(api.aiSettings).mockResolvedValue({ defaultProvider: 'claude', defaultTerminal: '', providers: {}, terminals: {} });
-		vi.mocked(api.aiCapabilities).mockResolvedValue([]);
-		render(<WorkspaceOwnSettings workspace={workspace} showHarness={false} />);
-		await screen.findByRole('combobox', { name: 'Provider here' });
-		expect(screen.queryByRole('region', { name: /Harness settings/ })).not.toBeInTheDocument();
-		expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
-	});
 });

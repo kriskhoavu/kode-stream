@@ -1,17 +1,9 @@
 import type { AppState, AgentConnectToken, CloudAgent, AuditEvent, RecentItem, SavedFilter, SearchResult } from '../../lib/types';
-import { apiURL, request } from './http';
+import { request } from './http';
 import { normalizeAuditEvent, normalizeSearchResult, normalizeSavedFilter, normalizeRecentItem } from './normalize';
 
 export const appApi = {
   health: () => request<{ status?: string }>('/api/health', undefined, false),
-  localServerReachable: async () => {
-    try {
-      await fetch(apiURL('/api/health'), { headers: { 'Content-Type': 'application/json' } });
-      return true;
-    } catch {
-      return false;
-    }
-  },
   state: (signal?: AbortSignal) => request<AppState>('/api/state', { signal }, !signal),
   logout: () => request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' }),
   cloudAgents: async () => ((await request<CloudAgent[] | null>('/api/agents')) ?? []),

@@ -21,8 +21,6 @@ export class ApiError extends Error {
 }
 
 export const inFlightRequests = new Map<string, Promise<unknown>>();
-export const defaultLocalAPIOrigin = 'http://127.0.0.1:4317';
-export const localAPIOriginStorageKey = 'kodeStreamApiOrigin';
 export const maxJSONResponseBytes = 2 * 1024 * 1024;
 export const maxSSEBufferBytes = 256 * 1024;
 export const maxSSETotalBytes = 2 * 1024 * 1024;
@@ -31,28 +29,13 @@ export class ApiResponseError extends Error {
   constructor(message: string) { super(message); this.name = 'ApiResponseError'; }
 }
 
-export function isExtensionSurface(protocol = globalThis.location?.protocol): boolean {
-  return protocol === 'chrome-extension:';
-}
-
-export function localAPIOrigin(storage: Pick<Storage, 'getItem'> = localStorage): string {
-  const configured = storage.getItem(localAPIOriginStorageKey)?.trim().replace(/\/+$/, '');
-  return configured || defaultLocalAPIOrigin;
-}
-
-export function apiURL(path: string, extensionSurface = isExtensionSurface()): string {
-  if (!path.startsWith('/')) return path;
-  if (!extensionSurface) return path;
-  return `${localAPIOrigin()}${path}`;
-}
-
 export async function request<T>(path: string, options?: RequestInit, dedupe = options?.method === undefined || options.method === 'GET'): Promise<T> {
   const key = dedupe ? `${options?.method ?? 'GET'} ${path} ${options?.body ?? ''}` : '';
   const existing = key ? inFlightRequests.get(key) : undefined;
   if (existing) return existing as Promise<T>;
 
   const pending = (async () => {
-    const res = await fetch(apiURL(path), {
+    const res = await fetch(path, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

@@ -102,11 +102,4 @@ describe('SettingsPage areas', () => {
     fireEvent.change(screen.getByRole('combobox', { name: 'Settings area' }), { target: { value: 'appearance' } });
     expect(screen.getByRole('radiogroup', { name: 'Header backdrop' })).toBeInTheDocument();
   });
-
-  it('leaves the harness out of the menu where it does not run', () => {
-    vi.mocked(api.aiSettings).mockResolvedValue(null as never);
-    vi.mocked(api.aiCapabilities).mockResolvedValue([]);
-    render(<SettingsPage settings={defaultAppSettings} onChange={vi.fn()} showHarness={false} />);
-    expect(within(screen.getByRole('navigation', { name: 'Settings areas' })).queryByRole('button', { name: /Harness/ })).not.toBeInTheDocument();
-  });
 });

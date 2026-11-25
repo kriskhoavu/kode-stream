@@ -61,7 +61,7 @@ export function AgentCluster({ agents, title, onOpen }: { agents?: ItemAgents; t
 	</span>;
 }
 
-export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError, allowEmbedded = true, harnessRun, mode, onModeChange }: { itemId: string; agents?: ItemAgents; focus?: AgentFocus; onFocus: (focus: AgentFocus) => void; onLaunched: (result: EmbeddedAISessionResult) => void; onError: (message: string) => void; allowEmbedded?: boolean; harnessRun?: React.ReactNode; mode?: AgentsMode; onModeChange?: (mode: AgentsMode) => void }) {
+export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError, harnessRun, mode, onModeChange }: { itemId: string; agents?: ItemAgents; focus?: AgentFocus; onFocus: (focus: AgentFocus) => void; onLaunched: (result: EmbeddedAISessionResult) => void; onError: (message: string) => void; harnessRun?: React.ReactNode; mode?: AgentsMode; onModeChange?: (mode: AgentsMode) => void }) {
 	const [earlierOpen, setEarlierOpen] = useState(false);
 	const [message, setMessage] = useState('');
 	const [ownMode, setOwnMode] = useState<AgentsMode>('run');
@@ -79,7 +79,7 @@ export function AgentsTab({ itemId, agents, focus, onFocus, onLaunched, onError,
 		{current === 'run' && harnessRun}
 		{current === 'sessions' && <>
 		<div className="agents-tab-launch">
-			<AISessionLaunchControl itemId={itemId} buttonLabel="New session" onLaunched={setMessage} onError={(caught) => onError(caught instanceof Error ? caught.message : 'The session could not be started.')} onEmbeddedLaunched={onLaunched} allowEmbedded={allowEmbedded} />
+			<AISessionLaunchControl itemId={itemId} buttonLabel="New session" onLaunched={setMessage} onError={(caught) => onError(caught instanceof Error ? caught.message : 'The session could not be started.')} onEmbeddedLaunched={onLaunched} />
 			{message && <p className="agents-tab-message" role="status">{message}</p>}
 		</div>
 		<AgentGroup title="Live" empty="No session is running for this card.">

@@ -4,7 +4,7 @@ import type { WorkspaceConfig } from '../lib/types';
 import { sourcePaths } from '../lib/sources';
 import type { Route } from './router';
 
-export function LeftNav({ route, navigate, workspaces, activeWorkspaceId, lastSync, collapsed, onToggle, showAgentSpace, onSelectWorkspace }: {
+export function LeftNav({ route, navigate, workspaces, activeWorkspaceId, lastSync, collapsed, onToggle, onSelectWorkspace }: {
   route: Route;
   navigate: (route: Route) => void;
   workspaces: WorkspaceConfig[];
@@ -12,7 +12,6 @@ export function LeftNav({ route, navigate, workspaces, activeWorkspaceId, lastSy
   lastSync: string;
   collapsed: boolean;
   onToggle: () => void;
-  showAgentSpace: boolean;
   onSelectWorkspace: (workspace: WorkspaceConfig) => void;
 }) {
   return (
@@ -27,7 +26,7 @@ export function LeftNav({ route, navigate, workspaces, activeWorkspaceId, lastSy
       <div className="nav-section">
         <span className="nav-section-label">Workspace</span>
         <NavButton active={route.name === 'workstream'} onClick={() => navigate({ name: 'workstream' })} icon={<WorkstreamIcon size={18} />} label="Workstream" />
-        {showAgentSpace && <NavButton active={route.name === 'canvas'} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeWorkspaceId } })} icon={<Bot size={18} />} label="Agent Space" />}
+        <NavButton active={route.name === 'canvas'} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeWorkspaceId } })} icon={<Bot size={18} />} label="Agent Space" />
         <NavButton active={route.name === 'knowledge'} onClick={() => navigate({ name: 'knowledge' })} icon={<BookOpen size={18} />} label="Knowledge" />
       </div>
       <div className="workspace-list">

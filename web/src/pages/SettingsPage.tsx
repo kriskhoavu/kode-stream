@@ -28,12 +28,11 @@ const areas: { id: SettingsArea; label: string; hint: string; icon: typeof Palet
   { id: 'storage', label: 'Storage', hint: 'Where app state lives', icon: Database }
 ];
 
-export function SettingsPage({ settings, onChange, showHarness = true }: { settings: AppSettings; onChange: (settings: AppSettings) => void; showHarness?: boolean }) {
+export function SettingsPage({ settings, onChange }: { settings: AppSettings; onChange: (settings: AppSettings) => void }) {
   const visible = new Set(settings.visibleWorkstreamStatuses);
   const ai = useAISettings();
-  const shownAreas = areas.filter((area) => showHarness || area.id !== 'harness');
-  const [area, setArea] = useState<SettingsArea>('appearance');
-  const current = shownAreas.find((candidate) => candidate.id === area) ?? shownAreas[0];
+    const [area, setArea] = useState<SettingsArea>('appearance');
+  const current = areas.find((candidate) => candidate.id === area) ?? areas[0];
   const toggleStatus = (status: ItemStatus) => {
     const next = visible.has(status)
       ? settings.visibleWorkstreamStatuses.filter((item) => item !== status)
@@ -50,7 +49,7 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
 
       <div className="settings-shell">
         <nav className="settings-nav" aria-label="Settings areas">
-          {shownAreas.map(({ id, label, hint, icon: Icon }) => (
+          {areas.map(({ id, label, hint, icon: Icon }) => (
             <button key={id} type="button" className={id === current.id ? 'active' : undefined} aria-current={id === current.id ? 'page' : undefined} onClick={() => setArea(id)}>
               <Icon size={16} aria-hidden="true" />
               <span><strong>{label}</strong><small>{hint}</small></span>
@@ -60,7 +59,7 @@ export function SettingsPage({ settings, onChange, showHarness = true }: { setti
         <label className="settings-nav-select">
           <span>Settings area</span>
           <select value={current.id} onChange={(event) => setArea(event.target.value as SettingsArea)}>
-            {shownAreas.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+            {areas.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
           </select>
         </label>
 

@@ -1,5 +1,5 @@
 import type { WorkstreamBranchLoadResult, ReviewedPlanImportInput, JiraConnection, JiraConnectionTest, JiraIssueState, WorkspaceConfig, WorkspaceCreateResult, WorkspaceInput, WorkspaceHealth, WorkspaceImportPreview, WorkspaceImportRequest, WorkspaceImportResult, SourceStructureSettings, ScanResult, WorkspaceRuntimeConfig, SourceSettingsResult, WriteResult } from '../../lib/types';
-import { ApiError, maxSSEBufferBytes, maxSSETotalBytes, ApiResponseError, apiURL, request, stringField, readJSONResponse, parseSSEMessage } from './http';
+import { ApiError, maxSSEBufferBytes, maxSSETotalBytes, ApiResponseError, request, stringField, readJSONResponse, parseSSEMessage } from './http';
 import { normalizeWorkspace, normalizeWorkspaceImportPreview, normalizeWorkspaceImportResult, isWorkspaceCreateResult, normalizeWorkstreamBranchLoadResult, normalizeWorkspaceHealth } from './normalize';
 
 export const workspaceApi = {
@@ -20,7 +20,7 @@ export const workspaceApi = {
     };
   },
   createWorkspaceStream: async (input: WorkspaceInput, onLog: (chunk: string) => void, signal?: AbortSignal) => {
-    const res = await fetch(apiURL('/api/workspaces/stream-create'), {
+    const res = await fetch('/api/workspaces/stream-create', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input), signal
@@ -88,7 +88,7 @@ export const workspaceApi = {
   testJiraConnection: (workspaceId: string, connection: JiraConnection) => request<JiraConnectionTest>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/test`, { method: 'POST', body: JSON.stringify(connection) }),
   workspaceJiraIssue: (workspaceId: string, issueKey: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}`, { signal }, !signal),
   refreshWorkspaceJiraIssue: (workspaceId: string, issueKey: string, signal?: AbortSignal) => request<JiraIssueState>(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}?refresh=1`, { signal }, false),
-  workspaceJiraAttachmentURL: (workspaceId: string, issueKey: string, attachmentId: string) => apiURL(`/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}/attachments/${encodeURIComponent(attachmentId)}`),
+  workspaceJiraAttachmentURL: (workspaceId: string, issueKey: string, attachmentId: string) => `/api/workspaces/${encodeURIComponent(workspaceId)}/jira/issues/${encodeURIComponent(issueKey)}/attachments/${encodeURIComponent(attachmentId)}`,
   workspaceRuntime: (workspaceId: string) => request<WorkspaceRuntimeConfig | { runtime: null }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/runtime`).then((payload) => {
     if ('runtime' in payload) return payload.runtime;
     return payload;

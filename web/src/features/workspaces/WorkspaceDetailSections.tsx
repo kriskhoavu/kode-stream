@@ -71,7 +71,7 @@ export function WorkspaceSourcesSection({ repo, edit, busy, canWrite, onShownIn,
   );
 }
 
-export function WorkspaceIntegrations({ repo, edit, busy, showHarness, settingsKey }: { repo: WorkspaceConfig; edit: WorkspaceEdit; busy: boolean; showHarness: boolean; settingsKey: string }) {
+export function WorkspaceIntegrations({ repo, edit, busy, settingsKey }: { repo: WorkspaceConfig; edit: WorkspaceEdit; busy: boolean; settingsKey: string }) {
   return (
     <>
       {edit.editingId === repo.id && isIntegrationEditSection(edit.editingSection) ? <>
@@ -83,7 +83,7 @@ export function WorkspaceIntegrations({ repo, edit, busy, showHarness, settingsK
         <div><strong>Jira</strong><span>{repo.jira ? `${repo.jira.projectKey} · ${repo.jira.deploymentType === 'cloud' ? 'Cloud' : 'Server / Data Center'}` : 'Not configured'}</span></div>
         <button className="secondary" type="button" onClick={() => edit.startEdit(repo, 'jira')}>{repo.jira ? 'Configure' : 'Connect Jira'}</button>
       </div><div className="workspace-integration-card"><div><strong>Knowledge</strong><span>{repo.knowledge?.enabled === false ? 'Disabled' : repo.knowledge?.enrichExecutable ? `Enabled · ${repo.knowledge.enrichExecutable}` : 'Enabled · Enrichment not configured'}</span><KnowledgeRoots workspaceId={repo.id} enabled={repo.knowledge?.enabled !== false} /></div><button className="secondary" type="button" onClick={() => edit.startEdit(repo, 'knowledge')}>Configure</button></div><div className="workspace-integration-card"><div><strong>Runtime and verification</strong><span>{repo.runtime ? `${repo.runtime.type} · ${repo.runtime.rebuildPolicy ?? 'changed-only'}` : 'Not configured'}</span></div><button className="secondary" type="button" onClick={() => edit.startEdit(repo, 'runtime')}>{repo.runtime ? 'Configure' : 'Set runtime'}</button></div>
-      {showHarness && <HarnessSettingsSection key={settingsKey} workspaceId={repo.id} part="sources" />}</>}
+      <HarnessSettingsSection key={settingsKey} workspaceId={repo.id} part="sources" /></>}
     </>
   );
 }

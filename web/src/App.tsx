@@ -1,11 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { useDismiss } from './components/useDismiss';
 import { LeftNav, WorkspaceMenu } from './app/AppNavigation';
 import { Bell, BookOpen, ChevronDown, KanbanSquare as WorkstreamIcon, Moon, Search, Sun, FolderGit2, Settings, Bot } from 'lucide-react';
 import type { WorkspaceConfig } from './lib/types';
 import { useAppState } from './app/useAppState';
 import { routeFromPath } from './app/router';
-import { api, isExtensionSurface, localAPIOrigin } from './shared/api';
+import { api } from './shared/api';
 import { ActivityPanel } from './components/ReliabilityPanels';
 import { HeaderBackdrop, bandClasses } from './components/HeaderBackdrop';
 import { SearchDialog } from './components/SearchDialog';
@@ -25,7 +25,6 @@ const BranchReviewPage = lazy(() => import('./pages/BranchReviewPage').then((mod
 const HarnessRunRedirect = lazy(() => import('./features/workstream/HarnessRunRedirect').then((module) => ({ default: module.HarnessRunRedirect })));
 
 export function App() {
-  const extensionSurface = isExtensionSurface();
   const {
     route,
     theme,
@@ -46,7 +45,6 @@ export function App() {
   const [leftNavCollapsed, setLeftNavCollapsed] = useState(() => readStringPreference('leftNavCollapsed') === 'true');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [localAPIStatus, setLocalAPIStatus] = useState<'ready' | 'checking' | 'unavailable'>(extensionSurface ? 'checking' : 'ready');
   const [appSettings, setAppSettings] = useAppSettings();
   const quickSwitcher = useQuickSwitcher();
   const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
@@ -68,31 +66,13 @@ export function App() {
     return next;
   });
 
-  const checkLocalAPI = useCallback(async () => {
-    if (!extensionSurface) return;
-    setLocalAPIStatus('checking');
-    if (await api.localServerReachable()) {
-      setLocalAPIStatus('ready');
-      return;
-    }
-    setLocalAPIStatus('unavailable');
-  }, [extensionSurface]);
-
-  useEffect(() => {
-    if (extensionSurface) void checkLocalAPI();
-  }, [extensionSurface, checkLocalAPI]);
-
-  if (extensionSurface && localAPIStatus !== 'ready') {
-    return <LocalServerUnavailable status={localAPIStatus} apiOrigin={localAPIOrigin()} onRetry={() => void checkLocalAPI()} />;
-  }
-
   const band = bandClasses(route.name, appSettings.headerBackdrop);
   const shellClasses = ['app-shell', leftNavCollapsed ? 'left-nav-collapsed' : '', band].filter(Boolean).join(' ');
 
   return (
     <div className={shellClasses}>
       {band && <HeaderBackdrop variant={appSettings.headerBackdrop} />}
-      <LeftNav route={route} navigate={navigate} workspaces={workspaces} activeWorkspaceId={activeRepo?.id} lastSync={lastSync} collapsed={leftNavCollapsed} onToggle={toggleLeftNav} showAgentSpace={!extensionSurface} onSelectWorkspace={selectWorkspace} />
+      <LeftNav route={route} navigate={navigate} workspaces={workspaces} activeWorkspaceId={activeRepo?.id} lastSync={lastSync} collapsed={leftNavCollapsed} onToggle={toggleLeftNav} onSelectWorkspace={selectWorkspace} />
 
       <header className="topbar">
         <div className="workspace-switcher" ref={workspaceMenuRef}>
@@ -203,11 +183,11 @@ export function App() {
             onOpenReview={() => navigate({ name: 'review', location: { workspaceId: activeRepo?.id } })}
           />
         </Suspense>}
-        {route.name === 'item' && <Suspense fallback={<section className="empty-state">Loading item...</section>}><ItemWorkspacePage key={route.itemId} itemId={route.itemId} view={route.view} onViewChange={(view) => navigate({ name: 'item', itemId: route.itemId, view })} refreshKey={contentRefreshKey} workspaces={workspaces} allowEmbeddedAISessions={!extensionSurface} onBack={() => navigate({ name: 'workstream' })} onContentChanged={async () => { await refreshAppStateOnly(); }} /></Suspense>}
-        {route.name === 'workspaces' && <Suspense fallback={<section className="empty-state">Loading workspaces...</section>}><WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} showHarness={!extensionSurface} onChanged={async () => { await refreshAppData(); }} /></Suspense>}
-        {route.name === 'settings' && <Suspense fallback={<section className="empty-state">Loading settings...</section>}><SettingsPage settings={appSettings} onChange={setAppSettings} showHarness={!extensionSurface} /></Suspense>}
+        {route.name === 'item' && <Suspense fallback={<section className="empty-state">Loading item...</section>}><ItemWorkspacePage key={route.itemId} itemId={route.itemId} view={route.view} onViewChange={(view) => navigate({ name: 'item', itemId: route.itemId, view })} refreshKey={contentRefreshKey} workspaces={workspaces} onBack={() => navigate({ name: 'workstream' })} onContentChanged={async () => { await refreshAppStateOnly(); }} /></Suspense>}
+        {route.name === 'workspaces' && <Suspense fallback={<section className="empty-state">Loading workspaces...</section>}><WorkspacesPage workspaces={workspaces} runtimeContext={runtimeContext} onChanged={async () => { await refreshAppData(); }} /></Suspense>}
+        {route.name === 'settings' && <Suspense fallback={<section className="empty-state">Loading settings...</section>}><SettingsPage settings={appSettings} onChange={setAppSettings} /></Suspense>}
         {route.name === 'knowledge' && <Suspense fallback={<section className="empty-state">Loading Knowledge...</section>}><KnowledgePage workspaces={workspaces} activeWorkspace={activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'knowledge', location })} /></Suspense>}
-		{route.name === 'canvas' && !extensionSurface && <Suspense fallback={<section className="empty-state">Loading Agent Space...</section>}><CanvasPage workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenOnCard={(itemId, sessionId) => navigate({ name: 'workstream', focusedItemId: itemId, focusedSessionId: sessionId })} onOpenHarnessRun={(runId) => navigate({ name: 'harness-run', runId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
+		{route.name === 'canvas' && <Suspense fallback={<section className="empty-state">Loading Agent Space...</section>}><CanvasPage workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo} location={route.location} onLocationChange={(location) => navigate({ name: 'canvas', location })} onOpenItem={(itemId) => navigate({ name: 'item', itemId })} onOpenOnCard={(itemId, sessionId) => navigate({ name: 'workstream', focusedItemId: itemId, focusedSessionId: sessionId })} onOpenHarnessRun={(runId) => navigate({ name: 'harness-run', runId })} onOpenWorkspaces={() => navigate({ name: 'workspaces' })} /></Suspense>}
         {route.name === 'review' && <Suspense fallback={<section className="empty-state">Loading Branch Review...</section>}><BranchReviewPage
           workspace={workspaces.find((candidate) => candidate.id === route.location?.workspaceId) ?? activeRepo}
           location={route.location}
@@ -223,11 +203,11 @@ export function App() {
       <nav className="bottom-nav">
         <button className={route.name === 'workstream' ? 'active' : ''} onClick={() => navigate({ name: 'workstream' })}><WorkstreamIcon size={18} />Workstream</button>
         <button className={route.name === 'knowledge' ? 'active' : ''} onClick={() => navigate({ name: 'knowledge' })}><BookOpen size={18} />Knowledge</button>
-		{!extensionSurface && <button className={route.name === 'canvas' ? 'active' : ''} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })}><Bot size={18} />Agent Space</button>}
+		<button className={route.name === 'canvas' ? 'active' : ''} onClick={() => navigate({ name: 'canvas', location: { workspaceId: activeRepo?.id } })}><Bot size={18} />Agent Space</button>
         <button className={route.name === 'workspaces' ? 'active' : ''} onClick={() => navigate({ name: 'workspaces' })}><FolderGit2 size={18} />Workspaces</button>
         <button className={route.name === 'settings' ? 'active' : ''} onClick={() => navigate({ name: 'settings' })}><Settings size={18} />Settings</button>
       </nav>
-		{!extensionSurface && <EmbeddedTerminalDock workspaces={workspaces} />}
+		<EmbeddedTerminalDock workspaces={workspaces} />
     </div>
   );
 }
@@ -237,14 +217,3 @@ function routeFromNavigationPath(path: string) {
   return routeFromPath(url.pathname, url.search);
 }
 
-export function LocalServerUnavailable({ status, apiOrigin, onRetry }: { status: 'checking' | 'unavailable'; apiOrigin: string; onRetry: () => void }) {
-  return (
-    <main className="main-content">
-      <section className="empty-state" role={status === 'checking' ? 'status' : 'alert'} aria-live="polite">
-        <h1>Kode Stream local server unavailable</h1>
-        <p>{status === 'checking' ? `Checking ${apiOrigin}...` : `Start kode-stream serve -port 4317, then retry ${apiOrigin}.`}</p>
-        <button className="primary" type="button" onClick={onRetry}>Retry</button>
-      </section>
-    </main>
-  );
-}

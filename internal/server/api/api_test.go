@@ -461,35 +461,6 @@ func TestGinHealthRoutePreservesContract(t *testing.T) {
 	}
 }
 
-func TestLocalModeAllowsChromeExtensionPreflight(t *testing.T) {
-	handler := New(Dependencies{RuntimeConfig: system.RuntimeConfig{Mode: models.RuntimeModeLocal}}).Routes()
-	request := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
-	request.Header.Set("Origin", "chrome-extension://extension-id")
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	if response.Code != http.StatusNoContent {
-		t.Fatalf("status = %d body = %s", response.Code, response.Body.String())
-	}
-	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "chrome-extension://extension-id" {
-		t.Fatalf("allow origin = %q", got)
-	}
-}
-
-func TestCloudModeDoesNotAllowChromeExtensionCORS(t *testing.T) {
-	handler := New(Dependencies{RuntimeConfig: system.RuntimeConfig{Mode: models.RuntimeModeCloud}}).Routes()
-	request := httptest.NewRequest(http.MethodOptions, "/api/health", nil)
-	request.Header.Set("Origin", "chrome-extension://extension-id")
-	response := httptest.NewRecorder()
-
-	handler.ServeHTTP(response, request)
-
-	if got := response.Header().Get("Access-Control-Allow-Origin"); got != "" {
-		t.Fatalf("allow origin = %q", got)
-	}
-}
-
 func TestGinHealthRouteIncludesDatabaseReadiness(t *testing.T) {
 	handler := New(Dependencies{DatabaseHealth: fakeDatabaseHealth{health: storage.DatabaseHealth{
 		Driver:           storage.StorageDriverSQLite,

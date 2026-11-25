@@ -73,4 +73,4 @@ Workspace details show the repository, ref, commit and local-terminal guidance. 
 
 ## Related pages
 
-See [[platform-storage-reference]] and [[platform-extension-reference]].
+See [[platform-storage-reference]].

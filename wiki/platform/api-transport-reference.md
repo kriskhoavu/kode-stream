@@ -19,7 +19,7 @@ lastVerified: 2026-09-12
 <!-- chunkId: platform-api-transport-reference-single-transport -->
 <!-- keywords: gin engine, route manifest, handlers, spa handler -->
 
-[live] One Gin engine registers the API route manifest. Registration and policy tests share that manifest. Evidence: `internal/server/api/gin_transport.go:20`, `internal/server/api/gin_routes.go:82`.
+[live] One Gin engine registers the API route manifest. Registration and policy tests share that manifest. Evidence: `internal/server/api/gin_transport.go:16`, `internal/server/api/gin_routes.go:82`.
 
 Gin parameters are adapted to the existing HTTP handlers. A separate SPA handler serves the frontend assets.
 
@@ -27,7 +27,7 @@ Gin parameters are adapted to the existing HTTP handlers. A separate SPA handler
 <!-- chunkId: platform-api-transport-reference-middleware-policy -->
 <!-- keywords: recovery, request id, timeout, cors, capability -->
 
-[live] The API stack applies recovery, Local extension CORS, request-ID propagation and a 30-second request context. Every protected route owner must declare an authorization policy. Evidence: `internal/server/api/gin_transport.go:26`, `internal/server/api/gin_routes.go:31`.
+[live] The API stack applies recovery, request-ID propagation and a 30-second request context. Every protected route owner must declare an authorization policy. Evidence: `internal/server/api/gin_transport.go:22`, `internal/server/api/gin_routes.go:31`.
 
 - The request-ID middleware passes on a supplied ID. It does not generate one.
 - The timeout cancels the request context. It does not guarantee that a handler stops within 30 seconds.

@@ -175,7 +175,7 @@ func New(deps Dependencies) *API {
 
 func (a *API) Routes() http.Handler {
 	a.initializeControllers()
-	return newTransport(a.runtimeConfig, a.registerGinRoutes)
+	return newTransport(a.registerGinRoutes)
 }
 
 // Each controller owns its unavailable-service response, so partial fixtures stay safe.

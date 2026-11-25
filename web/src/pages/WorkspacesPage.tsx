@@ -33,7 +33,7 @@ const localRuntimeContext: RuntimeContext = {
   capabilities: { read: true, write: true, workspace_registration: true, git: true, system: true, terminal: true, ai: true, runtime: true, verification: true },
   agent: { available: true, status: 'local' }
 };
-export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContext, onChanged, showHarness = true }: { workspaces: WorkspaceConfig[]; runtimeContext?: RuntimeContext; onChanged: () => void | Promise<void>; /** The harness's settings are absent on the extension surface. */ showHarness?: boolean }) {
+export function WorkspacesPage({ workspaces, runtimeContext = localRuntimeContext, onChanged }: { workspaces: WorkspaceConfig[]; runtimeContext?: RuntimeContext; onChanged: () => void | Promise<void> }) {
   const [systemConfig, setSystemConfig] = useState<SystemConfigPaths | null>(null);
   const [notice, setNotice] = useState<WorkspaceNotice | null>(null);
   const [settingsFile, setSettingsFile] = useState<SettingsFileMode | null>(null);
@@ -506,10 +506,8 @@ const busy = pendingOperations.length > 0;
                   <div className="repo-row-icon"><HardDrive size={18} /></div>
                   <div><h2>{repo.name}</h2><span>{workspaceDetailSubtitle(activeDetailTab)}</span></div>
                   <div className="workspace-detail-heading-actions">
-                    {showHarness && <>
-                      <button className="secondary" type="button" onClick={() => setSettingsFile('export')} title="Write this workspace's settings into .kode-stream/settings.yaml"><Upload size={16} /> Export settings</button>
-                      <button className="secondary" type="button" onClick={() => setSettingsFile('import')} title="Take settings from .kode-stream/settings.yaml"><Download size={16} /> Import settings</button>
-                    </>}
+                    <button className="secondary" type="button" onClick={() => setSettingsFile('export')} title="Write this workspace's settings into .kode-stream/settings.yaml"><Upload size={16} /> Export settings</button>
+                    <button className="secondary" type="button" onClick={() => setSettingsFile('import')} title="Take settings from .kode-stream/settings.yaml"><Download size={16} /> Import settings</button>
                     <button className="secondary" type="button" onClick={() => scan(repo)} disabled={operationBusy(`scan:${repo.id}`) || operationBusy('scan-all') || !canScan}><RotateCw size={16} /> Scan workspace</button>
                     <button className="secondary danger" type="button" onClick={() => setWorkspacesToRemove([repo])} disabled={!canWrite}><Trash2 size={16} /> Remove</button>
                   </div>
@@ -530,10 +528,10 @@ const busy = pendingOperations.length > 0;
                 </section>}
 
                 {activeDetailTab === 'integrations' && <section className="workspace-detail-section">
-                  <WorkspaceIntegrations repo={repo} edit={edit} busy={busy} showHarness={showHarness} settingsKey={`${repo.id}:${settingsImports}`} />
+                  <WorkspaceIntegrations repo={repo} edit={edit} busy={busy} settingsKey={`${repo.id}:${settingsImports}`} />
                 </section>}
 
-                {activeDetailTab === 'agents' && <WorkspaceOwnSettings key={`${repo.id}:${settingsImports}`} workspace={repo} showHarness={showHarness} />}
+                {activeDetailTab === 'agents' && <WorkspaceOwnSettings key={`${repo.id}:${settingsImports}`} workspace={repo} />}
 
                 {settingsFile && <SettingsFileDialog mode={settingsFile} workspaceId={repo.id} workspaceName={repo.name} onClose={() => setSettingsFile(null)} onImported={() => setSettingsImports((value) => value + 1)} />}
 

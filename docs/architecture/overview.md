@@ -37,8 +37,7 @@ flowchart TD
 [Cloud runtime reference](../../wiki/platform/cloud-runtime-reference.md) and the
 [storage reference](../../wiki/platform/storage-reference.md).
 
-Mode diagrams: [Local mode](local-mode/README.md), [Cloud mode](cloud-mode/README.md),
-[Chrome extension](chrome-extension/README.md). The runtime mode is configuration and policy, not one
+Mode diagrams: [Local mode](local-mode/README.md), [Cloud mode](cloud-mode/README.md). The runtime mode is configuration and policy, not one
 `DeploymentMode` interface. `StorageProvider` and `workspaceAccessAdapter` carry what varies. See
 [deployment adapters](deployment-adapters.md).
 

@@ -44,7 +44,7 @@ import { DiffPanel } from '../features/item-workspace/DiffPanel';
 import { TreeNode } from '../features/item-workspace/FileTreeNode';
 import { EmptyDocumentState, StatusBadge } from '../features/item-workspace/ItemBadges';
 
-export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, workspaces, onBack, onContentChanged, allowEmbeddedAISessions = true }: { itemId: string; /** `run` shows the item's harness run whole, full width. */ view?: ItemView; onViewChange?: (view?: ItemView) => void; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onContentChanged?: () => void | Promise<void>; allowEmbeddedAISessions?: boolean }) {
+export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, workspaces, onBack, onContentChanged }: { itemId: string; /** `run` shows the item's harness run whole, full width. */ view?: ItemView; onViewChange?: (view?: ItemView) => void; refreshKey: number; workspaces: WorkspaceConfig[]; onBack: () => void; onContentChanged?: () => void | Promise<void> }) {
   const [plan, setPlan] = useState<ItemDetail | null>(null);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [metadataDraft, setMetadataDraft] = useState<ItemMetadataUpdateInput>({});
@@ -536,7 +536,7 @@ export function ItemWorkspacePage({ itemId, view, onViewChange, refreshKey, work
       )}
       {rightPanelTab === 'jira' && <JiraItemPanel itemId={itemId} />}
       {rightPanelTab === 'quality' && <ItemQualityPanel quality={quality} plan={plan} workspaceConfig={workspaceConfig} />}
-      {rightPanelTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={setAgentFocus} onError={setError} allowEmbedded={allowEmbeddedAISessions} harnessRun={harnessRun} mode={agentsMode} onModeChange={setAgentsMode} onLaunched={(result) => { void Promise.resolve(reloadAgents()).then(() => setAgentFocus({ kind: 'session', id: result.session.id })); }} />}
+      {rightPanelTab === 'agents' && <AgentsTab itemId={itemId} agents={agents} focus={agentFocus} onFocus={setAgentFocus} onError={setError} harnessRun={harnessRun} mode={agentsMode} onModeChange={setAgentsMode} onLaunched={(result) => { void Promise.resolve(reloadAgents()).then(() => setAgentFocus({ kind: 'session', id: result.session.id })); }} />}
       {error && (
         <div className="operation-error">
           <p className="error">{error}</p>

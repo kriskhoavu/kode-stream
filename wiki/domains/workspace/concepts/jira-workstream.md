@@ -30,7 +30,7 @@ The item belongs to the repository and follows its source-structure rules. Jira 
 <!-- chunkId: workspace-jira-workstream-ai-context -->
 <!-- keywords: Jira description, AI prompt, launch composer, explicit inclusion -->
 
-[live] When the person chooses it, the AI launch flow appends the Jira description to the prompt. Evidence: `web/src/features/ai-session/AISessionLaunchControl.tsx:77`.
+[live] When the person chooses it, the AI launch flow appends the Jira description to the prompt. Evidence: `web/src/features/ai-session/AISessionLaunchControl.tsx:73`.
 
 ## Not supported
 <!-- chunkId: workspace-jira-workstream-not-supported -->

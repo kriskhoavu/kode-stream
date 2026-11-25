@@ -78,24 +78,3 @@ classDiagram
   agentAccessAdapter ..|> workspaceAccessAdapter
   remoteSnapshotAdapter ..|> workspaceAccessAdapter
 ```
-
-## Chrome Extension Surface
-
-The extension only chooses the local API origin. It has no server-side runtime or workspace-access adapter.
-
-```mermaid
-classDiagram
-  direction LR
-
-  class ExtensionAPIOrigin {
-    <<module>>
-    +isExtensionSurface() bool
-    +localAPIOrigin() string
-    +apiURL(path) string
-  }
-  class LocalKodeStreamAPI {
-    <<HTTP API>>
-  }
-
-  ExtensionAPIOrigin --> LocalKodeStreamAPI : HTTP requests
-```

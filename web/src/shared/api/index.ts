@@ -11,7 +11,7 @@ import { verificationApi } from './verificationApi';
 import { workspaceApi } from './workspaceApi';
 import { workspaceFilesApi } from './workspaceFilesApi';
 
-export { ApiError, ApiResponseError, apiURL, isExtensionSurface, localAPIOrigin } from './http';
+export { ApiError, ApiResponseError } from './http';
 export { editableStatusOrder, statusLabels, statusOrder } from './statusLabels';
 
 export const api = {

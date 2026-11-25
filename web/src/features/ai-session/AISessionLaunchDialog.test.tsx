@@ -156,14 +156,6 @@ describe('AISessionLaunchDialog', () => {
 		await waitFor(() => expect(api.startEmbeddedAISession).toHaveBeenCalledWith('item-1', expect.objectContaining({ expectedWorkspaceId: 'workspace-1', expectedBranch: 'main', observedCommit: 'abc123', idempotencyKey: 'canvas-launch-1' })));
 	});
 
-	it('hides embedded sessions when embedded launch is disabled', async () => {
-		mockOptions();
-		render(<AISessionLaunchDialog itemId="item-1" allowEmbedded={false} preference={{ provider: 'codex', terminal: 'terminal', contextMode: 'card_context', surface: 'embedded' }} onClose={vi.fn()} onLaunched={vi.fn()} />);
-
-		expect(await screen.findByLabelText('Integrated terminal')).toBeChecked();
-		expect(screen.queryByLabelText('Embedded terminal')).not.toBeInTheDocument();
-	});
-
 	it('includes selected provider capabilities in the launch payload', async () => {
 		mockOptions();
 		vi.mocked(api.launchAISession).mockResolvedValue({ accepted: true, provider: 'codex', terminal: 'terminal', contextMode: 'card_context', startedAt: '2026-07-02T00:00:00Z' });

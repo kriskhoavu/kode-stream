@@ -7,6 +7,8 @@ vi.mock('../../shared/api', () => ({ api: {
   systemConfigPaths: vi.fn(), workspaceHealth: vi.fn(), testJiraConnection: vi.fn(), updateWorkspace: vi.fn()
 }, ApiError: class ApiError extends Error { recoveryHint?: string } }));
 
+vi.mock('../workstream/HarnessSettingsSection', () => ({ HarnessSettingsSection: () => null }));
+
 describe('workspace Jira settings', () => {
   afterEach(() => vi.clearAllMocks());
 
@@ -18,7 +20,7 @@ describe('workspace Jira settings', () => {
     vi.mocked(api.workspaceHealth).mockResolvedValue({ workspaceId: 'w1', checkedAt: '', summary: 'ok', checks: [] });
     if (ok) vi.mocked(api.testJiraConnection).mockResolvedValue({ ok: true, deploymentType: 'server', projectKey: 'DI', message });
     else vi.mocked(api.testJiraConnection).mockRejectedValue(new Error(message));
-    const { container } = render(<WorkspacesPage workspaces={[{ id: 'w1', name: 'Repo', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '', jira: { deploymentType: 'server', baseUrl: 'https://jira.example.com', projectKey: 'DI', tokenEnvVar: 'JIRA_PAT' } }]} onChanged={vi.fn()} showHarness={false} />);
+    const { container } = render(<WorkspacesPage workspaces={[{ id: 'w1', name: 'Repo', path: '/repo', baselineBranch: 'main', sources: ['plans'], createdAt: '', jira: { deploymentType: 'server', baseUrl: 'https://jira.example.com', projectKey: 'DI', tokenEnvVar: 'JIRA_PAT' } }]} onChanged={vi.fn()} />);
     expect(screen.queryByText('Token Environment Variable')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Integrations' }));
     fireEvent.click(within(screen.getByText('Jira').closest('.workspace-integration-card') as HTMLElement).getByRole('button', { name: 'Configure' }));

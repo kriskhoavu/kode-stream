@@ -1,5 +1,5 @@
 import type { EmbeddedAISessionResult, SafeSessionRecord, SessionChanges, HarnessAgentRun, HarnessApproval, HarnessCostSummary, HarnessDecision, HarnessRoleHealth, HarnessRoleId, HarnessRun, HarnessRunDetail, HarnessSettings, SettingsFilePart, SettingsFileView, HarnessStatus, HarnessCreateTaskInput, HarnessRunFileDiff, HarnessRunPlan, HarnessSourcePoll, HarnessTask, HarnessTranscript } from '../../lib/types';
-import { ApiError, apiURL, request } from './http';
+import { ApiError, request } from './http';
 import { normalizeHarnessTask, normalizeHarnessRunDetail, normalizeHarnessSettings } from './normalize';
 
 export const harnessApi = {
@@ -43,7 +43,7 @@ export const harnessApi = {
   settingsFile: (workspaceId: string, signal?: AbortSignal) => request<SettingsFileView>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings-file`, { signal }, !signal),
   exportSettingsFile: (workspaceId: string, parts: SettingsFilePart[]) => request<{ path: string; has: SettingsFilePart[] }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings-file/export`, { method: 'POST', body: JSON.stringify({ parts }) }, false),
   importSettingsFile: (workspaceId: string, parts: SettingsFilePart[]) => request<{ imported: SettingsFilePart[] }>(`/api/workspaces/${encodeURIComponent(workspaceId)}/settings-file/import`, { method: 'POST', body: JSON.stringify({ parts }) }, false),
-  harnessEventsURL: (lastEventId?: number) => apiURL(lastEventId ? `/api/harness/events?after=${lastEventId}` : '/api/harness/events')
+  harnessEventsURL: (lastEventId?: number) => lastEventId ? `/api/harness/events?after=${lastEventId}` : '/api/harness/events'
 };
 
 async function decideHarnessGate(approval: Pick<HarnessApproval, 'id' | 'revision'>, decision: HarnessDecision, idempotencyKey: string, reason?: string): Promise<HarnessApproval | undefined> {
